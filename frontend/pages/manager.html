@@ -6,18 +6,18 @@
   <title>Conecta Joias - Gestão Premium</title>
   
   <!-- PWA e Configurações Mobile -->
-  <link rel="manifest" href="manifest.json">
+  <link rel="manifest" href="../manifest.json">
   <meta name="theme-color" content="#d4af37">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="apple-touch-icon" href="assets/logo.svg">
+  <link rel="apple-touch-icon" href="../assets/logo.svg">
 
   <!-- SEO Meta Tags -->
   <meta name="description" content="Plataforma de gestão inteligente e precificação para vendedoras e revendedoras de semijoias. Controle de estoque, consignação e marketing integrado.">
   <meta name="author" content="Conecta Joias">
   
   <!-- CSS Principal -->
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="../css/style.css">
   
   <!-- FontAwesome para Ícones de Alta Qualidade -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -32,7 +32,7 @@
        ========================================== -->
   <!-- Barra Superior Mobile com Hambúrguer -->
   <div class="mobile-top-bar">
-    <img src="assets/logo.svg" alt="Conecta Joias" class="mobile-brand">
+    <img src="../assets/logo.svg" alt="Conecta Joias" class="mobile-brand">
     <button class="btn-mobile-toggle" id="btn-toggle-sidebar-mobile" onclick="app.toggleSidebarMobile()" aria-label="Abrir Menu">
       <i class="fa-solid fa-bars"></i>
     </button>
@@ -47,7 +47,7 @@
     <aside class="sidebar mobile-drawer">
       <div class="brand" style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 2.5rem; padding: 0 0.5rem;">
         <!-- Inclusão do logotipo SVG premium criado previamente -->
-        <img src="assets/logo.svg" alt="Conecta Joias" id="logo-brand" style="max-width: 140px; height: auto;">
+        <img src="../assets/logo.svg" alt="Conecta Joias" id="logo-brand" style="max-width: 140px; height: auto;">
         
         <!-- Sino de Notificações na Sidebar (Manager) -->
         <div id="notif-wrapper" style="position: relative; z-index: 100;">
@@ -2424,9 +2424,9 @@
   <!-- 2. Biblioteca Robusta de CSV (PapaParse) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <!-- 3. Funções de Manipulação do Excel/CSV -->
-  <script src="excel-handler.js"></script>
+  <script src="../js/excel-handler.js"></script>
   <!-- 3. Lógica do Aplicativo Principal -->
-  <script src="manager.js"></script>
+  <script src="../js/manager.js"></script>
 
   <!-- Script de Autolimpeza imperativa de Cache e Service Workers do Navegador -->
   <script>

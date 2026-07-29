@@ -3213,7 +3213,7 @@ const app = {
         alert(`Revendedora cadastrada com sucesso!\n\n🔑 PIN de Acesso: ${pinCriado}\n🔒 Senha: ${senhaInput}\n\nInforme esses dados para a revendedora acessar o aplicativo.`);
         
         if (confirm("Deseja enviar as credenciais de acesso para a revendedora via WhatsApp agora?")) {
-          const msgTexto = `Olá ${nome}, seja muito bem-vinda à nossa equipe! ✨ Seu cadastro de Consultora foi realizado com sucesso. Aqui estão suas credenciais para entrar no portal:\n\n🔑 Login (PIN): ${pinCriado}\n🔒 Senha Temporária: ${senhaInput}\n\n🔗 Link do portal: ${window.location.origin}/manager.html\n\nQualquer dúvida, estamos à disposição!`;
+          const msgTexto = `Olá ${nome}, seja muito bem-vinda à nossa equipe! ✨ Seu cadastro de Consultora foi realizado com sucesso. Aqui estão suas credenciais para entrar no portal:\n\n🔑 Login (PIN): ${pinCriado}\n🔒 Senha Temporária: ${senhaInput}\n\n🔗 Link do portal: ${window.location.origin}/pages/manager.html\n\nQualquer dúvida, estamos à disposição!`;
           const phoneClean = whatsapp.replace(/\D/g, "");
           const waUrl = `https://api.whatsapp.com/send?phone=55${phoneClean}&text=${encodeURIComponent(msgTexto)}`;
           window.open(waUrl, "_blank");
@@ -4258,7 +4258,7 @@ const app = {
           .replace("{valor_liquido}", valorLiquido.toFixed(2).replace(".", ","));
 
         if (resp && resp.acerto && resp.acerto.id) {
-          mensagemTemplate += `\n\n🔗 *Visualizar Recibo e PDF:* ${window.location.origin}/recibo.html?id=${resp.acerto.id}`;
+          mensagemTemplate += `\n\n🔗 *Visualizar Recibo e PDF:* ${window.location.origin}/pages/recibo.html?id=${resp.acerto.id}`;
         }
 
         const whatsLink = `https://api.whatsapp.com/send?phone=55${rev.whatsapp.replace(/\D/g, '')}&text=${encodeURIComponent(mensagemTemplate)}`;

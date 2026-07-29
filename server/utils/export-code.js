@@ -17,7 +17,7 @@ const fs   = require('fs');
 const path = require('path');
 
 // ─── Configurações ───────────────────────────────────────────
-const ROOT        = __dirname;
+const ROOT        = path.join(__dirname, '..', '..');
 const OUTPUT_DIR  = path.join(ROOT, 'gemini_export');
 const MAX_BYTES   = 900_000; // ~900 KB por arquivo (limite seguro do Gemini)
 
@@ -73,7 +73,7 @@ FLUXO DE HERANÇA DE CORES:
   2. Cores salvas no localStorage ANTES de redirecionar
   3. manager.html carrega as cores corretas desde o início
 `,
-    arquivos: ['index.html', 'login.js']
+    arquivos: ['frontend/index.html', 'frontend/js/login.js']
   },
   {
     nome: '03_FRONTEND_admin',
@@ -98,7 +98,7 @@ CONFIGURAÇÕES VISUAIS:
   - Ao salvar, o PUT /api/config atualiza o banco de dados
   - As revendedoras herdam essas configurações automaticamente
 `,
-    arquivos: ['superadmin.html', 'superadmin.js', 'superadmin-vendas.js', 'superadmin-tour.js']
+    arquivos: ['frontend/pages/superadmin.html', 'frontend/js/superadmin.js', 'frontend/js/superadmin-vendas.js', 'frontend/js/superadmin-tour.js']
   },
   {
     nome: '04_FRONTEND_revendedora',
@@ -125,7 +125,7 @@ RESTRIÇÕES DE PERFIL:
   - Menus de estoque, dashboard, marketing ficam ocultos
   - Apenas "Minha Maleta" e "Clientes" são visíveis
 `,
-    arquivos: ['manager.html', 'manager.js', 'marketing-data.js']
+    arquivos: ['frontend/pages/manager.html', 'frontend/js/manager.js', 'frontend/js/marketing-data.js']
   },
   {
     nome: '05_FRONTEND_estilos',
@@ -157,7 +157,7 @@ COMPONENTES:
   - Toasts de notificação
   - Botões com gradiente dourado
 `,
-    arquivos: ['style.css']
+    arquivos: ['frontend/css/style.css']
   },
   {
     nome: '06_SAAS_admin',
@@ -177,7 +177,7 @@ ROLES:
   - Manager acessa superadmin.html (painel da sua loja)
   - Consultant acessa manager.html (maleta da revendedora)
 `,
-    arquivos: ['saasadmin.html', 'saasadmin.js']
+    arquivos: ['frontend/pages/saasadmin.html', 'frontend/js/saasadmin.js']
   },
   {
     nome: '07_PAGAMENTO_onboarding',
@@ -189,7 +189,7 @@ Módulos auxiliares:
 - onboarding.html/js: wizard de configuração inicial da loja
 - termo_assinatura.html/js: assinatura digital de termos de consignação
 `,
-    arquivos: ['pagamento.html', 'pagamento.js', 'onboarding.html', 'onboarding.js', 'termo_assinatura.html', 'termo_assinatura.js']
+    arquivos: ['frontend/pages/pagamento.html', 'frontend/js/pagamento.js', 'frontend/pages/onboarding.html', 'frontend/js/onboarding.js', 'frontend/pages/termo_assinatura.html', 'frontend/js/termo_assinatura.js']
   }
 ];
 

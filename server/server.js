@@ -220,10 +220,10 @@ app.use((req, res, next) => {
 
 // Forçar a rota raiz '/' a servir a Landing Page apresentacao.html
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'apresentacao.html'));
+  res.sendFile(path.join(__dirname, '..', 'frontend', 'pages', 'apresentacao.html'));
 });
 
-app.use(express.static(path.join(__dirname, '..')));
+app.use(express.static(path.join(__dirname, '..', 'frontend')));
 
 // Configuração do Multer para Imagens em Memória
 const storage = multer.memoryStorage();
@@ -741,7 +741,7 @@ app.post('/api/auth/register', autenticarJWT, autorizarRole(['Manager', 'SuperAd
 
     // Se o usuário criado for uma consultora (revendedora), cria mensagem de boas-vindas na fila do WhatsApp
     if (normalizedRole === 'Consultant') {
-      const msgTexto = `Olá ${nome}, seja muito bem-vinda à Conecta Joias! ✨ Seu cadastro de Consultora foi realizado com sucesso. Aqui estão suas credenciais para entrar no portal: Login (PIN): ${pin} | Senha Temporária: ${senha} | Link do portal: ${frontendUrl}/manager.html`;
+      const msgTexto = `Olá ${nome}, seja muito bem-vinda à Conecta Joias! ✨ Seu cadastro de Consultora foi realizado com sucesso. Aqui estão suas credenciais para entrar no portal: Login (PIN): ${pin} | Senha Temporária: ${senha} | Link do portal: ${frontendUrl}/pages/manager.html`;
       try {
         await prisma.mensagemWhatsapp.create({
           data: {
@@ -1850,7 +1850,7 @@ app.post('/api/acertos', autenticarJWT, autorizarRole(['Manager', 'SuperAdmin'])
 
       // Enviar mensagem de WhatsApp ao realizar acerto de contas (criar na fila) se houver número cadastrado
       if (revendedora.whatsapp) {
-        const msgTexto = `Olá ${revendedora.nome}! Seu acerto de contas da Conecta Joias foi concluído com sucesso. Resumo do acerto: Faturamento Bruto: R$ ${faturamentoBruto.toFixed(2)} | Comissão Devida: R$ ${comissaoPaga.toFixed(2)} | Retido em Mãos: R$ ${totalRetidoRev.toFixed(2)} | Saldo Final: R$ ${Math.abs(saldoFinal).toFixed(2)} (${saldoFinal >= 0 ? 'A receber da Conecta Joias' : 'A repassar para a Conecta Joias'}). Visualizar Recibo Completo e PDF: ${frontendUrl}/recibo.html?id=${acerto.id}`;
+        const msgTexto = `Olá ${revendedora.nome}! Seu acerto de contas da Conecta Joias foi concluído com sucesso. Resumo do acerto: Faturamento Bruto: R$ ${faturamentoBruto.toFixed(2)} | Comissão Devida: R$ ${comissaoPaga.toFixed(2)} | Retido em Mãos: R$ ${totalRetidoRev.toFixed(2)} | Saldo Final: R$ ${Math.abs(saldoFinal).toFixed(2)} (${saldoFinal >= 0 ? 'A receber da Conecta Joias' : 'A repassar para a Conecta Joias'}). Visualizar Recibo Completo e PDF: ${frontendUrl}/pages/recibo.html?id=${acerto.id}`;
 
         await tx.mensagemWhatsapp.create({
           data: {
@@ -2277,7 +2277,7 @@ app.post('/api/vendas-revendedora', autenticarJWT, autorizarRole(['Consultant'])
     let linkSimulado = null;
     if (isLink) {
       const linkId = Math.random().toString(36).substring(2, 15);
-      linkSimulado = `${frontendUrl}/pagamento.html?id=${linkId}`;
+      linkSimulado = `${frontendUrl}/pages/pagamento.html?id=${linkId}`;
 
       await prisma.linkPagamento.create({
         data: {
@@ -3187,7 +3187,7 @@ app.post('/api/public/onboarding', signupLimiter, uploadDocs.fields([
     }
 
     // Criar mensagem de boas-vindas na fila do WhatsApp
-    const mensagemTexto = `Olá ${nome}, seja muito bem-vinda à Conecta Joias! ✨ Seu cadastro de Consultora foi realizado com sucesso. Aqui estão suas credenciais para entrar no portal: Login (PIN): ${pin} | Senha Temporária: ${senhaProvisoria} | Link do portal: ${frontendUrl}/manager.html`;
+    const mensagemTexto = `Olá ${nome}, seja muito bem-vinda à Conecta Joias! ✨ Seu cadastro de Consultora foi realizado com sucesso. Aqui estão suas credenciais para entrar no portal: Login (PIN): ${pin} | Senha Temporária: ${senhaProvisoria} | Link do portal: ${frontendUrl}/pages/manager.html`;
 
     await prisma.mensagemWhatsapp.create({
       data: {
@@ -3263,7 +3263,7 @@ app.post('/api/pagamentos/link', autenticarJWT, identificarLoja, async (req, res
 
   try {
     const linkId = Math.random().toString(36).substring(2, 15);
-    const linkSimulado = `${frontendUrl}/pagamento.html?id=${linkId}`;
+    const linkSimulado = `${frontendUrl}/pages/pagamento.html?id=${linkId}`;
 
     const link = await prisma.linkPagamento.create({
       data: {

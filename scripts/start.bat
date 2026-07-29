@@ -5,10 +5,10 @@ echo           INICIANDO CONECTA JOIAS (LOCAL)
 echo ==========================================================
 echo.
 echo [1/3] Iniciando o servidor do Banco de Dados (Backend) na porta 5000...
-start "Conecta Joias Backend" cmd /c "cd server && npm run dev"
+start "Conecta Joias Backend" cmd /c "cd ../server && npm run dev"
 
 echo [2/3] Iniciando o servidor Web (Frontend) na porta 8080...
-start "Conecta Joias Frontend" cmd /c "npx http-server -p 8080 -c-1"
+start "Conecta Joias Frontend" cmd /c "cd ../frontend && npx http-server -p 8080 -c-1"
 
 echo [3/3] Aguardando inicializacao e abrindo o sistema no navegador...
 timeout /t 3 /nobreak >nul
