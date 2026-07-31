@@ -2,30 +2,29 @@
 node_modules/
 server/node_modules/
 
-# Bancos de Dados Locais (Criados dinamicamente no PC)
+# Bancos de Dados Locais
 *.db
 *.db-journal
 server/dev.db
 server/dev.db-journal
 
-# Credenciais e Variáveis de Ambiente locais (Segurança)
+# Credenciais e Variáveis de Ambiente locais
 .env
 server/.env
 
-# Arquivos temporários e do Sistema Operacional
+# Arquivos temporários de upload e imagens binárias
+server/uploads/
+uploads/
+*.jpeg
+*.jpg
+*.png
+
+# Arquivos temporários do Sistema Operacional e IDE
 .DS_Store
 Thumbs.db
 Desktop.ini
-
-# Configurações locais da IDE
 .vscode/
 
-# Scripts de debug/manutenção local (não fazem parte do produto)
-server/check_db.js
-server/limpar_para_teste.js
-
-# Pasta de exportação gerada (gerada pelo export-code.js)
-gemini_export/
-
-# Arquivo de código exportado antigo
+# Arquivo de dump monolítico pesado (evita duplicar código no import do Gemini)
 codigo_conecta_joias.md
+gemini_export/
