@@ -553,6 +553,7 @@ const app = {
       // Perfil Revendedora: Carregamento hiper-otimizado em PARALELO (Promise.all)
       await Promise.all([
         this.carregarConfiguracaoAPI(),
+        this.carregarProdutosDaAPI(),
         this.carregarMaletaPropriaDaAPI(),
         this.carregarVendasRevendedora(),
         this.carregarClientesDaAPI(),
@@ -573,6 +574,7 @@ const app = {
       }
       this.carregarPreferenciaPagamento();
       this.checarTermosPendentes();
+      this.checarRgObrigatorio();
     }
     
     // Inicializa o sistema de notificações
@@ -725,6 +727,9 @@ const app = {
       const faixas = res && res.faixasComissao ? res.faixasComissao : [];
       const config = res && res.config ? res.config : {};
 
+      // Salva o total de vendas do ciclo atual vindas do backend (vendas já persistidas)
+      this.state.totalVendidoCiclo = res && typeof res.totalVendidoCiclo === 'number' ? res.totalVendidoCiclo : 0;
+
       this.state.revendedoras = [{
         id: this.state.usuarioLogado.id,
         nome: this.state.usuarioLogado.nome,
@@ -742,11 +747,15 @@ const app = {
         periodoAcumulo: config.periodoAcumulo || "MANUAL"
       }];
       this.state.revendedoraSelecionadaId = this.state.usuarioLogado.id;
+
+      // Atualiza a barra de comissão imediatamente após carregar os dados
+      this.atualizarProgressaoComissaoVendedora();
     } catch (error) {
       console.warn("Falha ao obter maleta própria da API:", error.message);
       this.carregarDadosDoLocalStorage();
     }
   },
+
 
   carregarVendasRevendedora: async function() {
     const offlineMode = this.state.token && this.state.token.startsWith("mock_");
@@ -859,8 +868,13 @@ const app = {
   atualizarProgressaoComissaoVendedora: function() {
     const card = document.getElementById("vendedora-progressao-card");
     const progressBar = document.getElementById("vendedora-progressao-barra");
+    const indicador = document.getElementById("vendedora-progressao-indicador");
     const statusText = document.getElementById("vendedora-proxima-faixa-status");
     const infoText = document.getElementById("vendedora-progressao-info");
+    const tituloEl = document.getElementById("vendedora-comissao-titulo");
+    const subtituloEl = document.getElementById("vendedora-comissao-subtitulo");
+    const iconeEl = document.getElementById("vendedora-comissao-icone");
+    const marcadoresEl = document.getElementById("vendedora-faixas-marcadores");
 
     if (!card) return;
 
@@ -870,69 +884,123 @@ const app = {
       return;
     }
 
-    // Calcula o total de vendas pendentes no período atual
-    let totalVendidoPeriodo = 0;
+    // Calcula o total vendido no período:
+    // = Vendas já persistidas no banco (ciclo atual) + Vendas registradas na sessão ainda não sincronizadas
+    const totalVendidoCicloAPI = this.state.totalVendidoCiclo || 0;
+    let totalVendidoPendente = 0;
     const vendasPendentes = this.state.vendasPendentes || [];
     vendasPendentes.forEach(v => {
-      totalVendidoPeriodo += Number(v.precoVenda || 0) * Number(v.quantidade || 1);
+      totalVendidoPendente += Number(v.precoVenda || 0) * Number(v.quantidade || 1);
     });
+    const totalVendidoPeriodo = totalVendidoCicloAPI + totalVendidoPendente;
+
+    // Utilitário para formatar moeda
+    const fmt = (v) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    // Utilitário para atualizar posição do indicador e da barra
+    const setPct = (pct) => {
+      const p = Math.min(100, Math.max(0, pct));
+      progressBar.style.width = `${p}%`;
+      if (indicador) indicador.style.left = `${p}%`;
+    };
+
+    // Limpa marcadores de faixas anteriores e oculta-os
+    if (marcadoresEl) {
+      marcadoresEl.innerHTML = "";
+      marcadoresEl.style.display = "none";
+    }
 
     card.style.display = "block";
 
-    // Cenário 1: COMISSÃO FIXA
+    // ========================================================
+    // TIPO 1: COMISSÃO FIXA
+    // ========================================================
     if (!rev.tipoComissao || rev.tipoComissao === "FIXA") {
-      // Para comissão fixa, mostramos o progresso de vendas em relação ao valor total da maleta (consignado + vendido)
+      if (tituloEl) tituloEl.innerText = "Sua Comissão Fixa";
+      if (subtituloEl) subtituloEl.innerText = "Seu percentual é fixo. A barra mostra quanto da maleta já foi vendido.";
+      if (iconeEl) iconeEl.innerHTML = '<i class="fa-solid fa-tag"></i>';
+
+      // Barra mostra % da maleta vendida
       let totalConsignadoRestante = 0;
       const consignados = rev.consignado || [];
       consignados.forEach(c => {
         totalConsignadoRestante += Number(c.precoVenda || 0) * Number(c.quantidadeConsignada || 0);
       });
-
       const totalMaletaOriginal = totalVendidoPeriodo + totalConsignadoRestante;
-      const pct = totalMaletaOriginal > 0 ? Math.min(100, Math.max(0, (totalVendidoPeriodo / totalMaletaOriginal) * 100)) : 0;
-      
-      progressBar.style.width = `${pct}%`;
-      statusText.innerHTML = `Comissão Fixa: <strong>${rev.comissao || 30}%</strong>`;
-      infoText.innerHTML = `Você já vendeu <strong>R$ ${totalVendidoPeriodo.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> do total de <strong>R$ ${totalMaletaOriginal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> da sua maleta atual (<strong>${pct.toFixed(1)}%</strong> da maleta vendida).`;
+      const pct = totalMaletaOriginal > 0 ? (totalVendidoPeriodo / totalMaletaOriginal) * 100 : 0;
+
+      setPct(pct);
+
+      // Badge azul/neutro para comissão fixa
+      statusText.style.background = "rgba(66, 165, 245, 0.12)";
+      statusText.style.color = "#64b5f6";
+      statusText.style.borderColor = "rgba(66, 165, 245, 0.25)";
+      statusText.innerHTML = `<i class="fa-solid fa-tag"></i> Comissão Fixa: <strong>${rev.comissao || 30}%</strong>`;
+
+      const valorComissao = totalVendidoPeriodo * ((rev.comissao || 30) / 100);
+      infoText.innerHTML = `Você já vendeu <strong>R$ ${fmt(totalVendidoPeriodo)}</strong> de <strong>R$ ${fmt(totalMaletaOriginal)}</strong> da maleta (<strong>${pct.toFixed(1)}%</strong>). Sua comissão até agora: <strong style="color: #81c784;">R$ ${fmt(valorComissao)}</strong>.`;
       return;
     }
 
-    // Cenário 2: META ÚNICA
+    // ========================================================
+    // TIPO 2: META ÚNICA
+    // ========================================================
     if (rev.tipoComissao === "META_UNICA") {
       const meta = rev.metaUnicaValor || 5000;
       const bonus = rev.metaUnicaBonus || 5;
       const tipoBonus = rev.metaUnicaTipoBonus || "PERCENTUAL";
-      
+
+      if (tituloEl) tituloEl.innerText = "Sua Meta de Comissão";
+      if (subtituloEl) subtituloEl.innerText = "Atinja a meta de faturamento para liberar seu bônus!";
+      if (iconeEl) iconeEl.innerHTML = '<i class="fa-solid fa-trophy"></i>';
+
       const atingiu = totalVendidoPeriodo >= meta;
-      const pct = Math.min(100, Math.max(0, (totalVendidoPeriodo / meta) * 100));
-      progressBar.style.width = `${pct}%`;
+      const pct = (totalVendidoPeriodo / meta) * 100;
+      setPct(pct);
 
       if (atingiu) {
-        statusText.innerHTML = `Meta Atingida! <strong>Parabéns!</strong>`;
+        // Badge verde para meta atingida
+        statusText.style.background = "rgba(129, 199, 132, 0.15)";
+        statusText.style.color = "#81c784";
+        statusText.style.borderColor = "rgba(129, 199, 132, 0.3)";
+        statusText.innerHTML = `<i class="fa-solid fa-circle-check"></i> Meta Atingida! Parabéns!`;
         if (tipoBonus === "PERCENTUAL") {
-          infoText.innerHTML = `<strong style="color: #81c784;"><i class="fa-solid fa-crown"></i> Meta de R$ ${meta.toLocaleString('pt-BR', {minimumFractionDigits: 2})} Superada!</strong> Sua comissão neste acerto subiu para <strong>${Number(rev.comissao || 30) + bonus}%</strong> (+${bonus}% de bônus).`;
+          infoText.innerHTML = `<strong style="color: #81c784;"><i class="fa-solid fa-crown"></i> Meta de R$ ${fmt(meta)} Superada!</strong> Sua comissão neste acerto subiu para <strong>${Number(rev.comissao || 30) + bonus}%</strong> (+${bonus}% de bônus).`;
         } else {
-          infoText.innerHTML = `<strong style="color: #81c784;"><i class="fa-solid fa-crown"></i> Meta de R$ ${meta.toLocaleString('pt-BR', {minimumFractionDigits: 2})} Superada!</strong> Você garantiu um bônus extra de <strong>R$ ${bonus.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> em dinheiro além da comissão de ${rev.comissao || 30}%.`;
+          infoText.innerHTML = `<strong style="color: #81c784;"><i class="fa-solid fa-crown"></i> Meta de R$ ${fmt(meta)} Superada!</strong> Você garantiu um bônus extra de <strong>R$ ${fmt(bonus)}</strong> além da comissão de ${rev.comissao || 30}%.`;
         }
       } else {
         const faltam = meta - totalVendidoPeriodo;
-        statusText.innerHTML = `Meta de Vendas: <strong>R$ ${meta.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong>`;
+        // Badge dourado para meta pendente
+        statusText.style.background = "rgba(212, 175, 55, 0.12)";
+        statusText.style.color = "var(--gold-primary)";
+        statusText.style.borderColor = "rgba(212, 175, 55, 0.25)";
+        statusText.innerHTML = `<i class="fa-solid fa-trophy"></i> Meta: <strong>R$ ${fmt(meta)}</strong>`;
         if (tipoBonus === "PERCENTUAL") {
-          infoText.innerHTML = `Você vendeu <strong>R$ ${totalVendidoPeriodo.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong>. Faltam <strong style="color: var(--gold-primary);">R$ ${faltam.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> para atingir a meta e ganhar <strong>+${bonus}%</strong> de comissão!`;
+          infoText.innerHTML = `Você vendeu <strong>R$ ${fmt(totalVendidoPeriodo)}</strong> (${pct.toFixed(1)}%). Faltam <strong style="color: var(--gold-primary);">R$ ${fmt(faltam)}</strong> para atingir a meta e ganhar <strong>+${bonus}%</strong> de comissão!`;
         } else {
-          infoText.innerHTML = `Você vendeu <strong>R$ ${totalVendidoPeriodo.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong>. Faltam <strong style="color: var(--gold-primary);">R$ ${faltam.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> para atingir a meta e ganhar um bônus extra de <strong>R$ ${bonus.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong>!`;
+          infoText.innerHTML = `Você vendeu <strong>R$ ${fmt(totalVendidoPeriodo)}</strong> (${pct.toFixed(1)}%). Faltam <strong style="color: var(--gold-primary);">R$ ${fmt(faltam)}</strong> para atingir a meta e ganhar um bônus extra de <strong>R$ ${fmt(bonus)}</strong>!`;
         }
       }
       return;
     }
 
-    // Cenário 3: COMISSÃO PROGRESSIVA
+    // ========================================================
+    // TIPO 3: COMISSÃO PROGRESSIVA
+    // ========================================================
     if (rev.tipoComissao === "PROGRESSIVA") {
+      if (tituloEl) tituloEl.innerText = "Sua Comissão Progressiva";
+      if (subtituloEl) subtituloEl.innerText = "Aumente suas vendas para ganhar comissões maiores!";
+      if (iconeEl) iconeEl.innerHTML = '<i class="fa-solid fa-crown"></i>';
+
       const faixas = rev.faixasComissao || [];
       if (faixas.length === 0) {
-        progressBar.style.width = "0%";
-        statusText.innerHTML = `Sua Comissão: <strong>${rev.comissao || 30}%</strong>`;
-        infoText.innerHTML = `Você já vendeu <strong>R$ ${totalVendidoPeriodo.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> no acerto atual. Nenhuma faixa progressiva cadastrada.`;
+        setPct(0);
+        statusText.style.background = "rgba(212, 175, 55, 0.12)";
+        statusText.style.color = "var(--gold-primary)";
+        statusText.style.borderColor = "rgba(212, 175, 55, 0.25)";
+        statusText.innerHTML = `<i class="fa-solid fa-crown"></i> Comissão: <strong>${rev.comissao || 30}%</strong>`;
+        infoText.innerHTML = `Você já vendeu <strong>R$ ${fmt(totalVendidoPeriodo)}</strong> no acerto atual. Nenhuma faixa progressiva cadastrada.`;
         return;
       }
 
@@ -961,24 +1029,60 @@ const app = {
         }
       }
 
-      statusText.innerHTML = `Sua Comissão Atual: <strong>${percentualAtual}%</strong>`;
+      // Badge dourado para progressiva
+      statusText.style.background = "rgba(212, 175, 55, 0.12)";
+      statusText.style.color = "var(--gold-primary)";
+      statusText.style.borderColor = "rgba(212, 175, 55, 0.25)";
+      statusText.innerHTML = `<i class="fa-solid fa-crown"></i> Sua Comissão Atual: <strong>${percentualAtual}%</strong>`;
+
+      // ---- Renderizar marcadores de faixas sobre a barra ----
+      if (marcadoresEl && proximaFaixa) {
+        marcadoresEl.style.display = "block";
+        marcadoresEl.innerHTML = "";
+
+        // Determina o valor total do range da barra para posicionar os pips
+        const valorBase = faixaAtual ? faixaAtual.valorMin : 0;
+        const totalNecessario = proximaFaixa.valorMin - valorBase;
+
+        faixas.forEach((f, idx) => {
+          // Só mostra o pip da próxima faixa (valor de destino)
+          if (f.valorMin <= valorBase) return;
+          if (f.valorMin > proximaFaixa.valorMin) return;
+
+          const posRelativa = totalNecessario > 0 ? Math.min(100, ((f.valorMin - valorBase) / totalNecessario) * 100) : 100;
+          const pip = document.createElement("div");
+          pip.className = "faixa-pip";
+          pip.style.left = `${posRelativa}%`;
+          pip.title = `R$ ${fmt(f.valorMin)} → ${f.percentual}%`;
+          pip.innerHTML = `<div class="faixa-pip-line"></div><div class="faixa-pip-label">${f.percentual}%</div>`;
+          marcadoresEl.appendChild(pip);
+        });
+      } else if (marcadoresEl) {
+        marcadoresEl.style.display = "none";
+      }
 
       if (proximaFaixa) {
         const faltamParaProxima = proximaFaixa.valorMin - totalVendidoPeriodo;
         const valorBase = faixaAtual ? faixaAtual.valorMin : 0;
         const totalNecessario = proximaFaixa.valorMin - valorBase;
         const progresso = totalVendidoPeriodo - valorBase;
-        const pct = Math.min(100, Math.max(0, (progresso / totalNecessario) * 100));
+        const pct = totalNecessario > 0 ? (progresso / totalNecessario) * 100 : 0;
 
-        progressBar.style.width = `${pct}%`;
-        infoText.innerHTML = `Você já vendeu <strong>R$ ${totalVendidoPeriodo.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> no acerto atual. Faltam <strong style="color: var(--gold-primary);">R$ ${faltamParaProxima.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> para você atingir a comissão de <strong>${proximaFaixa.percentual}%</strong>!`;
+        setPct(pct);
+        infoText.innerHTML = `Você já vendeu <strong>R$ ${fmt(totalVendidoPeriodo)}</strong> no acerto atual. Faltam <strong style="color: var(--gold-primary);">R$ ${fmt(faltamParaProxima)}</strong> para você atingir a comissão de <strong>${proximaFaixa.percentual}%</strong>!`;
       } else {
-        // Última faixa atingida! Progresso em 100%
-        progressBar.style.width = "100%";
-        infoText.innerHTML = `<strong style="color: #81c784;"><i class="fa-solid fa-crown"></i> Faixa Máxima Atingida (${percentualAtual}%)!</strong> Você já vendeu <strong>R$ ${totalVendidoPeriodo.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> no acerto atual. Parabéns pelo excelente resultado!`;
+        // Última faixa atingida!
+        setPct(100);
+        // Badge verde para máximo atingido
+        statusText.style.background = "rgba(129, 199, 132, 0.15)";
+        statusText.style.color = "#81c784";
+        statusText.style.borderColor = "rgba(129, 199, 132, 0.3)";
+        statusText.innerHTML = `<i class="fa-solid fa-crown"></i> Comissão Máxima: <strong>${percentualAtual}%</strong> 🎉`;
+        infoText.innerHTML = `<strong style="color: #81c784;"><i class="fa-solid fa-crown"></i> Faixa Máxima Atingida (${percentualAtual}%)!</strong> Você já vendeu <strong>R$ ${fmt(totalVendidoPeriodo)}</strong> no acerto atual. Parabéns pelo excelente resultado!`;
       }
     }
   },
+
 
   renderizarHistoricoVendasRev: function() {
     const tbody = document.getElementById("tbody-vendas-revendedora");
@@ -1396,6 +1500,8 @@ const app = {
       this.state.vendasSessao.unshift(resp.venda);
       if (!this.state.vendasPendentes) this.state.vendasPendentes = [];
       this.state.vendasPendentes.unshift(resp.venda);
+      // Atualiza barra de comissão em tempo real após nova venda
+      this.atualizarProgressaoComissaoVendedora();
 
       // Fecha modal e renderiza
       document.getElementById("modal-venda-rev").classList.remove("active");
@@ -1685,6 +1791,8 @@ const app = {
           this.state.vendasSessao.unshift(novaVenda);
           if (!this.state.vendasPendentes) this.state.vendasPendentes = [];
           this.state.vendasPendentes.unshift(novaVenda);
+          // Atualiza barra de comissão em tempo real após nova venda (modo offline)
+          this.atualizarProgressaoComissaoVendedora();
 
           // Salva estado local no LocalStorage
           const localVendasKey = `conectajoias_vendas_${this.state.usuarioLogado.id}`;
@@ -1720,6 +1828,8 @@ const app = {
               this.state.vendasSessao.unshift(resp.venda);
               if (!this.state.vendasPendentes) this.state.vendasPendentes = [];
               this.state.vendasPendentes.unshift(resp.venda);
+              // Atualiza barra de comissão em tempo real após nova venda (carrinho/API)
+              this.atualizarProgressaoComissaoVendedora();
 
               // Atualiza maleta local com o valor da API
               const idx = rev.consignado.findIndex(c => c.produtoVariacaoId === item.produtoVariacaoId || c.produtoId === item.produtoVariacaoId);
@@ -2122,6 +2232,12 @@ const app = {
     }
     if (tabId === "treinamento-demand") {
       this.carregarTreinamentosVendedora();
+    }
+    if (tabId === "termos-maleta") {
+      this.carregarTermosProprios();
+    }
+    if (tabId === "cofre-virtual") {
+      this.carregarCofreVirtualProprio();
     }
   },
 
@@ -6105,10 +6221,39 @@ ${dinheiroAReceberDaRev >= comissaoApagarParaRev
     // Carrega na inicialização
     this.carregarNotificacoes();
 
-    // Polling a cada 2 minutos
-    this._notifInterval = setInterval(() => {
-      this.carregarNotificacoes();
-    }, 2 * 60 * 1000);
+    const offlineMode = this.state.token && this.state.token.startsWith("mock_");
+    if (!offlineMode) {
+      try {
+        const baseUrl = this.state.apiUrl || "http://localhost:5000/api";
+        const sseUrl = `${baseUrl.replace('/api', '')}/api/realtime/notificacoes?token=${encodeURIComponent(this.state.token)}`;
+        const eventSource = new EventSource(sseUrl);
+        eventSource.onmessage = (event) => {
+          try {
+            const dataObj = JSON.parse(event.data);
+            if (dataObj.tipo === "notificacao") {
+              this._notificacoes.unshift(dataObj.data);
+              this._atualizarSinoBadge();
+              if (this._notifAberto) this._renderizarListaNotificacoes();
+              this.toast(`🔔 Nova Notificação: ${dataObj.data.mensagem}`, "info");
+            }
+          } catch (err) {
+            console.error("Erro ao decodificar notificação SSE:", err);
+          }
+        };
+        eventSource.onerror = (err) => {
+          console.warn("Erro no canal SSE do manager, tentando reconectar via EventSource.");
+        };
+      } catch (sseErr) {
+        console.warn("Falha ao abrir canal SSE, usando fallback de polling:", sseErr);
+        this._notifInterval = setInterval(() => {
+          this.carregarNotificacoes();
+        }, 1 * 60 * 1000);
+      }
+    } else {
+      this._notifInterval = setInterval(() => {
+        this.carregarNotificacoes();
+      }, 2 * 60 * 1000);
+    }
 
     // Fecha painel ao clicar fora
     document.addEventListener('click', (e) => {
@@ -6420,6 +6565,206 @@ ${dinheiroAReceberDaRev >= comissaoApagarParaRev
       btn.innerHTML = '<i class="fa-solid fa-pen"></i>';
       btn.title = "Personalizar Painel";
       this.toast("Personalização do painel salva com sucesso! ✨", "success");
+    }
+  },
+
+  // 13. SISTEMA DE SEGURANÇA E COFRE VIRTUAL DA CONSULTORA
+  checarRgObrigatorio: async function() {
+    if (this.state.token && this.state.token.startsWith("mock_")) {
+      return;
+    }
+
+    try {
+      const res = await this.requisitarAPI(`/usuarios/${this.state.usuarioLogado.id}/documentos`);
+      const docs = res && res.documentos ? res.documentos : [];
+      
+      const temFrente = docs.some(d => d.tipo === "RG_FRENTE");
+      const temVerso = docs.some(d => d.tipo === "RG_VERSO");
+      
+      const modal = document.getElementById("modal-upload-rg-obrigatorio");
+      if (modal) {
+        if (!temFrente || !temVerso) {
+          modal.style.display = "flex";
+        } else {
+          modal.style.display = "none";
+        }
+      }
+    } catch (e) {
+      console.error("Erro ao checar RG obrigatório:", e);
+    }
+  },
+
+  enviarRgObrigatorio: async function(event) {
+    event.preventDefault();
+    const btn = document.getElementById("btn-submit-rg-obrigatorio");
+    const inputFrente = document.getElementById("rg-frente-file");
+    const inputVerso = document.getElementById("rg-verso-file");
+
+    if (!inputFrente || !inputVerso || !inputFrente.files[0] || !inputVerso.files[0]) {
+      this.toast("Por favor, selecione ambos os arquivos (frente e verso).", "warning");
+      return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando documentos...';
+
+    const formData = new FormData();
+    formData.append("rgFrente", inputFrente.files[0]);
+    formData.append("rgVerso", inputVerso.files[0]);
+
+    try {
+      const response = await fetch(`${this.state.apiUrl}/usuarios/documentos/upload`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${this.state.token}`
+        },
+        body: formData
+      });
+
+      const res = await response.json();
+      if (!response.ok) {
+        throw new Error(res.error || "Erro no upload.");
+      }
+
+      this.toast("Fotos do RG salvas com sucesso no cofre!", "success");
+      document.getElementById("modal-upload-rg-obrigatorio").style.display = "none";
+      
+      if (this.state.abaAtiva === "cofre-virtual") {
+        this.carregarCofreVirtualProprio();
+      }
+    } catch (e) {
+      this.toast("Erro ao enviar documentos: " + e.message, "error");
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-upload"></i> Salvar no Cofre Virtual e Entrar';
+    }
+  },
+
+  carregarTermosProprios: async function() {
+    const tbody = document.getElementById("tbody-termos-maleta-consultora");
+    if (!tbody) return;
+
+    try {
+      let termos = [];
+      if (this.state.token && !this.state.token.startsWith("mock_")) {
+        termos = await this.requisitarAPI("/termos");
+      } else {
+        termos = JSON.parse(localStorage.getItem("conectajoias_termos_mock") || "[]");
+        termos = termos.filter(t => t.usuarioId === (this.state.usuarioLogado ? this.state.usuarioLogado.id : "default"));
+      }
+
+      if (termos.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 2rem;">Nenhum termo de consignação gerado ainda.</td></tr>`;
+      } else {
+        tbody.innerHTML = termos.map(t => {
+          const statusCor = t.status === "PENDENTE" ? "var(--warning)" : "#81c784";
+          const statusTxt = t.status === "PENDENTE" ? "Pendente" : "Assinado";
+          const dataCriacao = new Date(t.createdAt).toLocaleDateString('pt-BR');
+          const prazo = t.prazoDevolucao ? new Date(t.prazoDevolucao).toLocaleDateString('pt-BR') : "Não definido";
+
+          let acaoBtn = "";
+          if (t.status === "PENDENTE") {
+            acaoBtn = `
+              <a href="termo_assinatura.html?id=${t.id}" target="_blank" class="btn-qty" style="color: var(--gold-primary); text-decoration: none; padding: 4px 10px; display: inline-flex; align-items: center; gap: 5px;">
+                <i class="fa-solid fa-signature"></i> Assinar Termo
+              </a>
+            `;
+          } else {
+            acaoBtn = `<span style="font-size: 0.8rem; color: var(--text-muted);"><i class="fa-solid fa-check"></i> Assinado em ${t.dataAssinatura ? new Date(t.dataAssinatura).toLocaleDateString('pt-BR') : dataCriacao}</span>`;
+          }
+
+          return `
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+              <td style="padding: 12px;">${dataCriacao}</td>
+              <td style="padding: 12px; font-weight: bold;">${t.titulo}</td>
+              <td style="padding: 12px; color: ${statusCor}; font-weight: 600;">${statusTxt}</td>
+              <td style="padding: 12px;">${prazo}</td>
+              <td style="padding: 12px;">${acaoBtn}</td>
+            </tr>
+          `;
+        }).join("");
+      }
+    } catch (e) {
+      console.error(e);
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--danger); padding: 2rem;">Erro ao carregar termos.</td></tr>`;
+    }
+  },
+
+  carregarCofreVirtualProprio: async function() {
+    const containerDocs = document.getElementById("cofre-virtual-lista-docs");
+    if (!containerDocs) return;
+
+    try {
+      let docs = [];
+      if (this.state.token && !this.state.token.startsWith("mock_")) {
+        const res = await this.requisitarAPI(`/usuarios/${this.state.usuarioLogado.id}/documentos`);
+        docs = res && res.documentos ? res.documentos : [];
+      } else {
+        docs = JSON.parse(localStorage.getItem("conectajoias_docs_mock") || "[]");
+      }
+
+      if (docs.length === 0) {
+        containerDocs.innerHTML = `<p style="color: var(--text-secondary); text-align: center; padding: 1.5rem; font-style: italic;">Nenhum documento anexado ainda.</p>`;
+      } else {
+        const baseUrl = this.state.apiUrl.replace('/api', '');
+        containerDocs.innerHTML = docs.map(doc => `
+          <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 0.8rem; border-radius: var(--radius-sm);">
+            <div>
+              <strong>${doc.tipo.replace('_', ' ')}</strong><br>
+              <small style="color: var(--text-muted);">${doc.nomeArquivo}</small>
+            </div>
+            <a href="${baseUrl}${doc.caminhoUrl}" target="_blank" class="btn-qty" style="color: var(--gold-primary); text-decoration: none; padding: 4px 8px; display: inline-flex; align-items: center; gap: 5px;">
+              <i class="fa-solid fa-download"></i> Baixar
+            </a>
+          </div>
+        `).join("");
+      }
+    } catch (e) {
+      console.error(e);
+      containerDocs.innerHTML = `<p style="color: var(--danger); text-align: center; padding: 1.5rem;">Erro ao carregar arquivos do cofre.</p>`;
+    }
+  },
+
+  enviarArquivoCofre: async function(event) {
+    event.preventDefault();
+    const btn = document.getElementById("btn-submit-cofre");
+    const select = document.getElementById("cofre-tipo-doc");
+    const input = document.getElementById("cofre-arquivo-doc");
+
+    if (!input || !input.files[0]) {
+      this.toast("Por favor, selecione um arquivo.", "warning");
+      return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando...';
+
+    const formData = new FormData();
+    formData.append("documento", input.files[0]);
+
+    const tipo = select.value;
+
+    try {
+      const response = await fetch(`${this.state.apiUrl}/usuarios/documentos/upload?tipo=${tipo}`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${this.state.token}`
+        },
+        body: formData
+      });
+
+      const res = await response.json();
+      if (!response.ok) {
+        throw new Error(res.error || "Erro no upload.");
+      }
+
+      this.toast("Documento enviado e guardado com sucesso!", "success");
+      input.value = "";
+      this.carregarCofreVirtualProprio();
+    } catch (e) {
+      this.toast("Erro ao enviar: " + e.message, "error");
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-upload"></i> Enviar para o Cofre';
     }
   }
 

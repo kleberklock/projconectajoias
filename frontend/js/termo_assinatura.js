@@ -144,13 +144,12 @@ const signApp = {
 
   carregarDadosTermo: async function() {
     try {
-      const response = await fetch(`${API_BASE_URL}/termos`);
+      const response = await fetch(`${API_BASE_URL}/public/termos/${this.termoId}`);
       if (!response.ok) {
-        throw new Error("Erro ao carregar termos.");
+        throw new Error("Erro ao carregar o termo de responsabilidade.");
       }
       
-      const termos = await response.json();
-      const termo = termos.find(t => t.id === this.termoId);
+      const termo = await response.json();
 
       if (!termo) {
         throw new Error("Termo não localizado no banco de dados.");
@@ -190,7 +189,7 @@ const signApp = {
       return;
     }
 
-    const signatureImg = this.canvas.toDataURL("image/png");
+    const assinaturaImg = this.canvas.toDataURL("image/png");
     
     const btn = document.getElementById("btn-submit-signature");
     btn.disabled = true;

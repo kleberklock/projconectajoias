@@ -506,6 +506,14 @@
             </div>
           </div>
 
+          <!-- Resolução Detalhada de Contas (Quem paga quem) -->
+          <div style="margin-top: 1.5rem; padding: 1.5rem; background: rgba(212, 175, 55, 0.04); border: 1px solid var(--border-color); border-radius: var(--radius); margin-bottom: 2rem; border-left: 4px solid var(--gold-primary);">
+            <h4 style="font-family: 'Playfair Display', serif; color: var(--gold-light); margin-bottom: 0.8rem; display: flex; align-items: center; gap: 8px; font-size: 1.1rem;"><i class="fa-solid fa-hand-holding-dollar"></i> Resolução Detalhada de Repasse</h4>
+            <div style="font-size: 0.95rem; color: var(--text-secondary); line-height: 1.6;" id="recibo-explicacao-resumo-detalhado">
+              Calculando explicação...
+            </div>
+          </div>
+
           <div style="text-align: center; color: var(--text-muted); font-size: 0.75rem; margin-top: 1rem; font-style: italic;">
             Este recibo é gerado automaticamente pelo sistema de gestão e serve como comprovante de prestação de contas consignada.
           </div>
@@ -515,6 +523,39 @@
             <button class="btn btn-gold" onclick="window.print()"><i class="fa-solid fa-print"></i> Imprimir / Salvar PDF</button>
           </div>
         `;
+
+        // Popula a explicação detalhada de contas
+        const elExplicacao = document.getElementById("recibo-explicacao-resumo-detalhado");
+        if (elExplicacao) {
+          let textoExplicativo = "";
+          const comissao = acerto.comissaoPaga;
+          const retido = acerto.totalRetidoRevendedora;
+          const recebidoAdmin = acerto.totalRecebidoAdmin;
+          const bruto = acerto.faturamentoBruto;
+
+          if (bruto === 0) {
+            textoExplicativo = "Nenhuma venda foi registrada neste ciclo. Não há transação financeira a ser realizada.";
+          } else if (retido === 0) {
+            textoExplicativo = `
+              <p style="margin-bottom: 8px;">👉 <strong>Resolução:</strong> A Gestora deve pagar <strong>R$ ${comissao.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong> para a Revendedora <strong>${acerto.usuario.nome}</strong>.</p>
+              <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 6px;"><strong>Explicação:</strong> Todas as vendas do ciclo (Faturamento Bruto: R$ ${bruto.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}) já estão com a administradora (vendas por Pix/Cartão/Link ou dinheiro físico já entregue). Portanto, a gestora deve repassar a comissão líquida de R$ ${comissao.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} integralmente à revendedora.</p>
+            `;
+          } else {
+            const diferenca = comissao - retido;
+            if (diferenca >= 0) {
+              textoExplicativo = `
+                <p style="margin-bottom: 8px;">👉 <strong>Resolução:</strong> A Gestora deve pagar <strong>R$ ${diferenca.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong> para a Revendedora <strong>${acerto.usuario.nome}</strong>.</p>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 6px;"><strong>Explicação:</strong> A revendedora vendeu R$ ${bruto.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}, ficando com R$ ${retido.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} em dinheiro físico em mãos. Como a comissão total dela é de R$ ${comissao.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}, a gestora deve transferir apenas a diferença de R$ ${diferenca.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} para completar a comissão dela.</p>
+              `;
+            } else {
+              textoExplicativo = `
+                <p style="margin-bottom: 8px;">👉 <strong>Resolução:</strong> A Revendedora <strong>${acerto.usuario.nome}</strong> deve pagar/transferir <strong>R$ ${Math.abs(diferenca).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong> para a Gestora.</p>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 6px;"><strong>Explicação:</strong> A revendedora vendeu R$ ${bruto.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}, ficando com R$ ${retido.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} em dinheiro físico em mãos. Como a comissão total dela é de R$ ${comissao.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}, ela reteve mais dinheiro em mãos do que o valor da comissão. Portanto, a revendedora deve devolver a diferença de R$ ${Math.abs(diferenca).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} para a gestora.</p>
+              `;
+            }
+          }
+          elExplicacao.innerHTML = textoExplicativo;
+        }
 
       } catch (err) {
         container.innerHTML = `

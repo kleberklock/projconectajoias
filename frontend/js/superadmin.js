@@ -704,10 +704,14 @@ const app = {
       // Mapeia revendedoras vindas da API para compatibilidade
       this.state.revendedoras.forEach(r => {
         r.consignado = r.consignados.map(c => ({
+          id: c.id,
           produtoId: c.produtoId,
-          codigo: c.produto.codigo,
-          nome: c.produto.nome,
+          produtoVariacaoId: c.produtoVariacaoId,
+          codigo: c.produto?.codigo || c.produtoVariacao?.produto?.codigo || "",
+          nome: c.produto?.nome || c.produtoVariacao?.produto?.nome || "",
           quantidadeConsignada: c.quantidadeConsignada,
+          quantidadeDisponivel: c.quantidadeDisponivel,
+          quantidadeVendidaApp: c.quantidadeVendidaApp,
           precoVenda: c.precoVenda
         }));
       });
@@ -1522,6 +1526,21 @@ const app = {
     
     // Recarrega dados visuais
     if (tabId === "dashboard") this.renderizarDashboard();
+    if (tabId === "meu-negocio") {
+      // Inicializa datas do DRE se não estiverem preenchidas
+      const inputInicio = document.getElementById("dre-data-inicio");
+      const inputFim = document.getElementById("dre-data-fim");
+      if (inputInicio && !inputInicio.value) {
+        const hoje = new Date();
+        const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+        inputInicio.value = primeiroDiaMes.toISOString().split('T')[0];
+      }
+      if (inputFim && !inputFim.value) {
+        const hoje = new Date();
+        inputFim.value = hoje.toISOString().split('T')[0];
+      }
+      this.carregarDRE();
+    }
     if (tabId === "estoque") {
       if (this.state.subAbaEstoqueAtiva === "geral") {
         this.renderizarEstoque();
@@ -1877,6 +1896,21 @@ const app = {
     if (despesasFixasEl) despesasFixasEl.innerText = `(-) ${formatar(valorDespesasFixas)}`;
 
     const lucro = receitaLiquida - resumo.custoTotalMercadorias - valorDespesasFixas;
+    
+    // Injeta nos KPIs de topo da aba "Meu Negócio"
+    const kpiFatBruto = document.getElementById("kpi-faturamento-bruto");
+    const kpiFatLiquido = document.getElementById("kpi-faturamento-liquido");
+    const kpiCmv = document.getElementById("kpi-cmv-total");
+    const kpiLucro = document.getElementById("kpi-lucro-liquido");
+
+    if (kpiFatBruto) kpiFatBruto.innerText = formatar(resumo.faturamentoBrutoTotal);
+    if (kpiFatLiquido) kpiFatLiquido.innerText = formatar(receitaLiquida);
+    if (kpiCmv) kpiCmv.innerText = formatar(resumo.custoTotalMercadorias);
+    if (kpiLucro) {
+      kpiLucro.innerText = formatar(lucro);
+      kpiLucro.style.color = lucro >= 0 ? "#66bb6a" : "#ef5350";
+    }
+
     const lucroEl = document.getElementById("dre-lucro-liquido");
     const resultadoValorEl = document.getElementById("dre-resultado-valor");
     const resultadoStatusEl = document.getElementById("dre-resultado-status");
@@ -2600,15 +2634,21 @@ const app = {
 
       if (rev.consignado) {
         rev.consignado.forEach(item => {
-          qtdConsignada += Number(item.quantidadeConsignada || 0);
-          valorConsignado += Number(item.precoVenda || 0) * Number(item.quantidadeConsignada || 0);
+          const qDisp = item.quantidadeDisponivel !== undefined ? Number(item.quantidadeDisponivel) : Number(item.quantidadeConsignada || 0);
+          qtdConsignada += qDisp;
+          valorConsignado += Number(item.precoVenda || 0) * qDisp;
         });
       }
 
       const itemDiv = document.createElement("div");
       itemDiv.className = `list-item ${this.state.revendedoraSelecionadaId === rev.id ? 'selected' : ''}`;
-      itemDiv.addEventListener("click", () => {
+      itemDiv.addEventListener("click", async () => {
         this.state.revendedoraSelecionadaId = rev.id;
+        try {
+          await this.carregarRevendedorasDaAPI();
+        } catch (e) {
+          console.warn("Falha ao recarregar revendedoras em tempo real:", e);
+        }
         this.renderizarRevendedoras();
       });
 
@@ -2634,7 +2674,14 @@ const app = {
 
       document.getElementById("detalhe-nome-revendedora").innerText = revSelecionada.nome;
       document.getElementById("detalhe-whatsapp-revendedora").innerText = revSelecionada.whatsapp;
-      document.getElementById("detalhe-comissao-revendedora").innerText = `${revSelecionada.comissao}%`;
+      
+      const tipoComissaoLabel = {
+        'FIXA': 'Fixa',
+        'PROGRESSIVA': 'Progressiva',
+        'META_UNICA': 'Meta Única'
+      }[revSelecionada.tipoComissao || 'FIXA'] || 'Fixa';
+      document.getElementById("detalhe-comissao-revendedora").innerHTML = `${revSelecionada.comissao}% <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted); margin-left: 0.3rem;">(${tipoComissaoLabel})</span>`;
+      
       document.getElementById("detalhe-pin-revendedora").innerText = revSelecionada.pin || "N/A";
 
       // Atualiza indicadores internos
@@ -2676,16 +2723,17 @@ const app = {
         `;
       } else {
         revSelecionada.consignado.forEach(item => {
-          const subtotal = Number(item.precoVenda || 0) * Number(item.quantidadeConsignada || 0);
+          const qDisp = item.quantidadeDisponivel !== undefined ? Number(item.quantidadeDisponivel) : Number(item.quantidadeConsignada || 0);
+          const subtotal = Number(item.precoVenda || 0) * qDisp;
           const tr = document.createElement("tr");
           tr.innerHTML = `
             <td><strong>${item.codigo}</strong></td>
             <td>${item.nome}</td>
-            <td>${item.quantidadeConsignada} unidades</td>
+            <td>${qDisp} unidades</td>
             <td>R$ ${Number(item.precoVenda).toFixed(2).replace(".", ",")}</td>
             <td style="color: var(--gold-primary); font-weight: 600;">R$ ${subtotal.toFixed(2).replace(".", ",")}</td>
             <td>
-              <button class="btn-qty" style="color: var(--gold-light); border-color: rgba(212,175,55,0.2);" onclick="app.devolverEstoqueConsignado('${item.id}', ${item.quantidadeConsignada})" title="Devolver ao Estoque Central">
+              <button class="btn-qty" style="color: var(--gold-light); border-color: rgba(212,175,55,0.2);" onclick="app.devolverEstoqueConsignado('${item.id}', ${qDisp})" title="Devolver ao Estoque Central">
                 <i class="fa-solid fa-arrow-rotate-left"></i> Devolver
               </button>
             </td>
@@ -2714,6 +2762,15 @@ const app = {
           `;
           tableHistoricoBody.appendChild(tr);
         });
+      }
+
+      // Força a atualização da sub-aba ativa se for dinâmica para a revendedora selecionada
+      if (document.getElementById("btn-subtab-termos").classList.contains("active")) {
+        this.carregarTermosRevendedora();
+      } else if (document.getElementById("btn-subtab-documentos").classList.contains("active")) {
+        this.carregarCofreDocumentos();
+      } else if (document.getElementById("btn-subtab-vendas-rev").classList.contains("active")) {
+        this.renderizarVendasIndividuaisRevendedora();
       }
     } else {
       document.getElementById("painel-detalhes-revendedora").style.display = "none";
@@ -4001,7 +4058,47 @@ const app = {
       vendasDinheiro = 0;
     }
 
-    const saldoFinalAcerto = comissaoFinal - vendasDinheiro;
+    // Exibe/oculta e popula painel de conferência se houver dinheiro com a revendedora
+    const confCard = document.getElementById("acerto-conferencia-financeira");
+    const confDinheiroVal = document.getElementById("acerto-conf-dinheiro-val");
+    const confPixVal = document.getElementById("acerto-conf-pix-val");
+    
+    if (confCard) {
+      if (vendasDinheiro > 0) {
+        confCard.style.display = "block";
+        if (confDinheiroVal) confDinheiroVal.innerText = vendasDinheiro.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        if (confPixVal) confPixVal.innerText = vendasLink.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+      } else {
+        confCard.style.display = "none";
+      }
+    }
+
+    const chkDinheiroEntregue = document.getElementById("acerto-chk-dinheiro-entregue")?.checked;
+    
+    // Se a revendedora já entregou o dinheiro das vendas em mãos para a gestora, ela não deve ser cobrada por esse dinheiro na conta de acerto.
+    // Nesse caso, o saldo final a pagar para a revendedora é exatamente a comissão dela (e a gestora fica com o dinheiro das vendas).
+    const saldoFinalAcerto = chkDinheiroEntregue ? comissaoFinal : (comissaoFinal - vendasDinheiro);
+
+    // Atualiza a caixa explicativa de "Quem paga quem" em tempo real
+    const elExplicacao = document.getElementById("acerto-explicacao-resumo");
+    if (elExplicacao) {
+      let textoExplicativo = "";
+      if (faturamentoBruto === 0) {
+        textoExplicativo = "Nenhuma peça foi vendida neste ciclo. Não há repasse financeiro a ser realizado.";
+      } else if (vendasDinheiro === 0) {
+        textoExplicativo = `Todas as vendas foram pagas via Pix/Cartão/Link direto para a administradora (R$ ${vendasLink.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}). A administradora deve transferir a comissão de <strong>R$ ${comissaoFinal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong> para a revendedora.`;
+      } else if (chkDinheiroEntregue) {
+        textoExplicativo = `A revendedora vendeu R$ ${(vendasLink + vendasDinheiro).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}, recebendo R$ ${vendasDinheiro.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} em dinheiro físico, o qual <strong>já foi entregue</strong> para a gestora. A administradora deve transferir a comissão integral de <strong>R$ ${comissaoFinal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong> para a revendedora.`;
+      } else {
+        const diferenca = comissaoFinal - vendasDinheiro;
+        if (diferenca >= 0) {
+          textoExplicativo = `A revendedora vendeu R$ ${(vendasLink + vendasDinheiro).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}, recebendo R$ ${vendasDinheiro.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} em dinheiro físico (que está com ela). Como a comissão dela é maior (R$ ${comissaoFinal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}), a gestora deve transferir a diferença de <strong>R$ ${diferenca.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong> para a revendedora.`;
+        } else {
+          textoExplicativo = `A revendedora vendeu R$ ${(vendasLink + vendasDinheiro).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}, recebendo R$ ${vendasDinheiro.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} em dinheiro físico (que está com ela). Como a comissão dela é menor (R$ ${comissaoFinal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}), a revendedora deve pagar a diferença de <strong>R$ ${Math.abs(diferenca).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong> para a gestora.`;
+        }
+      }
+      elExplicacao.innerHTML = textoExplicativo;
+    }
 
     document.getElementById("acerto-total-peças-levadas").innerText = `${totalPecasConsignadas} pçs`;
     document.getElementById("acerto-total-faturamento-bruto").innerText = `R$ ${faturamentoBruto.toFixed(2).replace(".", ",")}`;
@@ -4192,7 +4289,12 @@ const app = {
       vendasLink = 0;
       vendasDinheiro = 0;
     }
-    const saldoFinal = valorComissao - vendasDinheiro;
+    const chkDinheiroEntregue = document.getElementById("acerto-chk-dinheiro-entregue")?.checked;
+    
+    // Se a revendedora já entregou o dinheiro físico, a admin recebeu e o retido na mão é zero no final.
+    const finalRetidoRevendedora = chkDinheiroEntregue ? 0 : vendasDinheiro;
+    const finalRecebidoAdmin = chkDinheiroEntregue ? (vendasLink + vendasDinheiro) : vendasLink;
+    const saldoFinal = chkDinheiroEntregue ? valorComissao : (valorComissao - vendasDinheiro);
 
     const detalhesItens = itensAcerto.map(item => ({
       produtoId: item.produtoId,
@@ -4216,8 +4318,8 @@ const app = {
           usuarioId: rev.id,
           itensAcerto: postItens,
           formaPagamento: formaPagamento,
-          totalRetidoRevendedora: vendasDinheiro,
-          totalRecebidoAdmin: vendasLink,
+          totalRetidoRevendedora: finalRetidoRevendedora,
+          totalRecebidoAdmin: finalRecebidoAdmin,
           detalhesItens: detalhesItens,
           manterPecasMaleta: reterEstoque
         });
@@ -4237,14 +4339,37 @@ const app = {
         comissaoPaga: valorComissao,
         liquidoConectaJoias: valorLiquido,
         formaPagamento: formaPagamento,
-        totalRetidoRevendedora: vendasDinheiro,
-        totalRecebidoAdmin: vendasLink,
+        totalRetidoRevendedora: finalRetidoRevendedora,
+        totalRecebidoAdmin: finalRecebidoAdmin,
         saldoFinalAcerto: saldoFinal,
         detalhesItens: detalhesItens
       });
 
       // Se deve abrir WhatsApp, gera e redireciona
       if (abrirWhatsApp) {
+        let textoQuemPagaQuem = "";
+        let explicacaoWhats = "";
+        
+        if (faturamentoBruto === 0) {
+          textoQuemPagaQuem = "*Nenhum repasse financeiro necessário.*";
+          explicacaoWhats = "Nenhuma peça foi vendida neste ciclo.";
+        } else if (vendasDinheiro === 0) {
+          textoQuemPagaQuem = `*A gestora deve pagar à revendedora: R$ ${valorComissao.toFixed(2).replace(".", ",")}*`;
+          explicacaoWhats = "Todas as vendas foram pagas via Pix/Cartão/Link direto para a administradora.";
+        } else if (chkDinheiroEntregue) {
+          textoQuemPagaQuem = `*A gestora deve pagar à revendedora: R$ ${valorComissao.toFixed(2).replace(".", ",")}*`;
+          explicacaoWhats = `O dinheiro físico das vendas (R$ ${vendasDinheiro.toFixed(2).replace(".", ",")}) já foi entregue para a gestora. Portanto, a gestora paga a comissão integral.`;
+        } else {
+          const dif = valorComissao - vendasDinheiro;
+          if (dif >= 0) {
+            textoQuemPagaQuem = `*A gestora deve pagar à revendedora: R$ ${dif.toFixed(2).replace(".", ",")}*`;
+            explicacaoWhats = `A revendedora ficou com R$ ${vendasDinheiro.toFixed(2).replace(".", ",")} em mãos. Como a comissão dela é de R$ ${valorComissao.toFixed(2).replace(".", ",")}, a gestora transfere a diferença.`;
+          } else {
+            textoQuemPagaQuem = `*A revendedora deve pagar à gestora: R$ ${Math.abs(dif).toFixed(2).replace(".", ",")}*`;
+            explicacaoWhats = `A revendedora ficou com R$ ${vendasDinheiro.toFixed(2).replace(".", ",")} em mãos. Como a comissão dela é de R$ ${valorComissao.toFixed(2).replace(".", ",")}, a revendedora transfere a diferença restante para a gestora.`;
+          }
+        }
+
         let mensagemTemplate = MarketingData.whatsappTemplates.reciboAcerto;
         mensagemTemplate = mensagemTemplate
           .replace("{revendedora}", rev.nome)
@@ -4252,10 +4377,17 @@ const app = {
           .replace("{qtd_consignada}", totalConsignada)
           .replace("{qtd_devolvida}", totalDevolvida)
           .replace("{qtd_vendida}", totalVendida)
+          .replace("{qtd_perdida}", totalPerdida)
           .replace("{valor_bruto}", faturamentoBruto.toFixed(2).replace(".", ","))
-          .replace("{comissao_porc}", rev.comissao)
-          .replace("{valor_comissao}", valorComissao.toFixed(2).replace(".", ","))
-          .replace("{valor_liquido}", valorLiquido.toFixed(2).replace(".", ","));
+          .replace("{comissao_porc}", pctComissao)
+          .replace("{valor_comissao}", comissaoBruta.toFixed(2).replace(".", ","))
+          .replace("{valor_desconto_perda}", valorPerdas.toFixed(2).replace(".", ","))
+          .replace("{valor_comissao_liquida}", valorComissao.toFixed(2).replace(".", ","))
+          .replace("{recebido_dinheiro}", vendasDinheiro.toFixed(2).replace(".", ","))
+          .replace("{recebido_pix_cartao}", vendasLink.toFixed(2).replace(".", ","))
+          .replace("{dinheiro_entregue}", chkDinheiroEntregue ? "SIM (Já entregue à gestora)" : "NÃO (Em mãos com a revendedora)")
+          .replace("{texto_quem_paga_quem}", textoQuemPagaQuem)
+          .replace("{explicacao_detalhada}", explicacaoWhats);
 
         if (resp && resp.acerto && resp.acerto.id) {
           mensagemTemplate += `\n\n🔗 *Visualizar Recibo e PDF:* ${window.location.origin}/pages/recibo.html?id=${resp.acerto.id}`;
@@ -6398,13 +6530,14 @@ const app = {
 
       if (containerDocs) {
         if (data && data.documentos && data.documentos.length > 0) {
+          const baseUrl = this.state.apiUrl.replace('/api', '');
           containerDocs.innerHTML = data.documentos.map(doc => `
             <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 0.8rem; border-radius: var(--radius-sm);">
               <div>
                 <strong>${doc.tipo}</strong><br>
                 <small style="color: var(--text-muted);">${doc.nomeArquivo}</small>
               </div>
-              <a href="http://localhost:5000${doc.caminhoUrl}" target="_blank" class="btn-qty" style="color: var(--gold-primary); text-decoration: none; padding: 4px 8px; display: inline-flex; align-items: center; gap: 5px;">
+              <a href="${baseUrl}${doc.caminhoUrl}" target="_blank" class="btn-qty" style="color: var(--gold-primary); text-decoration: none; padding: 4px 8px; display: inline-flex; align-items: center; gap: 5px;">
                 <i class="fa-solid fa-download"></i> Baixar
               </a>
             </div>

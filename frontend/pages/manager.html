@@ -150,6 +150,12 @@
           <li class="nav-item" data-target="links-pagamento">
             <button id="btn-tab-links-pagamento"><i class="fa-solid fa-link"></i>Links de Pagamento</button>
           </li>
+          <li class="nav-item" data-target="termos-maleta">
+            <button id="btn-tab-termos-maleta"><i class="fa-solid fa-file-contract"></i>Termos de Maleta</button>
+          </li>
+          <li class="nav-item" data-target="cofre-virtual">
+            <button id="btn-tab-cofre-virtual"><i class="fa-solid fa-vault"></i>Cofre Virtual</button>
+          </li>
           <li class="nav-item" data-target="treinamento-demand">
             <button id="btn-tab-treinamentos"><i class="fa-solid fa-graduation-cap"></i>Treinamentos</button>
           </li>
@@ -570,31 +576,84 @@
         </div>
 
         <!-- Painel de Progressão de Comissão da Revendedora -->
-        <div id="vendedora-progressao-card" class="pricing-calculator-card" style="margin-bottom: 1.5rem; padding: 1.5rem; border-color: rgba(212, 175, 55, 0.35); background: var(--bg-card); display: none;">
-          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 0.8rem;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="font-size: 1.5rem; color: var(--gold-primary);"><i class="fa-solid fa-crown"></i></span>
+        <div id="vendedora-progressao-card" class="pricing-calculator-card" style="margin-bottom: 1.5rem; padding: 1.5rem; border-color: rgba(212, 175, 55, 0.35); background: var(--bg-card); display: none; position: relative; overflow: hidden;">
+          
+          <!-- Glow de fundo decorativo -->
+          <div style="position: absolute; top: -40px; right: -40px; width: 150px; height: 150px; border-radius: 50%; background: radial-gradient(circle, rgba(212,175,55,0.06) 0%, transparent 70%); pointer-events: none;"></div>
+
+          <!-- Cabeçalho: Ícone + Título + Badge de Comissão Atual -->
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span id="vendedora-comissao-icone" style="font-size: 1.6rem; color: var(--gold-primary); transition: all 0.3s ease;"><i class="fa-solid fa-crown"></i></span>
               <div>
-                <h3 style="margin: 0; font-size: 1.1rem; color: var(--gold-light);">Sua Comissão Progressiva</h3>
-                <p style="margin: 0; font-size: 0.8rem; color: var(--text-secondary);">Aumente suas vendas para ganhar comissões maiores!</p>
+                <h3 id="vendedora-comissao-titulo" style="margin: 0; font-size: 1.05rem; color: var(--gold-light); font-weight: 700;">Sua Comissão</h3>
+                <p id="vendedora-comissao-subtitulo" style="margin: 0; font-size: 0.78rem; color: var(--text-secondary);">Calculando...</p>
               </div>
             </div>
             <div style="text-align: right;">
-              <span id="vendedora-proxima-faixa-status" style="background: rgba(212, 175, 55, 0.1); color: var(--gold-primary); border: 1px solid rgba(212, 175, 55, 0.2); padding: 4px 12px; border-radius: 20px; font-weight: 600; font-size: 0.85rem;">
-                Faixa Atual: --
+              <span id="vendedora-proxima-faixa-status" style="background: rgba(212, 175, 55, 0.12); color: var(--gold-primary); border: 1px solid rgba(212, 175, 55, 0.25); padding: 5px 14px; border-radius: 20px; font-weight: 700; font-size: 0.85rem; display: inline-block; transition: all 0.4s ease;">
+                Calculando...
               </span>
             </div>
           </div>
 
-          <!-- Barra de Progresso Customizada -->
-          <div style="width: 100%; height: 12px; background: #222; border-radius: 6px; overflow: hidden; margin: 0.8rem 0; position: relative; border: 1px solid #333;">
-            <div id="vendedora-progressao-barra" style="width: 0%; height: 100%; background: linear-gradient(90deg, #b38f1d, #d4af37, #f3e5ab); border-radius: 6px; transition: width 0.5s ease-in-out;"></div>
+          <!-- Marcadores de Faixas (visíveis apenas para tipo PROGRESSIVA) -->
+          <div id="vendedora-faixas-marcadores" style="display: none; position: relative; width: 100%; height: 20px; margin-bottom: 4px;">
+            <!-- Preenchido dinamicamente pelo JS -->
           </div>
 
-          <div id="vendedora-progressao-info" style="font-size: 0.9rem; color: #eee; text-align: center; margin-top: 0.5rem; line-height: 1.4;">
+          <!-- Barra de Progresso -->
+          <div style="width: 100%; height: 14px; background: rgba(255,255,255,0.05); border-radius: 8px; overflow: visible; margin: 0.5rem 0 0.8rem; position: relative; border: 1px solid rgba(255,255,255,0.08);">
+            <!-- Trilha da barra -->
+            <div style="position: absolute; inset: 0; border-radius: 8px; overflow: hidden;">
+              <div id="vendedora-progressao-barra" style="width: 0%; height: 100%; background: linear-gradient(90deg, #b38f1d, #d4af37, #f5e78e); border-radius: 8px; transition: width 0.6s cubic-bezier(0.25, 1, 0.5, 1); position: relative;">
+                <!-- Brilho animado na barra -->
+                <div style="position: absolute; top: 0; right: 0; width: 40px; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent); animation: shimmer-bar 2s infinite;"></div>
+              </div>
+            </div>
+            <!-- Indicador de posição atual (bolinha) -->
+            <div id="vendedora-progressao-indicador" style="position: absolute; top: 50%; width: 20px; height: 20px; background: var(--gold-primary); border: 3px solid #0a0a0a; border-radius: 50%; transform: translate(-50%, -50%); left: 0%; transition: left 0.6s cubic-bezier(0.25, 1, 0.5, 1); box-shadow: 0 0 10px rgba(212,175,55,0.6); z-index: 2;"></div>
+          </div>
+
+          <!-- Texto de Informação -->
+          <div id="vendedora-progressao-info" style="font-size: 0.88rem; color: var(--text-secondary); text-align: center; margin-top: 0.4rem; line-height: 1.5;">
             Calculando progresso...
           </div>
         </div>
+
+        <style>
+          @keyframes shimmer-bar {
+            0% { opacity: 0; transform: translateX(-100%); }
+            50% { opacity: 1; }
+            100% { opacity: 0; transform: translateX(200%); }
+          }
+          .faixa-pip {
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            cursor: default;
+          }
+          .faixa-pip-line {
+            width: 2px;
+            height: 10px;
+            background: rgba(212,175,55,0.4);
+            border-radius: 2px;
+          }
+          .faixa-pip-label {
+            font-size: 0.65rem;
+            color: rgba(212,175,55,0.7);
+            white-space: nowrap;
+            font-weight: 600;
+            background: rgba(0,0,0,0.5);
+            padding: 1px 4px;
+            border-radius: 3px;
+          }
+        </style>
+
 
         <!-- Abas: Maleta Atual | Histórico de Vendas -->
         <div class="mkt-tabs" style="margin-bottom: 1.5rem;">
@@ -1271,6 +1330,82 @@
             </div>
             <div style="border-top: 1px solid var(--border-color); padding-top: 1.5rem; margin-top: 1.5rem; font-size: 0.85rem; color: var(--text-secondary);">
               <p id="cfg-security-note">Conecta Joias utiliza criptografia SSL ponta-a-ponta nas requisições da API e persistência reativa local para garantir a integridade dos seus dados em qualquer circunstância.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           ABA: TERMOS DE MALETA (CONSULTORA)
+           ========================================== -->
+      <section id="termos-maleta" class="app-section">
+        <div class="section-header">
+          <div class="section-title">
+            <h2>Termos de Maleta</h2>
+            <p>Visualize e assine seus termos de responsabilidade digitalmente</p>
+          </div>
+        </div>
+        <div class="pricing-calculator-card" style="padding: 1.5rem; background: var(--bg-card); border-color: rgba(212, 175, 55, 0.2); border-radius: var(--radius-md);">
+          <div class="table-responsive">
+            <table class="premium-table">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Título</th>
+                  <th>Status</th>
+                  <th>Prazo Acerto</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-termos-maleta-consultora">
+                <tr>
+                  <td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 2rem;">Nenhum termo de consignação gerado ainda.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           ABA: COFRE VIRTUAL (CONSULTORA)
+           ========================================== -->
+      <section id="cofre-virtual" class="app-section">
+        <div class="section-header">
+          <div class="section-title">
+            <h2>Meu Cofre Virtual</h2>
+            <p>Seus documentos de identificação guardados com segurança criptográfica</p>
+          </div>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; align-items: start;">
+          <!-- Enviar Novo Documento -->
+          <div class="pricing-calculator-card" style="padding: 1.5rem; background: var(--bg-card); border-color: rgba(212, 175, 55, 0.2); border-radius: var(--radius-md);">
+            <h3 style="font-family: var(--font-title); color: var(--gold-primary); margin-bottom: 1rem;"><i class="fa-solid fa-cloud-arrow-up"></i> Enviar Documento</h3>
+            <form id="form-upload-cofre-virtual" onsubmit="app.enviarArquivoCofre(event)" style="display: flex; flex-direction: column; gap: 1rem;">
+              <div class="form-group">
+                <label style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 600; display: block; margin-bottom: 0.3rem;">Tipo de Documento</label>
+                <select id="cofre-tipo-doc" class="form-control" style="width: 100%; padding: 0.6rem; background: rgba(0,0,0,0.4); border: 1px solid rgba(212,175,55,0.2); color: #fff; border-radius: var(--radius-sm);">
+                  <option value="RG_FRENTE">RG / CNH - Frente</option>
+                  <option value="RG_VERSO">RG / CNH - Verso</option>
+                  <option value="COMPROVANTE_RESIDENCIA">Comprovante de Residência</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 600; display: block; margin-bottom: 0.3rem;">Selecionar Arquivo</label>
+                <input type="file" id="cofre-arquivo-doc" accept="image/*,application/pdf" required style="width: 100%; padding: 0.5rem; background: rgba(0,0,0,0.4); border: 1px solid rgba(212,175,55,0.2); color: #fff; border-radius: var(--radius-sm);">
+              </div>
+              <button type="submit" id="btn-submit-cofre" class="btn-gold" style="width: 100%; justify-content: center; padding: 0.7rem; font-size: 0.85rem; margin-top: 0.5rem;">
+                <i class="fa-solid fa-upload"></i> Enviar para o Cofre
+              </button>
+            </form>
+          </div>
+          
+          <!-- Documentos Guardados -->
+          <div class="pricing-calculator-card" style="padding: 1.5rem; background: var(--bg-card); border-color: rgba(212, 175, 55, 0.2); border-radius: var(--radius-md);">
+            <h3 style="font-family: var(--font-title); color: var(--gold-primary); margin-bottom: 1rem;"><i class="fa-solid fa-lock"></i> Arquivos no Cofre</h3>
+            <div id="cofre-virtual-lista-docs" style="display: flex; flex-direction: column; gap: 1rem;">
+              <p style="color: var(--text-muted); font-style: italic;">Buscando seus documentos guardados...</p>
             </div>
           </div>
         </div>
@@ -2449,6 +2584,34 @@
       });
     }
   </script>
+
+  <!-- Modal Forçado de Upload de RG no Primeiro Acesso -->
+  <div class="modal-backdrop" id="modal-upload-rg-obrigatorio" style="display: none; align-items: center; justify-content: center; z-index: 10000; background: rgba(0,0,0,0.9);">
+    <div class="modal-card" style="max-width: 500px; width: 90%; background: var(--bg-card); border: 2px solid var(--gold-primary); box-shadow: 0 0 30px var(--gold-translucent); padding: 2rem; border-radius: var(--radius-lg); text-align: center;">
+      <div style="font-size: 3rem; color: var(--gold-primary); margin-bottom: 1rem;">
+        <i class="fa-solid fa-shield-halved"></i>
+      </div>
+      <h3 style="font-family: var(--font-title); color: var(--gold-light); margin-bottom: 0.8rem; font-size: 1.4rem;">Segurança da Conta</h3>
+      <p style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 1.5rem;">
+        Olá! Para a sua segurança jurídica e validação da retirada do seu consignado, é obrigatório realizar o upload das fotos do seu documento de identidade (RG ou CNH) frente e verso antes de prosseguir no sistema.
+      </p>
+      
+      <form id="form-upload-rg-obrigatorio" onsubmit="app.enviarRgObrigatorio(event)" style="display: flex; flex-direction: column; gap: 1.2rem;">
+        <div class="form-group" style="text-align: left;">
+          <label style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 600; display: block; margin-bottom: 0.4rem;">RG Frente (Foto nítida) *</label>
+          <input type="file" id="rg-frente-file" accept="image/*,application/pdf" required style="width: 100%; padding: 0.5rem; background: rgba(0,0,0,0.4); border: 1px solid rgba(212,175,55,0.2); border-radius: var(--radius-sm); color: #fff;">
+        </div>
+        <div class="form-group" style="text-align: left;">
+          <label style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 600; display: block; margin-bottom: 0.4rem;">RG Verso (Foto nítida) *</label>
+          <input type="file" id="rg-verso-file" accept="image/*,application/pdf" required style="width: 100%; padding: 0.5rem; background: rgba(0,0,0,0.4); border: 1px solid rgba(212,175,55,0.2); border-radius: var(--radius-sm); color: #fff;">
+        </div>
+        
+        <button type="submit" id="btn-submit-rg-obrigatorio" class="btn-gold" style="width: 100%; justify-content: center; padding: 0.8rem; font-size: 0.95rem; margin-top: 0.5rem;">
+          <i class="fa-solid fa-upload"></i> Salvar no Cofre Virtual e Entrar
+        </button>
+      </form>
+    </div>
+  </div>
 
 </body>
 </html>

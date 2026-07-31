@@ -850,6 +850,20 @@ body {
   font-weight: 600;
 }
 
+/* Grid Responsivo para Termos de Consignação */
+.termos-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+@media (max-width: 992px) {
+  .termos-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Simulador de Feed do Instagram */
 .feed-planner {
   display: grid;

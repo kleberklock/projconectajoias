@@ -1128,7 +1128,7 @@ app.get('/api/revendedoras', autenticarJWT, autorizarRole(['Manager', 'SuperAdmi
 
       const consignadosMapeados = r.consignados.map(c => {
         const qtdVendidaApp = mapaVendasCiclo.get(c.produtoVariacaoId) || mapaVendasCiclo.get(c.produtoVariacao?.produtoId) || 0;
-        const qtdDisponivel = Math.max(0, c.quantidadeConsignada - qtdVendidaApp);
+        const qtdDisponivel = c.quantidadeConsignada;
 
         quantidadeAtivaTotal += qtdDisponivel;
         valorMaletaAtivoTotal += (qtdDisponivel * (c.precoVenda || 0));
@@ -1138,7 +1138,7 @@ app.get('/api/revendedoras', autenticarJWT, autorizarRole(['Manager', 'SuperAdmi
           lojaId: c.lojaId,
           usuarioId: c.usuarioId,
           produtoVariacaoId: c.produtoVariacaoId,
-          quantidadeConsignada: c.quantidadeConsignada,
+          quantidadeConsignada: c.quantidadeConsignada + qtdVendidaApp,
           quantidadeDisponivel: qtdDisponivel,
           quantidadeVendidaApp: qtdVendidaApp,
           precoVenda: c.precoVenda,
@@ -1382,7 +1382,7 @@ app.get('/api/revendedoras/minha-maleta', autenticarJWT, identificarLoja, async 
 
     const maletaFormatada = consignados.map(c => {
       const qtdVendidaApp = mapaVendasCiclo.get(c.produtoVariacaoId) || mapaVendasCiclo.get(c.produtoVariacao?.produtoId) || 0;
-      const disponivel = Math.max(0, c.quantidadeConsignada - qtdVendidaApp);
+      const disponivel = c.quantidadeConsignada;
 
       return {
         id: c.id,
@@ -1395,7 +1395,7 @@ app.get('/api/revendedoras/minha-maleta', autenticarJWT, identificarLoja, async 
         codigo: c.produtoVariacao.produto.codigo,
         nome: c.produtoVariacao.produto.nome,
         categoria: c.produtoVariacao.produto.categoria,
-        quantidadeConsignadaTotal: c.quantidadeConsignada,
+        quantidadeConsignadaTotal: c.quantidadeConsignada + qtdVendidaApp,
         quantidadeConsignada: disponivel, // Retorna a quantidade disponível para o frontend da revendedora
         quantidadeDisponivel: disponivel,
         quantidadeVendidaApp: qtdVendidaApp,
@@ -1433,10 +1433,14 @@ app.get('/api/revendedoras/minha-maleta', autenticarJWT, identificarLoja, async 
       }
     });
 
+    // Calcula o total vendido no ciclo atual para exibir na barra de progressão
+    const totalVendidoCiclo = vendasCiclo.reduce((acc, v) => acc + (Number(v.precoVenda || 0) * Number(v.quantidade || 1)), 0);
+
     res.json({
       consignado: maletaFormatada,
       faixasComissao: faixas,
-      config: usuarioConfig
+      config: usuarioConfig,
+      totalVendidoCiclo: totalVendidoCiclo
     });
   } catch (error) {
     console.error("Erro ao carregar maleta própria:", error);
@@ -1540,6 +1544,19 @@ app.post('/api/consignacoes', autenticarJWT, autorizarRole(['Manager', 'SuperAdm
     const nomeRevendedora = revendedora.nome;
     registrarLog(req, "CONSIGNACAO_CRIAR", `Consignou ${qtdParsed} unidades do produto ${produto.nome} (SKU: ${variacao.sku}) para a revendedora ${nomeRevendedora}.`);
 
+    // Dispara notificação no sistema para a revendedora
+    try {
+      await criarNotificacao(
+        req.lojaId,
+        'novas_pecas_maleta',
+        `Novas peças foram adicionadas à sua maleta! ${qtdParsed}x ${produto.nome} (SKU: ${variacao.sku}).`,
+        { produtoNome: produto.nome, sku: variacao.sku, quantidade: qtdParsed, precoVenda: precoVendaCalculado },
+        usuarioId
+      );
+    } catch (notifErr) {
+      console.error("Erro ao gerar notificação de novas peças na maleta:", notifErr);
+    }
+
     // Dispara mensagem automática de consignação para a revendedora (Opção A)
     try {
       if (revendedora.whatsapp && revendedora.whatsapp.trim() !== '') {
@@ -1633,6 +1650,20 @@ app.post('/api/consignacoes/devolver', autenticarJWT, autorizarRole(['Manager', 
     });
 
     await registrarLog(req, 'CONSIGNACAO_DEVOLVER', `Devolveu ${qtdParsed} unidades do produto ${consignado.produtoVariacao.produto.nome} (SKU: ${consignado.produtoVariacao.sku}) da maleta da revendedora ${consignado.usuario.nome} para o estoque central.`);
+    
+    // Dispara notificação para a administradora
+    try {
+      await criarNotificacao(
+        req.lojaId,
+        'devolucao_maleta',
+        `A revendedora ${consignado.usuario.nome} devolveu ${qtdParsed}x ${consignado.produtoVariacao.produto.nome} ao estoque central.`,
+        { revendedoraNome: consignado.usuario.nome, produtoNome: consignado.produtoVariacao.produto.nome, quantidade: qtdParsed },
+        null
+      );
+    } catch (notifErr) {
+      console.error("Erro ao gerar notificação de devolução:", notifErr);
+    }
+
     res.json({ message: 'Peças devolvidas ao estoque central com sucesso!' });
   } catch (error) {
     console.error('Erro ao devolver consignado:', error);
@@ -1867,6 +1898,19 @@ app.post('/api/acertos', autenticarJWT, autorizarRole(['Manager', 'SuperAdmin'])
     });
 
     registrarLog(req, "ACERTO_CONCLUIR", `Concluiu acerto de contas com a revendedora ${revendedora.nome}. Pagamento: ${formaPagamento || "Pix"}. Vendido: ${totalVendida}, Devolvido: ${totalDevolvida}, Perda: ${totalPerdida}, Defeito: ${totalDefeito}. Faturamento Bruto: R$ ${acertoResult.faturamentoBruto.toFixed(2)}, Líquido Empresa: R$ ${acertoResult.liquidoConectaJoias.toFixed(2)}.`);
+
+    // Dispara notificação no sistema para a revendedora
+    try {
+      await criarNotificacao(
+        req.lojaId,
+        'acerto_concluido',
+        `Seu acerto de contas foi finalizado com sucesso pela administradora! Faturamento: R$ ${acertoResult.faturamentoBruto.toFixed(2)}, Comissão a receber: R$ ${acertoResult.comissaoPaga.toFixed(2)}.`,
+        { acertoId: acertoResult.acerto.id, faturamento: acertoResult.faturamentoBruto, comissao: acertoResult.comissaoPaga },
+        usuarioId
+      );
+    } catch (notifErr) {
+      console.error("Erro ao gerar notificação de acerto concluído:", notifErr);
+    }
 
     res.json({
       message: 'Acerto concluído com sucesso!',
@@ -2833,19 +2877,65 @@ app.delete('/api/clientes', autenticarJWT, autorizarRole(['Manager', 'SuperAdmin
 let sseClients = [];
 
 function dispararNotificacaoRealtime(lojaId, notificacao) {
-  // Disparado de forma restrita e exclusiva apenas para contas Manager/SuperAdmin daquela loja
-  const clientsOfLoja = sseClients.filter(c => c.lojaId === lojaId && (c.role === 'Manager' || c.role === 'SuperAdmin'));
-  clientsOfLoja.forEach(c => {
-    try {
-      c.res.write(`data: ${JSON.stringify({ tipo: 'notificacao', data: notificacao })}\n\n`);
-    } catch (err) {
-      console.error('Erro ao enviar mensagem SSE para cliente:', err.message);
+  // Envia a notificação somente para quem é o destinatário correto
+  sseClients.forEach(c => {
+    if (c.lojaId === lojaId) {
+      const isDestinatario = 
+        // Notificação para administrador (destinatarioId null) e o cliente SSE é admin
+        (notificacao.destinatarioId === null && (c.role === 'Manager' || c.role === 'SuperAdmin')) ||
+        // Notificação para uma revendedora específica (destinatarioId === c.usuarioId)
+        (notificacao.destinatarioId !== null && c.usuarioId === notificacao.destinatarioId);
+
+      if (isDestinatario) {
+        try {
+          c.res.write(`data: ${JSON.stringify({ tipo: 'notificacao', data: notificacao })}\n\n`);
+        } catch (err) {
+          console.error('Erro ao enviar mensagem SSE para cliente:', err.message);
+        }
+      }
     }
   });
 }
 
+async function criarNotificacao(lojaId, tipo, message, detalhesObj = {}, destinatarioId = null) {
+  try {
+    const novaNotif = await prisma.notificacao.create({
+      data: {
+        tipo,
+        mensagem: message,
+        detalhes: JSON.stringify(detalhesObj),
+        destinatarioId,
+        lojaId
+      }
+    });
+    dispararNotificacaoRealtime(lojaId, novaNotif);
+    return novaNotif;
+  } catch (error) {
+    console.error("Erro ao criar/disparar notificação:", error);
+  }
+}
+
+async function notificarModificacaoCatalogo(lojaId) {
+  try {
+    const revendedoras = await prisma.usuario.findMany({
+      where: { role: 'Consultant', lojaId }
+    });
+    for (const rev of revendedoras) {
+      await criarNotificacao(
+        lojaId,
+        'atualizacao_catalogo',
+        'O catálogo de semijoias da administradora foi atualizado! Verifique as novidades.',
+        { dataAlteracao: new Date().toISOString() },
+        rev.id
+      );
+    }
+  } catch (err) {
+    console.error("Erro ao notificar modificação de catálogo:", err);
+  }
+}
+
 // Canal de notificações em tempo real (SSE)
-app.get('/api/realtime/notificacoes', autenticarJWT, autorizarRole(['Manager', 'SuperAdmin']), identificarLoja, (req, res) => {
+app.get('/api/realtime/notificacoes', autenticarJWT, autorizarRole(['Consultant', 'Manager', 'SuperAdmin']), identificarLoja, (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -2855,6 +2945,7 @@ app.get('/api/realtime/notificacoes', autenticarJWT, autorizarRole(['Manager', '
     id: Date.now(),
     lojaId: req.lojaId,
     role: req.user ? req.user.role : 'Manager',
+    usuarioId: req.user ? req.user.id : null,
     res
   };
   sseClients.push(cliente);
@@ -2862,7 +2953,7 @@ app.get('/api/realtime/notificacoes', autenticarJWT, autorizarRole(['Manager', '
   // Envia ping inicial
   res.write(`data: ${JSON.stringify({ tipo: 'ping', message: 'Conectado ao canal de notificações em tempo real.' })}\n\n`);
 
-  // Mantém a conexão ativa com pings a cada 15 segundos para evitar timeouts do Heroku/Azure/etc
+  // Mantém a conexão ativa com pings a cada 15 segundos
   const keepAlive = setInterval(() => {
     try {
       res.write(`data: ${JSON.stringify({ tipo: 'ping' })}\n\n`);
@@ -2880,8 +2971,15 @@ app.get('/api/realtime/notificacoes', autenticarJWT, autorizarRole(['Manager', '
 // Listar notificações não lidas
 app.get('/api/notificacoes', autenticarJWT, autorizarRole(['Consultant', 'Manager', 'SuperAdmin']), identificarLoja, async (req, res) => {
   try {
+    let where = { lida: false, lojaId: req.lojaId };
+    if (req.user.role === 'Consultant') {
+      where.destinatarioId = req.user.id;
+    } else {
+      where.destinatarioId = null; // Admins recebem apenas notificações sem destinatário específico
+    }
+
     const notificacoes = await prisma.notificacao.findMany({
-      where: { lida: false, lojaId: req.lojaId },
+      where,
       orderBy: { createdAt: 'desc' }
     });
     res.json(notificacoes);
@@ -2895,14 +2993,21 @@ app.get('/api/notificacoes', autenticarJWT, autorizarRole(['Consultant', 'Manage
 app.put('/api/notificacoes/ler', autenticarJWT, autorizarRole(['Consultant', 'Manager', 'SuperAdmin']), identificarLoja, async (req, res) => {
   const { ids } = req.body;
   try {
+    let where = { lojaId: req.lojaId };
+    if (req.user.role === 'Consultant') {
+      where.destinatarioId = req.user.id;
+    } else {
+      where.destinatarioId = null;
+    }
+
     if (ids && Array.isArray(ids) && ids.length > 0) {
       await prisma.notificacao.updateMany({
-        where: { id: { in: ids }, lojaId: req.lojaId },
+        where: { id: { in: ids }, ...where },
         data: { lida: true }
       });
     } else {
       await prisma.notificacao.updateMany({
-        where: { lida: false, lojaId: req.lojaId },
+        where: { lida: false, ...where },
         data: { lida: true }
       });
     }
@@ -3221,11 +3326,16 @@ app.post('/api/public/onboarding', signupLimiter, uploadDocs.fields([
   }
 });
 
-app.get('/api/usuarios/:id/documentos', autenticarJWT, autorizarRole(['Manager', 'SuperAdmin']), identificarLoja, async (req, res) => {
+app.get('/api/usuarios/:id/documentos', autenticarJWT, identificarLoja, async (req, res) => {
   const { id } = req.params;
   try {
-    // Se não for SuperAdmin, valida se o usuário alvo pertence à mesma loja
-    if (req.user.role !== 'SuperAdmin') {
+    // Consultant só pode acessar seus próprios documentos
+    if (req.user.role === 'Consultant' && req.user.id !== id) {
+      return res.status(403).json({ error: 'Acesso negado. Você só pode consultar seus próprios documentos.' });
+    }
+
+    // Se não for SuperAdmin, valida se pertence à mesma loja (apenas para Managers)
+    if (req.user.role === 'Manager' && req.user.role !== 'SuperAdmin') {
       const usuarioDestino = await prisma.usuario.findFirst({
         where: { id: id, lojaId: req.lojaId }
       });
@@ -3243,6 +3353,80 @@ app.get('/api/usuarios/:id/documentos', autenticarJWT, autorizarRole(['Manager',
     res.json({ documentos, respostaOnboarding: respostaOnb });
   } catch (error) {
     res.status(500).json({ error: 'Erro ao listar documentos.' });
+  }
+});
+
+// Novo endpoint: Upload de documentos para o cofre virtual da revendedora
+app.post('/api/usuarios/documentos/upload', autenticarJWT, uploadDocs.fields([
+  { name: 'rgFrente', maxCount: 1 },
+  { name: 'rgVerso', maxCount: 1 },
+  { name: 'documento', maxCount: 1 }
+]), async (req, res) => {
+  try {
+    const usuarioId = req.user.id;
+    const arquivos = req.files;
+
+    if (!arquivos || Object.keys(arquivos).length === 0) {
+      return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
+    }
+
+    const criados = [];
+
+    if (arquivos.rgFrente && arquivos.rgFrente[0]) {
+      const doc = await prisma.documentoUsuario.create({
+        data: {
+          usuarioId,
+          tipo: 'RG_FRENTE',
+          nomeArquivo: arquivos.rgFrente[0].originalname,
+          caminhoUrl: `/uploads/documentos/${arquivos.rgFrente[0].filename}`
+        }
+      });
+      criados.push(doc);
+    }
+
+    if (arquivos.rgVerso && arquivos.rgVerso[0]) {
+      const doc = await prisma.documentoUsuario.create({
+        data: {
+          usuarioId,
+          tipo: 'RG_VERSO',
+          nomeArquivo: arquivos.rgVerso[0].originalname,
+          caminhoUrl: `/uploads/documentos/${arquivos.rgVerso[0].filename}`
+        }
+      });
+      criados.push(doc);
+    }
+
+    if (arquivos.documento && arquivos.documento[0]) {
+      const tipo = req.query.tipo || 'COMPROVANTE_RESIDENCIA';
+      const doc = await prisma.documentoUsuario.create({
+        data: {
+          usuarioId,
+          tipo: tipo,
+          nomeArquivo: arquivos.documento[0].originalname,
+          caminhoUrl: `/uploads/documentos/${arquivos.documento[0].filename}`
+        }
+      });
+      criados.push(doc);
+    }
+
+    if (criados.length > 0) {
+      try {
+        await criarNotificacao(
+          req.lojaId,
+          'cofre_virtual_upload',
+          `A revendedora ${req.user.nome} enviou ${criados.length} novo(s) documento(s)/foto(s) para o Cofre Virtual.`,
+          { usuarioNome: req.user.nome, totalDocumentos: criados.length },
+          null
+        );
+      } catch (notifErr) {
+        console.error("Erro ao gerar notificação do cofre virtual:", notifErr);
+      }
+    }
+
+    res.status(201).json({ message: 'Documentos carregados com sucesso!', documentos: criados });
+  } catch (error) {
+    console.error('Erro ao fazer upload de documentos:', error);
+    res.status(500).json({ error: 'Erro ao fazer upload de documentos.' });
   }
 });
 
@@ -3704,6 +3888,18 @@ app.post('/api/termos/gerar', autenticarJWT, autorizarRole(['Manager', 'SuperAdm
       }
     });
 
+    try {
+      await criarNotificacao(
+        req.lojaId,
+        'termo_solicitado',
+        `A vendedora principal solicitou a assinatura do Termo da Maleta: "${titulo}".`,
+        { termoId: termo.id, titulo },
+        usuarioId
+      );
+    } catch (notifErr) {
+      console.error("Erro ao gerar notificação de solicitação de termo:", notifErr);
+    }
+
     res.status(201).json(termo);
   } catch (error) {
     console.error('Erro ao criar termo:', error);
@@ -3733,6 +3929,25 @@ app.get('/api/termos', autenticarJWT, identificarLoja, async (req, res) => {
   }
 });
 
+// Obter detalhes de um termo específico (Público - para assinatura)
+app.get('/api/public/termos/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const termo = await prisma.termoConsignacao.findUnique({
+      where: { id },
+      include: {
+        usuario: { select: { nome: true } }
+      }
+    });
+    if (!termo) {
+      return res.status(404).json({ error: 'Termo de consignação não encontrado.' });
+    }
+    res.json(termo);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao obter termo de consignação.' });
+  }
+});
+
 // Assinar Termo Digitalmente
 app.post('/api/public/termos/:id/assinar', async (req, res) => {
   const { id } = req.params;
@@ -3757,6 +3972,19 @@ app.post('/api/public/termos/:id/assinar', async (req, res) => {
         dataAssinatura: new Date()
       }
     });
+
+    try {
+      const usr = await prisma.usuario.findUnique({ where: { id: termo.usuarioId } });
+      await criarNotificacao(
+        usr ? usr.lojaId : 'default-loja',
+        'termo_assinado',
+        `A revendedora ${nome} assinou o Termo da Maleta: "${termo.titulo}".`,
+        { termoId: id, nome, cpf },
+        null
+      );
+    } catch (notifErr) {
+      console.error("Erro ao gerar notificação de assinatura de termo:", notifErr);
+    }
 
     // Atualiza status no usuário também
     await prisma.usuario.update({

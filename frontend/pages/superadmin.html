@@ -86,6 +86,9 @@
           <li class="nav-item active" data-target="dashboard">
             <button id="btn-tab-dashboard"><i class="fa-solid fa-gem"></i>Painel Geral</button>
           </li>
+          <li class="nav-item" data-target="meu-negocio">
+            <button id="btn-tab-meu-negocio"><i class="fa-solid fa-chart-line"></i>Meu Negócio</button>
+          </li>
           <li class="nav-item" data-target="estoque">
             <button id="btn-tab-estoque"><i class="fa-solid fa-boxes-stacked"></i>Estoque & Custos</button>
           </li>
@@ -307,9 +310,53 @@
             </div>
           </div>
         </div>
+      </section>
+
+      <!-- ==========================================
+           ABA: MEU NEGÓCIO (DRE & KPIs)
+           ========================================== -->
+      <section id="meu-negocio" class="app-section">
+        <div class="section-header">
+          <div class="section-title">
+            <h2>Meu Negócio e Performance Financeira</h2>
+            <p>Monitore a saúde financeira, faturamento, despesas e o Demonstrativo de Resultados do Exercício (DRE) em tempo real.</p>
+          </div>
+        </div>
+
+        <!-- Indicadores de Lucratividade / Performance do Negócio -->
+        <div class="metrics-grid" style="margin-bottom: 2rem;">
+          <div class="metric-card">
+            <div class="metric-icon" style="background: rgba(212,175,55,0.1); color: var(--gold-primary);"><i class="fa-solid fa-calculator"></i></div>
+            <div class="metric-info">
+              <h3>Faturamento Bruto</h3>
+              <div class="metric-value" id="kpi-faturamento-bruto">R$ 0,00</div>
+            </div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-icon" style="background: rgba(129, 199, 132, 0.1); color: #81c784;"><i class="fa-solid fa-chart-line"></i></div>
+            <div class="metric-info">
+              <h3>Faturamento Líquido</h3>
+              <div class="metric-value" id="kpi-faturamento-liquido">R$ 0,00</div>
+            </div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-icon" style="background: rgba(239, 83, 80, 0.1); color: #ef5350;"><i class="fa-solid fa-tags"></i></div>
+            <div class="metric-info">
+              <h3>CMV (Custo de Venda)</h3>
+              <div class="metric-value" id="kpi-cmv-total">R$ 0,00</div>
+            </div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-icon" style="background: rgba(102, 187, 106, 0.1); color: #66bb6a;"><i class="fa-solid fa-coins"></i></div>
+            <div class="metric-info">
+              <h3>Lucro Líquido Real</h3>
+              <div class="metric-value" id="kpi-lucro-liquido">R$ 0,00</div>
+            </div>
+          </div>
+        </div>
 
         <!-- Relatório DRE Simplificado -->
-        <div class="dashboard-panel" style="margin-top: 2rem; width: 100%;">
+        <div class="dashboard-panel" style="width: 100%;">
           <div class="panel-header">
             <h2><i class="fa-solid fa-calculator"></i> Demonstrativo do Resultado do Exercício (DRE)</h2>
             <div class="dre-filter-container" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
@@ -795,9 +842,8 @@
               </div>
             </div>
 
-            <!-- Conteúdo Sub-Aba: Termos de Consignação -->
             <div id="sub-aba-rev-termos" class="sub-aba-rev" style="display: none;">
-              <div style="display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 1.5rem; margin-top: 1rem;">
+              <div class="termos-grid">
                 <!-- Lista de Termos -->
                 <div>
                   <h4 style="font-family: var(--font-title); font-size: 1.15rem; color: var(--gold-light); margin-bottom: 1rem;"><i class="fa-solid fa-file-contract"></i> Termos Emitidos</h4>
@@ -2066,6 +2112,26 @@
               <span id="acerto-vendas-dinheiro">R$ 0,00</span>
             </div>
 
+            <!-- Conferência Financeira com Checkboxes se houver Dinheiro com a Revendedora -->
+            <div id="acerto-conferencia-financeira" style="display: none; margin-top: 1rem; margin-bottom: 1rem; padding: 0.8rem; background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: var(--radius-sm);">
+              <h4 style="font-size: 0.85rem; color: var(--gold-light); margin-bottom: 0.6rem; display: flex; align-items: center; gap: 6px; font-weight: 600;"><i class="fa-solid fa-cash-register"></i> Conferência Financeira</h4>
+              
+              <label style="display: flex; align-items: flex-start; gap: 0.5rem; cursor: pointer; font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                <input type="checkbox" id="acerto-chk-dinheiro-entregue" onchange="app.calcularResumoFechamentoAcerto()" style="width: 15px; height: 15px; margin-top: 2px; accent-color: var(--gold-primary);">
+                <span>O dinheiro das vendas em mãos (R$ <span id="acerto-conf-dinheiro-val">0,00</span>) já foi entregue fisicamente para a gestora?</span>
+              </label>
+
+              <label style="display: flex; align-items: flex-start; gap: 0.5rem; cursor: pointer; font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                <input type="checkbox" id="acerto-chk-pix-conferido" style="width: 15px; height: 15px; margin-top: 2px; accent-color: var(--gold-primary);">
+                <span>Os Pix/Cartões recebidos direto pela gestora (R$ <span id="acerto-conf-pix-val">0,00</span>) foram conferidos no extrato?</span>
+              </label>
+
+              <label style="display: flex; align-items: flex-start; gap: 0.5rem; cursor: pointer; font-size: 0.78rem; color: var(--text-secondary);">
+                <input type="checkbox" id="acerto-chk-comissao-paga" style="width: 15px; height: 15px; margin-top: 2px; accent-color: var(--gold-primary);">
+                <span>A comissão final e acerto deste ciclo foi paga/negociada com a revendedora?</span>
+              </label>
+            </div>
+
             <!-- Opção de Retenção de Estoque na Maleta -->
             <div style="margin-top: 1rem; margin-bottom: 1rem; padding: 0.8rem; background: rgba(212, 175, 55, 0.05); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: var(--radius-sm);">
               <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; font-size: 0.85rem; color: var(--gold-light);">
@@ -2077,6 +2143,11 @@
             <div class="pricing-row total" style="margin: 0.8rem 0; padding: 0.8rem 0; font-size: 1.15rem; background: rgba(212, 175, 55, 0.05); padding-left: 0.5rem; padding-right: 0.5rem; border-radius: var(--radius-sm);">
               <span id="acerto-lbl-saldo-final">Saldo Final a Pagar Revendedora</span>
               <span id="acerto-total-liquido-receber">R$ 0,00</span>
+            </div>
+
+            <!-- Explicação dinâmica do Acerto (Quem paga quem) -->
+            <div id="acerto-explicacao-resumo" style="font-size: 0.8rem; padding: 0.8rem; background: rgba(212, 175, 55, 0.08); border: 1px dashed rgba(212, 175, 55, 0.3); border-radius: var(--radius-sm); color: var(--text-secondary); line-height: 1.4; margin-bottom: 1rem;">
+              Calculando explicação do acerto...
             </div>
 
             <div class="form-group" style="margin-top: 1rem; margin-bottom: 1rem;">
