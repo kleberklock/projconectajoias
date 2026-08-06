@@ -192,8 +192,42 @@ const checkout = {
         this.renderizarBoleto(linkData.boletoLinhaDigitavel, linkData.asaasInvoiceUrl);
       }
 
+      // Iniciar polling para checar se o pagamento foi confirmado via webhook ou simulação
+      if (linkData.status === "PENDENTE") {
+        this.iniciarPollingStatus();
+      }
+
     } catch (error) {
       this.toast(error.message, "error");
+    }
+  },
+
+  pollingTimer: null,
+
+  iniciarPollingStatus: function() {
+    if (this.pollingTimer) return;
+    this.pollingTimer = setInterval(async () => {
+      if (!this.linkId) return;
+      try {
+        const response = await fetch(`${API_BASE_URL}/public/pagamento/${this.linkId}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.status === "PAGO") {
+            this.pararPolling();
+            this.toast("Pagamento confirmado com sucesso!", "success");
+            this.exibirSucesso(this.linkId);
+          }
+        }
+      } catch (err) {
+        console.warn("Erro no polling de pagamento:", err.message);
+      }
+    }, 4000);
+  },
+
+  pararPolling: function() {
+    if (this.pollingTimer) {
+      clearInterval(this.pollingTimer);
+      this.pollingTimer = null;
     }
   },
 
@@ -272,6 +306,7 @@ const checkout = {
   },
 
   exibirSucesso: function(id) {
+    this.pararPolling();
     document.getElementById("checkout-main-content").style.display = "none";
     document.getElementById("success-id").innerText = id.toUpperCase();
     document.getElementById("success-date").innerText = new Date().toLocaleString("pt-BR");

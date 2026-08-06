@@ -101,8 +101,13 @@ const loginApp = {
     document.title = `${config.nomeEmpresa} - Login Premium`;
     const logoImg = document.getElementById("login-logo-img");
     if (logoImg) {
-      logoImg.src = config.logoUrl || "assets/logo.svg";
+      logoImg.src = config.logoUrl || "assets/logo.png";
       logoImg.alt = config.nomeEmpresa;
+    }
+    const signupLogoImg = document.getElementById("signup-logo-img");
+    if (signupLogoImg) {
+      signupLogoImg.src = config.logoUrl || "assets/logo.png";
+      signupLogoImg.alt = config.nomeEmpresa;
     }
     const inputEmail = document.getElementById("login-email");
     if (inputEmail) {

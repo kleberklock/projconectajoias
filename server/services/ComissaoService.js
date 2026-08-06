@@ -71,6 +71,65 @@ class ComissaoService {
     }
     return faixaSelecionada;
   }
+
+  /**
+   * Recalcula retroativamente a comissão de todas as vendas do ciclo em aberto de uma revendedora
+   * @param {Object} prismaClient - Cliente do Prisma ou transação
+   * @param {string} usuarioId - ID da revendedora
+   * @param {string} lojaId - ID da loja
+   * @returns {Promise<Object>} { percentualAplicado, totalVendasRecalculadas, faturamentoTotalCiclo }
+   */
+  async recalcularVendasCicloEmAberto(prismaClient, usuarioId, lojaId) {
+    try {
+      const revendedora = await prismaClient.usuario.findFirst({
+        where: { id: usuarioId, lojaId },
+        include: { faixasComissao: true, loja: { include: { faixasComissao: true } } }
+      });
+      if (!revendedora) return { percentualAplicado: 0, totalVendasRecalculadas: 0, faturamentoTotalCiclo: 0 };
+
+      const ultimoAcerto = await prismaClient.historicoAcerto.findFirst({
+        where: { usuarioId, lojaId },
+        orderBy: { data: 'desc' }
+      });
+      const dataInicioCiclo = ultimoAcerto ? new Date(ultimoAcerto.data) : new Date(0);
+
+      const vendasCiclo = await prismaClient.vendaRevendedora.findMany({
+        where: {
+          usuarioId,
+          lojaId,
+          data: { gt: dataInicioCiclo }
+        }
+      });
+
+      const faturamentoTotalCiclo = vendasCiclo.reduce((sum, v) => sum + (Number(v.precoVenda || 0) * Number(v.quantidade || 0)), 0);
+
+      const calc = this.calcularComissao(revendedora, faturamentoTotalCiclo, faturamentoTotalCiclo, 0);
+      const percentualAplicado = calc.percentualComissao;
+
+      // Atualiza retroativamente todas as vendas do ciclo em aberto
+      for (const venda of vendasCiclo) {
+        const valorTotalVenda = Number(venda.precoVenda || 0) * Number(venda.quantidade || 0);
+        const novaComissao = valorTotalVenda * (percentualAplicado / 100);
+
+        if (Math.abs(venda.comissaoValor - novaComissao) > 0.001) {
+          await prismaClient.vendaRevendedora.update({
+            where: { id: venda.id },
+            data: { comissaoValor: novaComissao }
+          });
+        }
+      }
+
+      return {
+        percentualAplicado,
+        totalVendasRecalculadas: vendasCiclo.length,
+        faturamentoTotalCiclo
+      };
+    } catch (err) {
+      console.error("Erro ao recalcular vendas do ciclo em aberto:", err);
+      return { percentualAplicado: 0, totalVendasRecalculadas: 0, faturamentoTotalCiclo: 0 };
+    }
+  }
 }
 
 module.exports = new ComissaoService();
+

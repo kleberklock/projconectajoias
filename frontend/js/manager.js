@@ -410,7 +410,7 @@ const app = {
     const logoBrand = document.getElementById("logo-brand");
     const brandTextSpan = document.getElementById("brand-text-span");
     if (logoBrand) {
-      if (config.logoUrl && config.logoUrl !== "" && !config.logoUrl.includes("logo.svg")) {
+      if (config.logoUrl && config.logoUrl !== "" && !config.logoUrl.includes("logo.svg") && !config.logoUrl.includes("logo.png")) {
         logoBrand.src = config.logoUrl;
         logoBrand.alt = config.nomeEmpresa;
         logoBrand.style.display = "block";
@@ -423,7 +423,7 @@ const app = {
             brandTextSpan.style.display = "block";
           }
         } else {
-          logoBrand.src = "assets/logo.svg";
+          logoBrand.src = "assets/logo.png";
           logoBrand.alt = "Conecta Joias";
           logoBrand.style.display = "block";
           if (brandTextSpan) brandTextSpan.style.display = "none";
@@ -539,12 +539,17 @@ const app = {
     const isManager = ['Manager', 'SuperAdmin', 'ADMIN_LOJA', 'SUPER_ADMIN', 'admin'].includes(this.state.usuarioLogado ? this.state.usuarioLogado.role : '');
     
     if (isManager) {
-      // Perfil Administrador/Manager: Carrega dados do painel completo
-      await this.carregarConfiguracaoAPI();
-      await this.carregarProdutosDaAPI();
-      await this.carregarRevendedorasDaAPI();
-      await this.carregarClientesDaAPI();
-      await this.carregarVendasConsolidadas();
+      // Perfil Administrador/Manager: Exibe Frame 1 e carrega dados protegidos em paralelo
+      this.renderizarDashboard();
+
+      await Promise.allSettled([
+        this.carregarConfiguracaoAPI(),
+        this.carregarProdutosDaAPI(),
+        this.carregarRevendedorasDaAPI(),
+        this.carregarClientesDaAPI(),
+        this.carregarVendasConsolidadas()
+      ]);
+
       this.renderizarEstoque();
       this.renderizarRevendedoras();
       this.renderizarDashboard();
@@ -809,6 +814,30 @@ const app = {
     if (elComissao) elComissao.innerText = `R$ ${comissaoProjetada.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
     if (elVendas) elVendas.innerText = `R$ ${faturamentoTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
 
+    // Novo Card: Comissão Adquirida (Garantida no momento)
+    let totalComissaoAdquirida = 0;
+    vendas.forEach(v => {
+      totalComissaoAdquirida += Number(v.comissaoValor || 0);
+    });
+
+    const baseCalculo = (rev && rev.baseCalculo) ? rev.baseCalculo : (this.state.usuarioLogado?.baseCalculo || 'BRUTO');
+    const isLiquido = baseCalculo === 'LIQUIDO';
+
+    const elComissaoAdquirida = document.getElementById("maleta-comissao-adquirida");
+    const elTagBase = document.getElementById("maleta-tag-base-calculo");
+    const elSubtituloBase = document.getElementById("maleta-subtitulo-base");
+
+    if (elComissaoAdquirida) elComissaoAdquirida.innerText = `R$ ${totalComissaoAdquirida.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    if (elTagBase) {
+      elTagBase.innerText = isLiquido ? "Base: Líquido" : "Base: Bruto";
+      elTagBase.style.background = isLiquido ? "rgba(100, 181, 246, 0.15)" : "rgba(129, 199, 132, 0.18)";
+      elTagBase.style.color = isLiquido ? "#64b5f6" : "#81c784";
+      elTagBase.style.borderColor = isLiquido ? "rgba(100, 181, 246, 0.35)" : "rgba(129, 199, 132, 0.35)";
+    }
+    if (elSubtituloBase) {
+      elSubtituloBase.innerText = isLiquido ? "Calculado sobre o Valor Líquido" : "Calculado sobre o Valor Bruto";
+    }
+
     // Reaplica a ordem dos widgets no DOM
     this.aplicarOrdemWidgets();
 
@@ -1015,7 +1044,7 @@ const app = {
         }
       }
 
-      const comissaoPadrao = rev.comissao || 30;
+      const comissaoPadrao = faixas.length > 0 ? faixas[0].percentual : (rev.comissao || 30);
       const percentualAtual = faixaAtual ? faixaAtual.percentual : comissaoPadrao;
 
       // Encontra a próxima faixa
@@ -2253,8 +2282,10 @@ const app = {
     document.querySelectorAll(".app-section").forEach(sec => {
       if (sec.getAttribute("id") === this.state.abaAtiva) {
         sec.classList.add("active");
+        sec.style.display = "block";
       } else {
         sec.classList.remove("active");
+        sec.style.display = "none";
       }
     });
   },
@@ -5814,6 +5845,22 @@ ${dinheiroAReceberDaRev >= comissaoApagarParaRev
         links = links.filter(l => l.usuarioId === revId);
       }
 
+      let totalPendente = 0;
+      let totalPago = 0;
+
+      links.forEach(l => {
+        if (l.status === "PAGO") {
+          totalPago += Number(l.valor || 0);
+        } else {
+          totalPendente += Number(l.valor || 0);
+        }
+      });
+
+      const elPendente = document.getElementById("kpi-links-pendente");
+      const elPago = document.getElementById("kpi-links-pago");
+      if (elPendente) elPendente.innerText = `R$ ${totalPendente.toFixed(2).replace(".", ",")}`;
+      if (elPago) elPago.innerText = `R$ ${totalPago.toFixed(2).replace(".", ",")}`;
+
       if (links.length === 0) {
         tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 1.5rem;">Nenhum link de pagamento gerado ainda.</td></tr>`;
       } else {
@@ -5821,22 +5868,31 @@ ${dinheiroAReceberDaRev >= comissaoApagarParaRev
           const statusCor = l.status === "PENDENTE" ? "var(--warning)" : "#81c784";
           const statusTxt = l.status === "PENDENTE" ? "Pendente" : "Compensado";
           
+          const clienteNomeExibido = l.cliente ? l.cliente.nome : (l.clienteNome || "Cliente Avulso");
+          const clienteFone = l.cliente ? (l.cliente.whatsapp || l.cliente.telefone) : (l.clienteWhatsapp || "");
+          const urlCheckout = `pagamento.html?id=${l.id}`;
+          const fullUrl = `${window.location.origin}/${urlCheckout}`;
+
           let acoes = "";
           if (l.status === "PENDENTE") {
-            const urlCheckout = `pagamento.html?id=${l.id}`;
             acoes = `
-              <button class="btn-qty" style="color: var(--gold-primary);" onclick="navigator.clipboard.writeText('${window.location.origin}/${urlCheckout}').then(() => alert('Link de checkout copiado!'));" title="Copiar Link de Pagamento">
-                <i class="fa-solid fa-copy"></i> Copiar
+              <button class="btn-qty" style="color: #25D366;" onclick="app.enviarWhatsappLink('${l.id}', '${clienteNomeExibido.replace(/'/g, "\\'")}', '${clienteFone}', ${l.valor})" title="Enviar via WhatsApp">
+                <i class="fa-brands fa-whatsapp"></i>
               </button>
-              <a href="${urlCheckout}" target="_blank" class="btn-qty" style="color: var(--gold-light); text-decoration: none;" title="Abrir Checkout Externo">
-                <i class="fa-solid fa-up-right-from-square"></i> Abrir
+              <button class="btn-qty" style="color: var(--gold-primary);" onclick="navigator.clipboard.writeText('${fullUrl}').then(() => app.toast('Link copiado!', 'success'));" title="Copiar Link">
+                <i class="fa-solid fa-copy"></i>
+              </button>
+              <a href="${urlCheckout}" target="_blank" class="btn-qty" style="color: var(--gold-light); text-decoration: none;" title="Abrir Checkout">
+                <i class="fa-solid fa-up-right-from-square"></i>
               </a>
+              <button class="btn-qty" style="color: #81c784;" onclick="app.simularBaixaLink('${l.id}')" title="Simular Baixa / Pago">
+                <i class="fa-solid fa-bolt"></i> Simular
+              </button>
             `;
           } else {
-            acoes = `<span style="font-size: 0.8rem; color: var(--text-muted);"><i class="fa-solid fa-circle-check"></i> Pago</span>`;
+            acoes = `<span style="font-size: 0.8rem; color: #81c784; font-weight: 600;"><i class="fa-solid fa-circle-check"></i> Pago</span>`;
           }
 
-          const clienteNomeExibido = l.cliente ? l.cliente.nome : (l.clienteNome || "Cliente Avulso");
           const formaPagamentoExibida = l.formaEnvio || l.forma || "PIX";
 
           return `
@@ -5846,13 +5902,47 @@ ${dinheiroAReceberDaRev >= comissaoApagarParaRev
               <td style="padding: 12px; font-weight: bold;">R$ ${Number(l.valor).toFixed(2).replace(".", ",")}</td>
               <td style="padding: 12px; font-size: 0.85rem; color: var(--gold-light);">${formaPagamentoExibida}</td>
               <td style="padding: 12px; color: ${statusCor}; font-weight: 600;">${statusTxt}</td>
-              <td style="padding: 12px; display: flex; gap: 0.5rem;">${acoes}</td>
+              <td style="padding: 12px; display: flex; gap: 0.4rem; justify-content: center;">${acoes}</td>
             </tr>
           `;
         }).join("");
       }
     } catch (error) {
       console.error(error);
+    }
+  },
+
+  enviarWhatsappLink: function(linkId, clienteNome, clienteFone, valor) {
+    const urlCheckout = `${window.location.origin}/pages/pagamento.html?id=${linkId}`;
+    const textoMsg = encodeURIComponent(`Olá ${clienteNome || ''}! Seu link seguro para pagamento no Conecta Joias (R$ ${Number(valor).toFixed(2).replace('.', ',')}) está pronto:\n\n${urlCheckout}\n\nAguardamos sua confirmação! 💎`);
+    
+    let whatsappUrl = `https://api.whatsapp.com/send?text=${textoMsg}`;
+    if (clienteFone) {
+      const foneLimpo = clienteFone.replace(/\D/g, '');
+      if (foneLimpo.length >= 10) {
+        whatsappUrl = `https://api.whatsapp.com/send?phone=55${foneLimpo}&text=${textoMsg}`;
+      }
+    }
+    window.open(whatsappUrl, '_blank');
+  },
+
+  simularBaixaLink: async function(linkId) {
+    if (!confirm("Deseja simular a baixa/confirmação deste pagamento no sistema?")) return;
+    try {
+      if (this.state.token && !this.state.token.startsWith("mock_")) {
+        await this.requisitarAPI(`/public/pagamento/${linkId}/confirmar`, "POST");
+      } else {
+        let mockLinks = JSON.parse(localStorage.getItem("conectajoias_links_pagamento_mock") || "[]");
+        const idx = mockLinks.findIndex(l => l.id === linkId);
+        if (idx !== -1) {
+          mockLinks[idx].status = "PAGO";
+          localStorage.setItem("conectajoias_links_pagamento_mock", JSON.stringify(mockLinks));
+        }
+      }
+      this.toast("Pagamento simulado como PAGO com sucesso!", "success");
+      this.carregarLinksPagamento();
+    } catch (err) {
+      this.toast("Erro ao simular baixa: " + err.message, "error");
     }
   },
 

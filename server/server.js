@@ -1363,6 +1363,13 @@ app.get('/api/revendedoras/minha-maleta', autenticarJWT, identificarLoja, async 
     });
     const dataInicioCiclo = ultimoAcerto ? new Date(ultimoAcerto.data) : new Date(0);
 
+    // Recalcula retroativamente todas as vendas do ciclo em aberto da revendedora
+    try {
+      await comissaoService.recalcularVendasCicloEmAberto(prisma, usuarioId, req.lojaId);
+    } catch (e) {
+      console.error("Erro ao recalcular vendas em minha-maleta:", e);
+    }
+
     const vendasCiclo = await prisma.vendaRevendedora.findMany({
       where: {
         usuarioId,
@@ -2341,6 +2348,13 @@ app.post('/api/vendas-revendedora', autenticarJWT, autorizarRole(['Consultant'])
         where: { id: venda.id },
         data: { linkPagamentoId: linkId }
       });
+    }
+
+    // Recalcula retroativamente todas as vendas do ciclo em aberto da revendedora
+    try {
+      await comissaoService.recalcularVendasCicloEmAberto(prisma, usuarioId, req.lojaId);
+    } catch (recalcErr) {
+      console.error("Erro ao recalcular comissões do ciclo:", recalcErr);
     }
 
     // Cria notificação de venda para o Admin

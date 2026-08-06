@@ -10,7 +10,8 @@
   <meta name="theme-color" content="#d4af37">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="apple-touch-icon" href="../assets/logo.svg">
+  <link rel="icon" type="image/png" href="../assets/favicon.png">
+  <link rel="apple-touch-icon" href="../assets/favicon.png">
 
   <!-- SEO Meta Tags -->
   <meta name="description" content="Plataforma de gestão inteligente e precificação para vendedoras e revendedoras de semijoias. Controle de estoque, consignação e marketing integrado.">
@@ -32,7 +33,7 @@
        ========================================== -->
   <!-- Barra Superior Mobile com Hambúrguer -->
   <div class="mobile-top-bar">
-    <img src="../assets/logo.svg" alt="Conecta Joias" class="mobile-brand">
+    <img src="../assets/logo.png" alt="Conecta Joias" class="mobile-brand">
     <button class="btn-mobile-toggle" id="btn-toggle-sidebar-mobile" onclick="app.toggleSidebarMobile()" aria-label="Abrir Menu">
       <i class="fa-solid fa-bars"></i>
     </button>
@@ -47,7 +48,7 @@
     <aside class="sidebar mobile-drawer">
       <div class="brand" style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 2.5rem; padding: 0 0.5rem;">
         <!-- Inclusão do logotipo SVG premium criado previamente -->
-        <img src="../assets/logo.svg" alt="Conecta Joias" id="logo-brand" style="max-width: 140px; height: auto;">
+        <img src="../assets/logo.png" alt="Conecta Joias" id="logo-brand" style="max-width: 140px; height: auto;">
         
         <!-- Sino de Notificações na Sidebar (Manager) -->
         <div id="notif-wrapper" style="position: relative; z-index: 100;">
@@ -198,7 +199,7 @@
 
            ABA: DASHBOARD (INATIVA PARA REVENDEDORA)
            ========================================== -->
-      <section id="dashboard" class="app-section" style="display: none !important;">
+      <section id="dashboard" class="app-section">
         <div class="section-header">
           <div class="section-title">
             <h1 id="main-h1">Conecta Joias</h1>
@@ -571,6 +572,23 @@
             <div class="metric-info">
               <h3>Faturamento Total</h3>
               <div class="metric-value vendas-destaque" id="maleta-vendas-hoje">R$ 0,00</div>
+            </div>
+          </div>
+
+          <!-- Card: Comissão Adquirida (Garantida no momento) -->
+          <div class="metric-card" id="widget-comissao-adquirida" data-widget="comissao-adquirida" style="position: relative; border-color: rgba(129, 199, 132, 0.35); background: rgba(129, 199, 132, 0.03);">
+            <div class="widget-controls" style="position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; z-index: 10;">
+              <button onclick="event.stopPropagation(); app.moverWidget('left', 'comissao-adquirida')" style="background: rgba(0,0,0,0.4); border: 1px solid rgba(129, 199, 132, 0.3); color: #81c784; cursor: pointer; border-radius: 4px; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 0.75rem;" title="Mover Esquerda"><i class="fa-solid fa-chevron-left"></i></button>
+              <button onclick="event.stopPropagation(); app.moverWidget('right', 'comissao-adquirida')" style="background: rgba(0,0,0,0.4); border: 1px solid rgba(129, 199, 132, 0.3); color: #81c784; cursor: pointer; border-radius: 4px; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 0.75rem;" title="Mover Direita"><i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+            <div class="metric-icon" style="color: #81c784; background: rgba(129, 199, 132, 0.12);"><i class="fa-solid fa-sack-dollar"></i></div>
+            <div class="metric-info">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-wrap: wrap;">
+                <h3>Comissão Adquirida</h3>
+                <span id="maleta-tag-base-calculo" style="font-size: 0.65rem; font-weight: 700; padding: 2px 7px; border-radius: 12px; background: rgba(129, 199, 132, 0.18); color: #81c784; border: 1px solid rgba(129, 199, 132, 0.35);">Base: Bruto</span>
+              </div>
+              <div class="metric-value" style="color: #81c784; font-weight: 700;" id="maleta-comissao-adquirida">R$ 0,00</div>
+              <small id="maleta-subtitulo-base" style="font-size: 0.72rem; color: var(--text-secondary); display: block; margin-top: 2px;">Calculado sobre o Valor Bruto</small>
             </div>
           </div>
         </div>
@@ -1263,7 +1281,7 @@
 
               <div class="form-group" style="margin-bottom: 1.5rem;">
                 <label for="cfg-logo-url" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">URL do Logotipo (Logo)</label>
-                <input type="text" id="cfg-logo-url" class="form-control" placeholder="Ex: assets/logo.svg ou link externo">
+                <input type="text" id="cfg-logo-url" class="form-control" placeholder="Ex: assets/logo.png ou link externo">
               </div>
 
               <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
@@ -1461,6 +1479,28 @@
           </div>
         </div>
 
+        <!-- Stats dos Links -->
+        <div class="kpi-grid" style="grid-template-columns: repeat(2, 1fr); gap: 1.5rem; margin-bottom: 1.5rem;">
+          <div class="kpi-card">
+            <div class="kpi-icon" style="background: rgba(255, 179, 0, 0.1); color: var(--warning);">
+              <i class="fa-solid fa-clock"></i>
+            </div>
+            <div class="kpi-info">
+              <span class="kpi-label">Pendente de Recebimento</span>
+              <h3 class="kpi-value" id="kpi-links-pendente">R$ 0,00</h3>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-icon" style="background: rgba(129, 199, 132, 0.1); color: #81c784;">
+              <i class="fa-solid fa-circle-check"></i>
+            </div>
+            <div class="kpi-info">
+              <span class="kpi-label">Total Liquidado (Pago)</span>
+              <h3 class="kpi-value" id="kpi-links-pago">R$ 0,00</h3>
+            </div>
+          </div>
+        </div>
+
         <div class="split-layout" style="grid-template-columns: 1.2fr 0.8fr; gap: 2rem;">
           <!-- Histórico / Links Gerados -->
           <div class="dashboard-panel">
@@ -1473,16 +1513,15 @@
                   <tr>
                     <th>Data</th>
                     <th>Cliente</th>
-                    <th>Produto(s)</th>
                     <th>Valor</th>
                     <th>Forma</th>
                     <th>Status</th>
-                    <th>Ações</th>
+                    <th style="text-align: center;">Ações</th>
                   </tr>
                 </thead>
                 <tbody id="tbody-links-pagamento">
                   <tr>
-                    <td colspan="7" style="text-align: center; color: var(--text-secondary);">Nenhum link de pagamento gerado ainda.</td>
+                    <td colspan="6" style="text-align: center; color: var(--text-secondary);">Nenhum link de pagamento gerado ainda.</td>
                   </tr>
                 </tbody>
               </table>

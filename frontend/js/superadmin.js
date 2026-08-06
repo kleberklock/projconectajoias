@@ -429,7 +429,7 @@ const app = {
     const logoBrand = document.getElementById("logo-brand");
     const brandTextSpan = document.getElementById("brand-text-span");
     if (logoBrand) {
-      if (config.logoUrl && config.logoUrl !== "" && !config.logoUrl.includes("logo.svg")) {
+      if (config.logoUrl && config.logoUrl !== "" && !config.logoUrl.includes("logo.svg") && !config.logoUrl.includes("logo.png")) {
         logoBrand.src = config.logoUrl;
         logoBrand.alt = config.nomeEmpresa;
         logoBrand.style.display = "block";
@@ -442,7 +442,7 @@ const app = {
             brandTextSpan.style.display = "block";
           }
         } else {
-          logoBrand.src = "assets/logo.svg";
+          logoBrand.src = "assets/logo.png";
           logoBrand.alt = "Conecta Joias";
           logoBrand.style.display = "block";
           if (brandTextSpan) brandTextSpan.style.display = "none";
@@ -1307,7 +1307,7 @@ const app = {
           const previewContainer = document.getElementById("prod-foto-preview-container");
           if (previewContainer) previewContainer.style.display = "block";
           if (previewImg) {
-            previewImg.src = "assets/logo.svg"; 
+            previewImg.src = "assets/logo.png"; 
             previewImg.style.opacity = "0.5";
           }
 
@@ -1585,8 +1585,10 @@ const app = {
     document.querySelectorAll(".app-section").forEach(sec => {
       if (sec.getAttribute("id") === this.state.abaAtiva) {
         sec.classList.add("active");
+        sec.style.display = "block";
       } else {
         sec.classList.remove("active");
+        sec.style.display = "none";
       }
     });
   },
@@ -2941,7 +2943,7 @@ const app = {
     const faixaAtual = faixaAtualIdx !== -1 ? faixas[faixaAtualIdx] : null;
     const proximaFaixa = faixaAtualIdx + 1 < faixas.length ? faixas[faixaAtualIdx + 1] : null;
 
-    const percentualAtual = faixaAtual ? faixaAtual.percentual : rev.comissao;
+    const percentualAtual = faixaAtual ? faixaAtual.percentual : (faixas.length > 0 ? faixas[0].percentual : (rev.comissao || 30));
     statusText.innerText = `Faixa Atual: ${percentualAtual}%`;
 
     if (proximaFaixa) {

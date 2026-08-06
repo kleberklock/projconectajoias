@@ -383,7 +383,7 @@ const app = {
     const logoBrand = document.getElementById("logo-brand");
     const brandTextSpan = document.getElementById("brand-text-span");
     if (logoBrand) {
-      if (config.logoUrl && config.logoUrl !== "" && !config.logoUrl.includes("logo.svg")) {
+      if (config.logoUrl && config.logoUrl !== "" && !config.logoUrl.includes("logo.svg") && !config.logoUrl.includes("logo.png")) {
         logoBrand.src = config.logoUrl;
         logoBrand.alt = config.nomeEmpresa;
         logoBrand.style.display = "block";
@@ -396,7 +396,7 @@ const app = {
             brandTextSpan.style.display = "block";
           }
         } else {
-          logoBrand.src = "assets/logo.svg";
+          logoBrand.src = "assets/logo.png";
           logoBrand.alt = "Conecta Joias";
           logoBrand.style.display = "block";
           if (brandTextSpan) brandTextSpan.style.display = "none";
