@@ -203,8 +203,100 @@ async function obterCodigoBarrasBoleto(paymentId) {
   return await asaasRequest(`/payments/${paymentId}/identificationField`);
 }
 
+/**
+ * Cria cobrança de assinatura de plano SaaS (BRONZE, GOLD, PLATINUM)
+ */
+async function criarCobrancaPlanoSaaS(dados) {
+  const {
+    lojaId,
+    lojaNome,
+    plano, // "BRONZE" | "GOLD" | "PLATINUM"
+    formaEnvio, // "PIX" | "BOLETO" | "CARTAO"
+    clienteNome,
+    clienteCpfCnpj,
+    clienteEmail,
+    clienteWhatsapp,
+    cartaoDados,
+    enderecoDados
+  } = dados;
+
+  const precosPlanos = {
+    BRONZE: 147.00,
+    GOLD: 297.00,
+    PLATINUM: 497.00
+  };
+
+  const valor = precosPlanos[(plano || 'BRONZE').toUpperCase()] || 147.00;
+  const externalRef = `SAAS_PLANO_${lojaId}_${(plano || 'BRONZE').toUpperCase()}_${Date.now()}`;
+
+  if (eModoSimulado) {
+    console.log(`[Simulação ASAAS] Cobrança de Plano SaaS ${plano} no valor de R$ ${valor} via ${formaEnvio}`);
+    const payId = 'pay_saas_mock_' + Math.random().toString(36).substring(2, 10);
+    return {
+      id: payId,
+      status: formaEnvio === 'CARTAO' ? 'CONFIRMED' : 'PENDENTE',
+      value: valor,
+      externalReference: externalRef,
+      billingType: formaEnvio === 'CARTAO' ? 'CREDIT_CARD' : (formaEnvio === 'BOLETO' ? 'BOLETO' : 'PIX'),
+      bankSlipUrl: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+      invoiceUrl: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf'
+    };
+  }
+
+  const customerId = await obterOuCriarCliente({
+    nome: clienteNome || lojaNome || 'Lojista Conecta Joias',
+    cpfCnpj: clienteCpfCnpj,
+    email: clienteEmail,
+    whatsapp: clienteWhatsapp
+  });
+
+  let billingType = 'PIX';
+  if (formaEnvio === 'BOLETO') billingType = 'BOLETO';
+  if (formaEnvio === 'CARTAO') billingType = 'CREDIT_CARD';
+
+  const dataVencimento = new Date();
+  dataVencimento.setDate(dataVencimento.getDate() + 3);
+  const dueDateStr = dataVencimento.toISOString().split('T')[0];
+
+  const payload = {
+    customer: customerId,
+    billingType,
+    value: valor,
+    dueDate: dueDateStr,
+    description: `Assinatura Conecta Joias - Plano ${(plano || 'BRONZE').toUpperCase()}`,
+    externalReference: externalRef,
+  };
+
+  if (billingType === 'CREDIT_CARD' && cartaoDados) {
+    payload.creditCard = {
+      holderName: cartaoDados.holderName,
+      number: cartaoDados.number.replace(/\s/g, ''),
+      expiryMonth: cartaoDados.expiryMonth,
+      expiryYear: cartaoDados.expiryYear,
+      ccv: cartaoDados.cvv
+    };
+
+    const docLimpo = clienteCpfCnpj ? clienteCpfCnpj.replace(/\D/g, '') : '';
+    const telLimpo = clienteWhatsapp ? clienteWhatsapp.replace(/\D/g, '') : '';
+
+    payload.creditCardHolderInfo = {
+      name: cartaoDados.holderName || clienteNome || lojaNome,
+      email: clienteEmail || 'financeiro@conectajoias.com',
+      cpfCnpj: docLimpo,
+      postalCode: enderecoDados ? enderecoDados.cep.replace(/\D/g, '') : '01001000',
+      addressNumber: enderecoDados ? enderecoDados.numero : 'S/N',
+      addressComplement: enderecoDados ? enderecoDados.complemento : undefined,
+      phone: telLimpo || '11999999999',
+    };
+  }
+
+  const cobranca = await asaasRequest('/payments', 'POST', payload);
+  return cobranca;
+}
+
 module.exports = {
   criarCobranca,
+  criarCobrancaPlanoSaaS,
   obterQrCodePix,
   obterCodigoBarrasBoleto
 };

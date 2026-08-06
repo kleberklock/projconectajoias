@@ -2268,6 +2268,9 @@ const app = {
     if (tabId === "cofre-virtual") {
       this.carregarCofreVirtualProprio();
     }
+    if (tabId === "meu-plano-saas") {
+      this.carregarMeuPlanoSaaS();
+    }
   },
 
   renderizarAbas: function() {
@@ -6855,6 +6858,206 @@ ${dinheiroAReceberDaRev >= comissaoApagarParaRev
     } finally {
       btn.disabled = false;
       btn.innerHTML = '<i class="fa-solid fa-upload"></i> Enviar para o Cofre';
+    }
+  },
+
+  planoSaasSelecionado: 'GOLD',
+  pollingTimerSaas: null,
+
+  carregarMeuPlanoSaaS: async function() {
+    try {
+      const res = await this.requisitarAPI('/saas/meu-plano');
+      if (!res) return;
+
+      const elNome = document.getElementById("saas-plano-nome");
+      const elStatus = document.getElementById("saas-plano-badge-status");
+      const elVenc = document.getElementById("saas-plano-vencimento");
+
+      if (elNome) elNome.innerText = `Plano ${res.plano}`;
+      if (elStatus) {
+        elStatus.innerText = res.statusPlano || 'ATIVO';
+        elStatus.style.borderColor = res.statusPlano === 'ATIVO' ? '#81c784' : 'var(--warning)';
+        elStatus.style.color = res.statusPlano === 'ATIVO' ? '#81c784' : 'var(--warning)';
+      }
+      if (elVenc) {
+        if (res.vencimentoPlano) {
+          elVenc.innerText = `Vence em ${new Date(res.vencimentoPlano).toLocaleDateString('pt-BR')}`;
+        } else {
+          elVenc.innerText = 'Acesso Ativo (30 dias)';
+        }
+      }
+
+      // Atualiza barras de uso
+      const consultorasTxt = document.getElementById("saas-uso-consultoras-txt");
+      const consultorasBar = document.getElementById("saas-bar-consultoras");
+      if (consultorasTxt) consultorasTxt.innerText = `${res.uso.totalConsultoras} / ${res.uso.limiteConsultoras >= 999 ? 'Ilimitado' : res.uso.limiteConsultoras}`;
+      if (consultorasBar) {
+        const pct = res.uso.limiteConsultoras >= 999 ? 10 : Math.min(100, Math.round((res.uso.totalConsultoras / res.uso.limiteConsultoras) * 100));
+        consultorasBar.style.width = `${pct}%`;
+      }
+
+      const estoqueTxt = document.getElementById("saas-uso-estoque-txt");
+      const estoqueBar = document.getElementById("saas-bar-estoque");
+      if (estoqueTxt) estoqueTxt.innerText = `${res.uso.totalEstoque} / ${res.uso.limiteEstoque >= 9999 ? 'Ilimitado' : res.uso.limiteEstoque}`;
+      if (estoqueBar) {
+        const pct = res.uso.limiteEstoque >= 9999 ? 10 : Math.min(100, Math.round((res.uso.totalEstoque / res.uso.limiteEstoque) * 100));
+        estoqueBar.style.width = `${pct}%`;
+      }
+    } catch (e) {
+      console.error("Erro ao carregar dados do plano SaaS:", e);
+    }
+  },
+
+  abrirModalCheckoutPlano: function(plano) {
+    this.planoSaasSelecionado = plano || 'GOLD';
+    const valores = { BRONZE: 'R$ 147,00', GOLD: 'R$ 297,00', PLATINUM: 'R$ 497,00' };
+
+    document.getElementById("modal-saas-plano-nome").innerText = `Plano ${this.planoSaasSelecionado}`;
+    document.getElementById("modal-saas-plano-valor").innerText = valores[this.planoSaasSelecionado] || 'R$ 297,00';
+    
+    // Reseta estado das seções PIX / Boleto
+    document.getElementById("sec-saas-pix-qr").style.display = "none";
+    document.getElementById("btn-gerar-saas-pix").style.display = "block";
+    document.getElementById("sec-saas-boleto-res").style.display = "none";
+    document.getElementById("btn-gerar-saas-boleto").style.display = "block";
+    
+    this.selecionarFormaSaas('pix');
+    document.getElementById("modal-checkout-plano-saas").style.display = "flex";
+  },
+
+  fecharModalCheckoutPlano: function() {
+    document.getElementById("modal-checkout-plano-saas").style.display = "none";
+    this.pararPollingPlanoSaaS();
+  },
+
+  selecionarFormaSaas: function(forma) {
+    const tabs = ['pix', 'cartao', 'boleto'];
+    tabs.forEach(t => {
+      const tabEl = document.getElementById(`tab-saas-${t}`);
+      const secEl = document.getElementById(`sec-saas-${t}`);
+      if (tabEl) tabEl.classList.toggle("active", t === forma);
+      if (secEl) secEl.style.display = t === forma ? "block" : "none";
+    });
+  },
+
+  processarPagamentoPlanoSaas: async function(formaEnvio) {
+    const plano = this.planoSaasSelecionado || 'GOLD';
+    try {
+      this.toast(`Gerando cobrança do Plano ${plano} via ${formaEnvio}...`, "info");
+      
+      const res = await this.requisitarAPI("/saas/plano/pagar", "POST", {
+        plano,
+        formaEnvio
+      });
+
+      if (!res) return;
+
+      if (formaEnvio === 'PIX') {
+        document.getElementById("btn-gerar-saas-pix").style.display = "none";
+        document.getElementById("sec-saas-pix-qr").style.display = "block";
+        const img = document.getElementById("saas-pix-qr-img");
+        if (img) img.src = res.pixQrCode.startsWith("data:") ? res.pixQrCode : `data:image/png;base64,${res.pixQrCode}`;
+        document.getElementById("saas-pix-copia-cola").innerText = res.pixCopiaCola || '-';
+        this.iniciarPollingPlanoSaaS();
+      } else if (formaEnvio === 'BOLETO') {
+        document.getElementById("btn-gerar-saas-boleto").style.display = "none";
+        document.getElementById("sec-saas-boleto-res").style.display = "block";
+        document.getElementById("saas-boleto-code").innerText = res.boletoLinhaDigitavel || '-';
+        document.getElementById("saas-boleto-pdf").href = res.invoiceUrl || '#';
+      }
+
+    } catch (e) {
+      this.toast("Erro ao processar cobrança do plano: " + e.message, "error");
+    }
+  },
+
+  processarCartaoSaasForm: async function(e) {
+    e.preventDefault();
+    const holder = document.getElementById("saas-card-holder").value.trim();
+    const number = document.getElementById("saas-card-number").value.trim();
+    const expiry = document.getElementById("saas-card-expiry").value.trim();
+    const cvv = document.getElementById("saas-card-cvv").value.trim();
+    const cpf = document.getElementById("saas-card-cpf").value.trim();
+    const cep = document.getElementById("saas-card-cep").value.trim();
+
+    if (!holder || !number || !expiry || !cvv || !cpf || !cep) {
+      this.toast("Preencha todos os campos do cartão.", "warning");
+      return;
+    }
+
+    const parts = expiry.split("/");
+    if (parts.length !== 2) {
+      this.toast("Validade do cartão inválida. Use MM/AA.", "warning");
+      return;
+    }
+
+    const btn = document.getElementById("btn-submit-saas-cartao");
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Processando...`;
+
+    try {
+      const res = await this.requisitarAPI("/saas/plano/pagar", "POST", {
+        plano: this.planoSaasSelecionado || 'GOLD',
+        formaEnvio: 'CARTAO',
+        cartaoDados: {
+          holderName: holder,
+          number: number,
+          expiryMonth: parts[0],
+          expiryYear: "20" + parts[1],
+          cvv: cvv
+        },
+        enderecoDados: { cep, numero: "123" }
+      });
+
+      if (res && res.status === 'PAGO') {
+        this.toast(`Parabéns! Seu Plano ${this.planoSaasSelecionado} foi ativado com sucesso!`, "success");
+        this.fecharModalCheckoutPlano();
+        this.carregarMeuPlanoSaaS();
+      } else {
+        this.toast("Pagamento em análise pelo ASAAS.", "info");
+      }
+    } catch (err) {
+      this.toast("Erro no cartão: " + err.message, "error");
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = orig;
+    }
+  },
+
+  simularAtivacaoPlanoDev: async function() {
+    const plano = this.planoSaasSelecionado || 'GOLD';
+    try {
+      await this.requisitarAPI("/saas/plano/simular-confirmacao", "POST", { plano });
+      this.toast(`Plano ${plano} ativado com sucesso em modo de teste!`, "success");
+      this.fecharModalCheckoutPlano();
+      this.carregarMeuPlanoSaaS();
+    } catch (e) {
+      this.toast("Erro ao simular ativação: " + e.message, "error");
+    }
+  },
+
+  iniciarPollingPlanoSaaS: function() {
+    if (this.pollingTimerSaas) return;
+    this.pollingTimerSaas = setInterval(async () => {
+      try {
+        const res = await this.requisitarAPI('/saas/meu-plano');
+        if (res && res.plano === (this.planoSaasSelecionado || 'GOLD')) {
+          this.pararPollingPlanoSaaS();
+          this.toast(`Pagamento confirmado! Plano ${res.plano} ativado!`, "success");
+          this.fecharModalCheckoutPlano();
+          this.carregarMeuPlanoSaaS();
+        }
+      } catch (e) {
+        console.warn("Polling plano error:", e);
+      }
+    }, 4000);
+  },
+
+  pararPollingPlanoSaaS: function() {
+    if (this.pollingTimerSaas) {
+      clearInterval(this.pollingTimerSaas);
+      this.pollingTimerSaas = null;
     }
   }
 

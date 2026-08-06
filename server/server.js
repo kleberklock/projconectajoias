@@ -9,7 +9,8 @@ const rateLimit = require('express-rate-limit');
 const fs = require('fs');
 const path = require('path');
 require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
-const { criarCobranca, obterQrCodePix, obterCodigoBarrasBoleto } = require('./asaas-service');
+const { MercadoPagoConfig, Preference } = require('mercadopago');
+const { criarCobranca, criarCobrancaPlanoSaaS, obterQrCodePix, obterCodigoBarrasBoleto } = require('./asaas-service');
 const comissaoService = require('./services/ComissaoService');
 const crypto = require('crypto');
 
@@ -153,6 +154,8 @@ if (!JWT_SECRET) {
   console.error("ERRO CRÍTICO: JWT_SECRET inválido.");
   process.exit(1);
 }
+
+const clientMercadoPago = new MercadoPagoConfig({ accessToken: process.env.MP_ACCESS_TOKEN });
 
 // Configuração de CORS restrita ao frontend (inclui as portas de desenvolvimento local 5500 e 8080 e subdomínios)
 const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5500';
@@ -3732,6 +3735,39 @@ app.post('/api/public/pagamento/:id/confirmar', async (req, res) => {
   }
 });
 
+// Rota para criar preferência de pagamento no Mercado Pago (Checkout Pro)
+app.post('/api/criar-pagamento', async (req, res) => {
+  try {
+    const { usuarioId, planoNome, preco } = req.body;
+
+    const preference = new Preference(clientMercadoPago);
+    const response = await preference.create({
+      body: {
+        items: [
+          {
+            title: planoNome,
+            quantity: 1,
+            unit_price: Number(preco)
+          }
+        ],
+        external_reference: String(usuarioId),
+        notification_url: process.env.PUBLIC_URL + '/api/webhook/mercadopago',
+        back_urls: {
+          success: `${process.env.PUBLIC_URL}/success`,
+          failure: `${process.env.PUBLIC_URL}/failure`,
+          pending: `${process.env.PUBLIC_URL}/pending`
+        },
+        auto_return: 'approved'
+      }
+    });
+
+    return res.status(200).json({ linkDePagamento: response.init_point });
+  } catch (error) {
+    console.error('Erro ao criar preferência de pagamento no Mercado Pago:', error);
+    return res.status(500).json({ error: 'Erro ao processar criação de pagamento no Mercado Pago' });
+  }
+});
+
 // Webhook público para receber eventos de pagamento do ASAAS
 app.post('/api/webhooks/asaas', async (req, res) => {
   const tokenRecebido = req.headers['asaas-access-token'];
@@ -3753,9 +3789,54 @@ app.post('/api/webhooks/asaas', async (req, res) => {
   // Eventos de sucesso de pagamento
   if (event === 'PAYMENT_RECEIVED' || event === 'PAYMENT_CONFIRMED') {
     try {
-      // 1. Localizar o link correspondente
       const linkId = payment.externalReference;
-      
+
+      // Tratar pagamento de Plano SaaS
+      if (linkId && linkId.startsWith('SAAS_PLANO_')) {
+        const parts = linkId.split('_');
+        const lojaId = parts[2];
+        const novoPlano = parts[3];
+
+        if (lojaId && novoPlano) {
+          const dataVencimento = new Date();
+          dataVencimento.setDate(dataVencimento.getDate() + 30);
+
+          await prisma.loja.update({
+            where: { id: lojaId },
+            data: {
+              plano: novoPlano.toUpperCase(),
+              statusPlano: 'ATIVO',
+              vencimentoPlano: dataVencimento,
+              asaasCustomerId: payment.customer || null
+            }
+          });
+
+          await prisma.logAcao.create({
+            data: {
+              usuarioId: 'SISTEMA',
+              acao: 'PLANO_SAAS_PAGO_WEBHOOK',
+              detalhes: `Assinatura do Plano ${novoPlano.toUpperCase()} confirmada via Webhook ASAAS (${payment.billingType}). Vencimento renovado até ${dataVencimento.toLocaleDateString('pt-BR')}.`
+            }
+          });
+
+          await prisma.notificacao.create({
+            data: {
+              lojaId,
+              tipo: 'plano_saas',
+              mensagem: `Sua assinatura do Plano ${novoPlano.toUpperCase()} foi ativada com sucesso!`,
+              detalhes: JSON.stringify({
+                plano: novoPlano,
+                valor: payment.value,
+                vencimento: dataVencimento
+              })
+            }
+          });
+
+          return res.json({ success: true, message: `Plano SaaS ${novoPlano} ativado com sucesso!` });
+        }
+      }
+
+      // 1. Localizar o link de venda correspondente
       let link = null;
       if (linkId) {
         link = await prisma.linkPagamento.findUnique({ where: { id: linkId } });
@@ -4297,6 +4378,204 @@ app.put('/api/saas/lojas/:id/plano', autenticarJWT, autorizarRole(['SuperAdmin']
   } catch (error) {
     console.error("Erro ao atualizar plano da loja:", error);
     res.status(500).json({ error: 'Erro interno ao tentar atualizar plano do tenant.' });
+  }
+});
+
+// Buscar detalhes do plano atual da loja do usuário logado (Gestor)
+app.get('/api/saas/meu-plano', autenticarJWT, async (req, res) => {
+  try {
+    const usuario = await prisma.usuario.findUnique({
+      where: { id: req.user.id },
+      include: { loja: true }
+    });
+
+    if (!usuario || !usuario.lojaId || !usuario.loja) {
+      return res.status(404).json({ error: 'Loja não encontrada para este usuário.' });
+    }
+
+    const loja = usuario.loja;
+    const planoStr = (loja.plano || 'BRONZE').toUpperCase();
+
+    // Contar consultoras cadastradas
+    const totalConsultoras = await prisma.usuario.count({
+      where: { lojaId: loja.id, role: 'Consultant' }
+    });
+
+    // Somar total de peças no estoque central da loja
+    const estoqueAgg = await prisma.produto.aggregate({
+      where: { lojaId: loja.id, deletado: false },
+      _sum: { quantidadeTotal: true }
+    });
+    const totalEstoque = estoqueAgg._sum.quantidadeTotal || 0;
+
+    // Limites de acordo com o plano
+    const limites = {
+      BRONZE: { consultoras: 5, estoque: 300, valor: 147.00 },
+      GOLD: { consultoras: 25, estoque: 1500, valor: 297.00 },
+      PLATINUM: { consultoras: 9999, estoque: 99999, valor: 497.00 }
+    };
+
+    const limiteAtual = limites[planoStr] || limites.BRONZE;
+
+    res.json({
+      lojaId: loja.id,
+      lojaNome: loja.nome,
+      plano: planoStr,
+      statusPlano: loja.statusPlano || 'ATIVO',
+      vencimentoPlano: loja.vencimentoPlano,
+      uso: {
+        totalConsultoras,
+        limiteConsultoras: limiteAtual.consultoras,
+        totalEstoque,
+        limiteEstoque: limiteAtual.estoque
+      },
+      planosDisponiveis: [
+        { id: 'BRONZE', nome: 'Plano Bronze', valor: 147.00, limiteConsultoras: 5, limiteEstoque: 300 },
+        { id: 'GOLD', nome: 'Plano Gold', valor: 297.00, limiteConsultoras: 25, limiteEstoque: 1500, popular: true },
+        { id: 'PLATINUM', nome: 'Plano Platinum', valor: 497.00, limiteConsultoras: 'Ilimitado', limiteEstoque: 'Ilimitado' }
+      ]
+    });
+  } catch (error) {
+    console.error("Erro ao buscar dados do plano da loja:", error);
+    res.status(500).json({ error: 'Erro ao buscar dados do plano.' });
+  }
+});
+
+// Processar pagamento/upgrade do plano SaaS via ASAAS
+app.post('/api/saas/plano/pagar', autenticarJWT, async (req, res) => {
+  const {
+    plano,
+    formaEnvio,
+    clienteNome,
+    clienteCpfCnpj,
+    clienteEmail,
+    clienteWhatsapp,
+    cartaoDados,
+    enderecoDados
+  } = req.body;
+
+  if (!plano || !['BRONZE', 'GOLD', 'PLATINUM'].includes(plano.toUpperCase())) {
+    return res.status(400).json({ error: 'Plano inválido selecionado.' });
+  }
+
+  if (!formaEnvio) {
+    return res.status(400).json({ error: 'Forma de pagamento é obrigatória.' });
+  }
+
+  try {
+    const usuario = await prisma.usuario.findUnique({
+      where: { id: req.user.id },
+      include: { loja: true }
+    });
+
+    if (!usuario || !usuario.lojaId || !usuario.loja) {
+      return res.status(404).json({ error: 'Loja não encontrada para este usuário.' });
+    }
+
+    const loja = usuario.loja;
+
+    const cobranca = await criarCobrancaPlanoSaaS({
+      lojaId: loja.id,
+      lojaNome: loja.nome,
+      plano: plano.toUpperCase(),
+      formaEnvio,
+      clienteNome: clienteNome || usuario.nome,
+      clienteCpfCnpj,
+      clienteEmail: clienteEmail || usuario.email,
+      clienteWhatsapp: clienteWhatsapp || usuario.whatsapp,
+      cartaoDados,
+      enderecoDados
+    });
+
+    let statusNovo = 'PENDENTE';
+    if (cobranca.status === 'RECEIVED' || cobranca.status === 'CONFIRMED') {
+      statusNovo = 'PAGO';
+      const dataVencimento = new Date();
+      dataVencimento.setDate(dataVencimento.getDate() + 30);
+
+      await prisma.loja.update({
+        where: { id: loja.id },
+        data: {
+          plano: plano.toUpperCase(),
+          statusPlano: 'ATIVO',
+          vencimentoPlano: dataVencimento,
+          asaasCustomerId: cobranca.customer || null
+        }
+      });
+
+      await prisma.logAcao.create({
+        data: {
+          usuarioId: req.user.id,
+          usuarioNome: req.user.nome,
+          acao: 'PLANO_SAAS_PAGO_DIRETO',
+          detalhes: `Plano ${plano.toUpperCase()} pago e ativado diretamente via Cartão de Crédito.`
+        }
+      });
+    }
+
+    const resposta = {
+      status: statusNovo,
+      asaasPaymentId: cobranca.id,
+      plano: plano.toUpperCase(),
+      invoiceUrl: cobranca.bankSlipUrl || cobranca.invoiceUrl || null
+    };
+
+    if (formaEnvio === 'PIX') {
+      const pixInfo = await obterQrCodePix(cobranca.id);
+      resposta.pixQrCode = pixInfo.encodedImage;
+      resposta.pixCopiaCola = pixInfo.payload;
+    } else if (formaEnvio === 'BOLETO') {
+      const boletoInfo = await obterCodigoBarrasBoleto(cobranca.id);
+      resposta.boletoLinhaDigitavel = boletoInfo.identificationField;
+      resposta.boletoCodigoBarras = boletoInfo.barCode;
+    }
+
+    res.json(resposta);
+  } catch (error) {
+    console.error("Erro ao processar pagamento de plano SaaS:", error);
+    res.status(500).json({ error: error.message || 'Erro ao processar pagamento do plano.' });
+  }
+});
+
+// Simular baixa/confirmação manual do pagamento do plano (Modo Dev / Homologação)
+app.post('/api/saas/plano/simular-confirmacao', autenticarJWT, async (req, res) => {
+  const { plano } = req.body;
+  try {
+    const usuario = await prisma.usuario.findUnique({
+      where: { id: req.user.id },
+      include: { loja: true }
+    });
+
+    if (!usuario || !usuario.lojaId || !usuario.loja) {
+      return res.status(404).json({ error: 'Loja não encontrada.' });
+    }
+
+    const novoPlano = (plano || usuario.loja.plano || 'GOLD').toUpperCase();
+    const dataVencimento = new Date();
+    dataVencimento.setDate(dataVencimento.getDate() + 30);
+
+    const lojaAtualizada = await prisma.loja.update({
+      where: { id: usuario.lojaId },
+      data: {
+        plano: novoPlano,
+        statusPlano: 'ATIVO',
+        vencimentoPlano: dataVencimento
+      }
+    });
+
+    await prisma.logAcao.create({
+      data: {
+        usuarioId: req.user.id,
+        usuarioNome: req.user.nome,
+        acao: 'PLANO_SAAS_SIMULACAO_PAGO',
+        detalhes: `Simulação de pagamento efetuada para o Plano ${novoPlano}. Vencimento renovado até ${dataVencimento.toLocaleDateString('pt-BR')}.`
+      }
+    });
+
+    res.json({ message: `Plano ${novoPlano} ativado com sucesso!`, loja: lojaAtualizada });
+  } catch (error) {
+    console.error("Erro ao simular confirmação do plano:", error);
+    res.status(500).json({ error: 'Erro ao simular confirmação do plano.' });
   }
 });
 

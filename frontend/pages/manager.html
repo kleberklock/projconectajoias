@@ -151,6 +151,9 @@
           <li class="nav-item" data-target="links-pagamento">
             <button id="btn-tab-links-pagamento"><i class="fa-solid fa-link"></i>Links de Pagamento</button>
           </li>
+          <li class="nav-item" data-target="meu-plano-saas" id="menu-meu-plano-saas">
+            <button id="btn-tab-meu-plano-saas"><i class="fa-solid fa-crown"></i>Meu Plano & Assinatura</button>
+          </li>
           <li class="nav-item" data-target="termos-maleta">
             <button id="btn-tab-termos-maleta"><i class="fa-solid fa-file-contract"></i>Termos de Maleta</button>
           </li>
@@ -1748,6 +1751,243 @@
         </div>
 
       </section>
+
+      <!-- ==========================================
+           ABA: MEU PLANO & ASSINATURA SAAS
+           ========================================== -->
+      <section id="meu-plano-saas" class="app-section">
+        <div class="section-header">
+          <div class="section-title">
+            <h2>Meu Plano & Assinatura SaaS</h2>
+            <p>Gerencie sua assinatura da plataforma Conecta Joias, acompanhe seus limites e faça upgrade a qualquer momento.</p>
+          </div>
+        </div>
+
+        <!-- Banner do Plano Atual + Limites -->
+        <div class="dashboard-panel" style="margin-bottom: 2rem; border: 1px solid var(--border-gold); background: radial-gradient(circle at top left, rgba(212, 175, 55, 0.08) 0%, rgba(15, 15, 15, 0.9) 100%);">
+          <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1.5rem; border-bottom: 1px solid rgba(212, 175, 55, 0.15); padding-bottom: 1.2rem; margin-bottom: 1.2rem;">
+            <div>
+              <span style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px;">Plano Ativo no Momento</span>
+              <div style="display: flex; align-items: center; gap: 0.8rem; margin-top: 0.3rem;">
+                <h2 id="saas-plano-nome" style="font-family: var(--font-title); font-size: 1.8rem; color: var(--gold-primary); margin: 0;">Plano Bronze</h2>
+                <span id="saas-plano-badge-status" class="badge-status" style="background: rgba(129, 199, 132, 0.15); color: #81c784; border: 1px solid #81c784; font-size: 0.75rem; padding: 4px 10px; border-radius: 20px; font-weight: bold;">ATIVO</span>
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <span style="font-size: 0.8rem; color: var(--text-secondary);">Renovação / Vencimento:</span>
+              <div id="saas-plano-vencimento" style="font-size: 1.1rem; font-weight: bold; color: var(--text-primary); margin-top: 0.2rem;">30 dias de acesso</div>
+            </div>
+          </div>
+
+          <!-- Uso de Limites -->
+          <div class="kpi-grid" style="grid-template-columns: repeat(2, 1fr); gap: 1.5rem;">
+            <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); padding: 1rem; border-radius: var(--radius-md);">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.85rem;">
+                <span style="color: var(--text-secondary);"><i class="fa-solid fa-users" style="color: var(--gold-primary); margin-right: 6px;"></i> Consultoras Cadastradas</span>
+                <span id="saas-uso-consultoras-txt" style="font-weight: bold; color: var(--text-primary);">0 / 5</span>
+              </div>
+              <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+                <div id="saas-bar-consultoras" style="width: 0%; height: 100%; background: var(--gold-gradient); transition: width 0.4s ease;"></div>
+              </div>
+            </div>
+            <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); padding: 1rem; border-radius: var(--radius-md);">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.85rem;">
+                <span style="color: var(--text-secondary);"><i class="fa-solid fa-gem" style="color: var(--gold-primary); margin-right: 6px;"></i> Peças em Estoque Central</span>
+                <span id="saas-uso-estoque-txt" style="font-weight: bold; color: var(--text-primary);">0 / 300</span>
+              </div>
+              <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+                <div id="saas-bar-estoque" style="width: 0%; height: 100%; background: var(--gold-gradient); transition: width 0.4s ease;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Opções de Planos para Upgrade -->
+        <h3 style="font-family: var(--font-title); font-size: 1.3rem; color: var(--gold-primary); margin-bottom: 1rem;">Opções de Assinatura & Upgrade</h3>
+        <div class="kpi-grid" style="grid-template-columns: repeat(3, 1fr); gap: 1.5rem;">
+          
+          <!-- Bronze Card -->
+          <div class="dashboard-panel" style="display: flex; flex-direction: column; justify-content: space-between; border: 1px solid rgba(212, 175, 55, 0.2);">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
+                <h3 style="color: #cd7f32; font-size: 1.2rem; font-family: var(--font-title);">Plano Bronze</h3>
+                <span style="font-size: 0.7rem; background: rgba(205, 127, 50, 0.15); color: #cd7f32; padding: 2px 8px; border-radius: 12px; font-weight: bold;">Inicial</span>
+              </div>
+              <div style="font-size: 1.8rem; font-weight: bold; color: var(--text-primary); margin-bottom: 1rem;">
+                R$ 147<span style="font-size: 0.85rem; color: var(--text-secondary);">/mês</span>
+              </div>
+              <ul style="list-style: none; padding: 0; font-size: 0.85rem; color: var(--text-secondary); line-height: 2;">
+                <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Até <strong>5 Consultoras</strong></li>
+                <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Até <strong>300 Peças</strong> em Estoque</li>
+                <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Gestão de Maletas e Consignado</li>
+                <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Controle financeiro básico</li>
+              </ul>
+            </div>
+            <button class="btn-outline-gold" style="width: 100%; margin-top: 1.5rem;" onclick="app.abrirModalCheckoutPlano('BRONZE')">
+              <i class="fa-solid fa-sync"></i> Alterar para Bronze
+            </button>
+          </div>
+
+          <!-- Gold Card (Recomendado) -->
+          <div class="dashboard-panel" style="display: flex; flex-direction: column; justify-content: space-between; border: 2px solid var(--gold-primary); background: rgba(212, 175, 55, 0.04); position: relative;">
+            <div style="position: absolute; top: -12px; right: 20px; background: var(--gold-gradient); color: #000; font-size: 0.65rem; font-weight: 800; padding: 3px 10px; border-radius: 10px; text-transform: uppercase;">Mais Popular</div>
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
+                <h3 style="color: var(--gold-primary); font-size: 1.3rem; font-family: var(--font-title);">Plano Gold</h3>
+              </div>
+              <div style="font-size: 1.8rem; font-weight: bold; color: var(--gold-primary); margin-bottom: 1rem;">
+                R$ 297<span style="font-size: 0.85rem; color: var(--text-secondary);">/mês</span>
+              </div>
+              <ul style="list-style: none; padding: 0; font-size: 0.85rem; color: var(--text-secondary); line-height: 2;">
+                <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Até <strong>25 Consultoras</strong></li>
+                <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Até <strong>1.500 Peças</strong> em Estoque</li>
+                <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> <strong>Links de Pagamento ASAAS</strong></li>
+                <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Termos de Maleta Digital no WhatsApp</li>
+                <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Baixa Automática de Vendas</li>
+              </ul>
+            </div>
+            <button class="btn-gold" style="width: 100%; margin-top: 1.5rem;" onclick="app.abrirModalCheckoutPlano('GOLD')">
+              <i class="fa-solid fa-crown"></i> Fazer Upgrade Gold
+            </button>
+          </div>
+
+          <!-- Platinum Card -->
+          <div class="dashboard-panel" style="display: flex; flex-direction: column; justify-content: space-between; border: 1px solid rgba(255, 255, 255, 0.2);">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
+                <h3 style="color: #e5e4e2; font-size: 1.2rem; font-family: var(--font-title);">Plano Platinum</h3>
+                <span style="font-size: 0.7rem; background: rgba(255, 255, 255, 0.15); color: #e5e4e2; padding: 2px 8px; border-radius: 12px; font-weight: bold;">Enterprise</span>
+              </div>
+              <div style="font-size: 1.8rem; font-weight: bold; color: var(--text-primary); margin-bottom: 1rem;">
+                R$ 497<span style="font-size: 0.85rem; color: var(--text-secondary);">/mês</span>
+              </div>
+              <ul style="list-style: none; padding: 0; font-size: 0.85rem; color: var(--text-secondary); line-height: 2;">
+                <li><i class="fa-solid fa-star" style="color: var(--gold-primary); margin-right: 6px;"></i> Consultoras <strong>ILIMITADAS</strong></li>
+                <li><i class="fa-solid fa-star" style="color: var(--gold-primary); margin-right: 6px;"></i> Estoque Central <strong>ILIMITADO</strong></li>
+                <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Todos os recursos Gold inclusos</li>
+                <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Múltiplas lojas / franquias</li>
+                <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Suporte prioritário 24/7</li>
+              </ul>
+            </div>
+            <button class="btn-outline-gold" style="width: 100%; margin-top: 1.5rem;" onclick="app.abrirModalCheckoutPlano('PLATINUM')">
+              <i class="fa-solid fa-gem"></i> Fazer Upgrade Platinum
+            </button>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- Modal de Checkout do Plano SaaS -->
+      <div class="modal-backdrop" id="modal-checkout-plano-saas" style="display: none; z-index: 9999;">
+        <div class="modal-card" style="width: 520px; max-width: 95%;">
+          <div class="modal-title-row">
+            <h3>Pagamento de Assinatura SaaS</h3>
+            <button class="btn-close-modal" onclick="app.fecharModalCheckoutPlano()"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+
+          <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(212,175,55,0.2); padding: 1rem; border-radius: var(--radius-md); margin-bottom: 1.2rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <span style="font-size: 0.8rem; color: var(--text-secondary);">Plano Selecionado:</span>
+                <h4 id="modal-saas-plano-nome" style="color: var(--gold-primary); font-size: 1.2rem; margin: 0;">Plano Gold</h4>
+              </div>
+              <div style="text-align: right;">
+                <span style="font-size: 0.8rem; color: var(--text-secondary);">Valor Mensal:</span>
+                <div id="modal-saas-plano-valor" style="font-size: 1.4rem; font-weight: bold; color: var(--text-primary);">R$ 297,00</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Abas de Pagamento -->
+          <div class="payment-tabs" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-bottom: 1rem;">
+            <button type="button" class="pay-tab active" id="tab-saas-pix" onclick="app.selecionarFormaSaas('pix')">
+              <i class="fa-brands fa-pix"></i> PIX
+            </button>
+            <button type="button" class="pay-tab" id="tab-saas-cartao" onclick="app.selecionarFormaSaas('cartao')">
+              <i class="fa-solid fa-credit-card"></i> Cartão
+            </button>
+            <button type="button" class="pay-tab" id="tab-saas-boleto" onclick="app.selecionarFormaSaas('boleto')">
+              <i class="fa-solid fa-barcode"></i> Boleto
+            </button>
+          </div>
+
+          <!-- Conteúdo PIX -->
+          <div id="sec-saas-pix" style="text-align: center; padding: 1rem 0;">
+            <div id="sec-saas-pix-qr" style="display: none;">
+              <div style="width: 160px; height: 160px; background: white; margin: 0 auto 1rem auto; padding: 0.5rem; border-radius: 8px; border: 2px solid var(--gold-primary);">
+                <img id="saas-pix-qr-img" src="" alt="QR Code PIX" style="width: 100%; height: 100%;">
+              </div>
+              <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Escaneie o QR Code acima ou copie a chave PIX abaixo:</p>
+              <div id="saas-pix-copia-cola" style="background: rgba(0,0,0,0.5); padding: 0.6rem; border-radius: 4px; font-family: monospace; font-size: 0.75rem; word-break: break-all; margin-bottom: 1rem; border: 1px dashed rgba(212,175,55,0.3);">-</div>
+              <button class="btn-outline-gold" style="width: 100%;" onclick="navigator.clipboard.writeText(document.getElementById('saas-pix-copia-cola').innerText).then(() => app.toast('Chave PIX copiada!', 'success'));">
+                <i class="fa-solid fa-copy"></i> Copiar Código PIX
+              </button>
+            </div>
+            <button id="btn-gerar-saas-pix" class="btn-gold" style="width: 100%;" onclick="app.processarPagamentoPlanoSaas('PIX')">
+              <i class="fa-brands fa-pix"></i> Gerar PIX para Ativação do Plano
+            </button>
+          </div>
+
+          <!-- Conteúdo Cartão -->
+          <div id="sec-saas-cartao" style="display: none;">
+            <form onsubmit="app.processarCartaoSaasForm(event)" style="display: flex; flex-direction: column; gap: 0.8rem;">
+              <div class="form-group">
+                <label style="font-size: 0.8rem;">Nome no Cartão</label>
+                <input type="text" id="saas-card-holder" class="form-control" placeholder="Como no cartão" required>
+              </div>
+              <div class="form-group">
+                <label style="font-size: 0.8rem;">Número do Cartão</label>
+                <input type="text" id="saas-card-number" class="form-control" placeholder="0000 0000 0000 0000" required>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem;">
+                <div class="form-group">
+                  <label style="font-size: 0.8rem;">Validade (MM/AA)</label>
+                  <input type="text" id="saas-card-expiry" class="form-control" placeholder="12/28" required>
+                </div>
+                <div class="form-group">
+                  <label style="font-size: 0.8rem;">CVV</label>
+                  <input type="password" id="saas-card-cvv" class="form-control" placeholder="123" maxlength="4" required>
+                </div>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem;">
+                <div class="form-group">
+                  <label style="font-size: 0.8rem;">CPF/CNPJ Titular</label>
+                  <input type="text" id="saas-card-cpf" class="form-control" placeholder="000.000.000-00" required>
+                </div>
+                <div class="form-group">
+                  <label style="font-size: 0.8rem;">CEP Faturamento</label>
+                  <input type="text" id="saas-card-cep" class="form-control" placeholder="00000-000" required>
+                </div>
+              </div>
+              <button type="submit" id="btn-submit-saas-cartao" class="btn-gold" style="width: 100%; margin-top: 0.5rem;">
+                <i class="fa-solid fa-lock"></i> Pagar Agora e Ativar Plano
+              </button>
+            </form>
+          </div>
+
+          <!-- Conteúdo Boleto -->
+          <div id="sec-saas-boleto" style="display: none; text-align: center; padding: 1rem 0;">
+            <div id="sec-saas-boleto-res" style="display: none;">
+              <i class="fa-solid fa-circle-check" style="font-size: 2rem; color: #81c784; margin-bottom: 0.5rem;"></i>
+              <p style="font-size: 0.85rem; color: var(--text-primary); margin-bottom: 0.8rem;">Boleto emitido! Copie o código abaixo:</p>
+              <div id="saas-boleto-code" style="background: rgba(0,0,0,0.5); padding: 0.6rem; font-family: monospace; font-size: 0.8rem; word-break: break-all; margin-bottom: 1rem; border: 1px solid rgba(212,175,55,0.2);">-</div>
+              <a id="saas-boleto-pdf" href="#" target="_blank" class="btn-gold" style="text-decoration: none; display: inline-flex; width: 100%; justify-content: center; margin-bottom: 0.5rem;">
+                <i class="fa-solid fa-file-pdf"></i> Baixar Boleto em PDF
+              </a>
+            </div>
+            <button id="btn-gerar-saas-boleto" class="btn-gold" style="width: 100%;" onclick="app.processarPagamentoPlanoSaas('BOLETO')">
+              <i class="fa-solid fa-barcode"></i> Gerar Boleto Bancário
+            </button>
+          </div>
+
+          <!-- Atalho de Simulação em Dev -->
+          <div style="margin-top: 1.5rem; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 1rem; text-align: center;">
+            <button class="btn-outline-gold" style="font-size: 0.8rem; color: #81c784; border-color: #81c784; width: 100%;" onclick="app.simularAtivacaoPlanoDev()">
+              <i class="fa-solid fa-bolt"></i> Simular Ativação do Plano Instantânea (Modo Teste)
+            </button>
+          </div>
+        </div>
+      </div>
 
     </main>
 
