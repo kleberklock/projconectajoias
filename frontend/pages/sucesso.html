@@ -138,7 +138,7 @@
       </p>
     </div>
 
-    <a href="manager.html" class="btn-painel">
+    <a href="superadmin.html" class="btn-painel">
       <i class="fa-solid fa-gauge-high"></i> Acessar Painel Agora
     </a>
   </div>
@@ -147,6 +147,8 @@
     // 1. Atualiza os dados do usuário no localStorage para refletir status 'ATIVO'
     (function atualizarSessaoLocal() {
       try {
+        localStorage.setItem("conectajoias_status_plano", "ATIVO");
+
         const usuarioRaw = localStorage.getItem("conectajoias_usuario");
         if (usuarioRaw) {
           const user = JSON.parse(usuarioRaw);
@@ -176,7 +178,7 @@
       }
     })();
 
-    // 2. Redireciona o usuário para manager.html em 4 segundos
+    // 2. Redireciona o usuário para superadmin.html em 4 segundos
     let segundos = 4;
     const countEl = document.getElementById("countdown");
 
@@ -185,7 +187,7 @@
       if (countEl) countEl.innerText = segundos;
       if (segundos <= 0) {
         clearInterval(timer);
-        window.location.href = "manager.html";
+        window.location.href = "superadmin.html";
       }
     }, 1000);
   </script>

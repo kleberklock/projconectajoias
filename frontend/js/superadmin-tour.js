@@ -9,7 +9,17 @@
     {
       elementSelector: '#btn-tab-dashboard',
       title: '💎 Painel Geral',
-      description: 'Este é o seu centro de controle de luxo. Aqui você visualiza o resumo de faturamento da sua marca, gráficos analíticos de vendas, alertas de estoque crítico e o relatório DRE consolidado.'
+      description: 'Este é o seu centro de controle de luxo. Aqui você visualiza o resumo de faturamento da sua marca, gráficos analíticos de vendas, alertas de estoque crítico e visão geral.'
+    },
+    {
+      elementSelector: '#btn-tab-meu-negocio',
+      title: '📊 Meu Negócio',
+      description: 'Monitore o Demonstrativo de Resultados do Exercício (DRE), margens de lucro, faturamento bruto/líquido e a saúde financeira completa da sua empresa em tempo real.'
+    },
+    {
+      elementSelector: '#btn-tab-meu-plano-saas',
+      title: '👑 Meu Plano & Assinaturas',
+      description: 'Gerencie sua assinatura (Básico, Bronze, Gold ou Platinum), acompanhe seu consumo de cotas de produtos e revendedoras ou faça upgrade/downgrade a qualquer momento.'
     },
     {
       elementSelector: '#btn-tab-estoque',
@@ -29,7 +39,7 @@
     {
       elementSelector: '#btn-tab-vendas-geral',
       title: '🧾 Histórico de Vendas',
-      description: 'Visualize todas as vendas realizadas. Registre vendas administrativas diretas e emita recibos elegantes para os acertos fechados.'
+      description: 'Visualize todas as vendas realizadas. Registre vendas administrativas diretas e consulte a forma de pagamento de cada transação.'
     },
     {
       elementSelector: '#btn-tab-notas-fiscais',
@@ -259,14 +269,17 @@
   function createTourElements() {
     if (document.querySelector('.tour-backdrop')) return;
 
-    // Blocker de cliques para impedir bagunçar o painel
+    // Blocker de cliques que encerra o tour ao clicar fora
     clickBlockerEl = document.createElement('div');
     clickBlockerEl.className = 'tour-click-blocker';
+    clickBlockerEl.title = 'Clique para fechar o tutorial';
+    clickBlockerEl.addEventListener('click', endTour);
     document.body.appendChild(clickBlockerEl);
 
-    // Holofote spotlight
+    // Holofote spotlight que encerra o tour ao ser clicado
     backdropEl = document.createElement('div');
     backdropEl.className = 'tour-backdrop';
+    backdropEl.addEventListener('click', endTour);
     document.body.appendChild(backdropEl);
 
     // Popover informativo
@@ -279,7 +292,7 @@
       </div>
       <p id="tour-desc">Descrição explicativa...</p>
       <div class="tour-popover-footer">
-        <span class="tour-progress" id="tour-progress-lbl">1 de 9</span>
+        <span class="tour-progress" id="tour-progress-lbl">1 de 11</span>
         <div class="tour-buttons">
           <button class="tour-btn tour-btn-outline" id="tour-btn-prev"><i class="fa-solid fa-chevron-left"></i> Voltar</button>
           <button class="tour-btn tour-btn-gold" id="tour-btn-next">Próximo <i class="fa-solid fa-chevron-right"></i></button>
@@ -318,15 +331,11 @@
     
     if (popoverEl) popoverEl.classList.remove('active');
     
-    setTimeout(() => {
-      if (backdropEl) backdropEl.remove();
-      if (popoverEl) popoverEl.remove();
-      if (clickBlockerEl) clickBlockerEl.remove();
-      
-      backdropEl = null;
-      popoverEl = null;
-      clickBlockerEl = null;
-    }, 300);
+    document.querySelectorAll('.tour-backdrop, .tour-popover, .tour-click-blocker').forEach(el => el.remove());
+    
+    backdropEl = null;
+    popoverEl = null;
+    clickBlockerEl = null;
 
     // Ativa aba padrão de dashboard para fechar
     const btn = document.querySelector('#btn-tab-dashboard');

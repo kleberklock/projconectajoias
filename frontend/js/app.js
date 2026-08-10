@@ -1482,37 +1482,21 @@ const app = {
   },
 
   gerarDRELocal: function(inicio, fim) {
-    const dataInicio = inicio ? new Date(inicio) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const dataFim = fim ? new Date(fim) : new Date();
-    dataFim.setHours(23, 59, 59, 999);
-
-    const diasDiferenca = Math.max(1, Math.round((dataFim - dataInicio) / (1000 * 60 * 60 * 24)));
-    
-    const numProdutos = this.state.produtos.length || 10;
-    const numRev = this.state.revendedoras.length || 3;
-
-    const faturamentoVendasDiretas = numProdutos * 15 * (diasDiferenca / 30); 
-    const custoVendasDiretas = faturamentoVendasDiretas / 3.0;
-    
-    const faturamentoAcertos = numRev * 250 * (diasDiferenca / 30);
-    const comissoesPagas = faturamentoAcertos * 0.3;
-    const descontoPerdas = numRev * 15 * (diasDiferenca / 30);
-    const custoVendasConsignado = faturamentoAcertos * 0.28;
-
-    const faturamentoBrutoTotal = faturamentoVendasDiretas + faturamentoAcertos;
-    const custoTotalMercadorias = custoVendasDiretas + custoVendasConsignado;
-    const lucroLiquidoEstimado = faturamentoBrutoTotal - comissoesPagas - custoTotalMercadorias + descontoPerdas;
-
     this.renderizarDadosDRE({
-      faturamentoVendasDiretas,
-      faturamentoAcertos,
-      faturamentoBrutoTotal,
-      comissoesPagas,
-      descontoPerdas,
-      custoVendasDiretas,
-      custoVendasConsignado,
-      custoTotalMercadorias,
-      lucroLiquidoEstimado
+      faturamentoVendasDiretas: 0,
+      faturamentoAcertos: 0,
+      faturamentoVendasRevendedora: 0,
+      faturamentoBrutoTotal: 0,
+      comissoesPagas: 0,
+      comissoesVendasRevendedora: 0,
+      comissoesTotais: 0,
+      descontoPerdas: 0,
+      impostos: 0,
+      custoVendasDiretas: 0,
+      custoVendasConsignado: 0,
+      custoTotalMercadorias: 0,
+      despesasFixas: 0,
+      lucroLiquidoEstimado: 0
     });
   },
 
@@ -1522,28 +1506,61 @@ const app = {
     const fatBrutoEl = document.getElementById("dre-fat-bruto");
     const fatDiretasEl = document.getElementById("dre-fat-diretas");
     const fatConsignadoEl = document.getElementById("dre-fat-consignado");
+    const fatRevendedorasEl = document.getElementById("dre-fat-revendedoras");
+
     const comissoesEl = document.getElementById("dre-comissoes");
+    const comissoesAcertosEl = document.getElementById("dre-comissoes-acertos");
+    const comissoesRevendedorasEl = document.getElementById("dre-comissoes-revendedoras");
     const perdasEl = document.getElementById("dre-perdas-ajuste");
+    const impostosEl = document.getElementById("dre-impostos");
+
     const recLiquidaEl = document.getElementById("dre-receita-liquida");
     const cmvEl = document.getElementById("dre-cmv");
     const custoDiretasEl = document.getElementById("dre-custo-diretas");
     const custoConsignadoEl = document.getElementById("dre-custo-consignado");
-    
-    if (fatBrutoEl) fatBrutoEl.innerText = formatar(resumo.faturamentoBrutoTotal);
-    if (fatDiretasEl) fatDiretasEl.innerText = formatar(resumo.faturamentoVendasDiretas);
-    if (fatConsignadoEl) fatConsignadoEl.innerText = formatar(resumo.faturamentoAcertos);
-    
-    if (comissoesEl) comissoesEl.innerText = `(-) ${formatar(resumo.comissoesPagas)}`;
-    if (perdasEl) perdasEl.innerText = `(+) ${formatar(resumo.descontoPerdas)}`;
-    
-    const receitaLiquida = resumo.faturamentoBrutoTotal - resumo.comissoesPagas + resumo.descontoPerdas;
+    const despesasFixasEl = document.getElementById("dre-despesas-fixas");
+
+    const fatDiretas = resumo.faturamentoVendasDiretas || 0;
+    const fatAcertos = resumo.faturamentoAcertos || 0;
+    const fatRevendedoras = resumo.faturamentoVendasRevendedora || 0;
+    const fatBrutoTotal = resumo.faturamentoBrutoTotal || (fatDiretas + fatAcertos + fatRevendedoras);
+
+    const comissoesAcertos = resumo.comissoesPagas || 0;
+    const comissoesRevendedoras = resumo.comissoesVendasRevendedora || 0;
+    const comissoesTotais = resumo.comissoesTotais || (comissoesAcertos + comissoesRevendedoras);
+
+    const descontoPerdas = resumo.descontoPerdas || 0;
+    const impostos = resumo.impostos || 0;
+    const despesasFixas = resumo.despesasFixas || 0;
+
+    const custoDiretas = resumo.custoVendasDiretas || 0;
+    const custoConsignado = resumo.custoVendasConsignado || 0;
+    const custoTotalMercadorias = resumo.custoTotalMercadorias || (custoDiretas + custoConsignado);
+
+    // Faturamento
+    if (fatBrutoEl) fatBrutoEl.innerText = formatar(fatBrutoTotal);
+    if (fatDiretasEl) fatDiretasEl.innerText = formatar(fatDiretas);
+    if (fatConsignadoEl) fatConsignadoEl.innerText = formatar(fatAcertos);
+    if (fatRevendedorasEl) fatRevendedorasEl.innerText = formatar(fatRevendedoras);
+
+    // Deduções
+    if (comissoesEl) comissoesEl.innerText = `(-) ${formatar(comissoesTotais)}`;
+    if (comissoesAcertosEl) comissoesAcertosEl.innerText = formatar(comissoesAcertos);
+    if (comissoesRevendedorasEl) comissoesRevendedorasEl.innerText = formatar(comissoesRevendedoras);
+    if (perdasEl) perdasEl.innerText = `(+) ${formatar(descontoPerdas)}`;
+    if (impostosEl) impostosEl.innerText = `(-) ${formatar(impostos)}`;
+
+    const receitaLiquida = fatBrutoTotal - comissoesTotais + descontoPerdas - impostos;
     if (recLiquidaEl) recLiquidaEl.innerText = formatar(receitaLiquida);
-    
-    if (cmvEl) cmvEl.innerText = `(-) ${formatar(resumo.custoTotalMercadorias)}`;
-    if (custoDiretasEl) custoDiretasEl.innerText = formatar(resumo.custoVendasDiretas);
-    if (custoConsignadoEl) custoConsignadoEl.innerText = formatar(resumo.custoVendasConsignado);
-    
-    const lucro = resumo.lucroLiquidoEstimado;
+
+    // CMV e Despesas
+    if (cmvEl) cmvEl.innerText = `(-) ${formatar(custoTotalMercadorias)}`;
+    if (custoDiretasEl) custoDiretasEl.innerText = formatar(custoDiretas);
+    if (custoConsignadoEl) custoConsignadoEl.innerText = formatar(custoConsignado);
+    if (despesasFixasEl) despesasFixasEl.innerText = `(-) ${formatar(despesasFixas)}`;
+
+    // Lucro Líquido
+    const lucro = resumo.lucroLiquidoEstimado !== undefined ? resumo.lucroLiquidoEstimado : (receitaLiquida - custoTotalMercadorias - despesasFixas);
     const lucroEl = document.getElementById("dre-lucro-liquido");
     const resultadoValorEl = document.getElementById("dre-resultado-valor");
     const resultadoStatusEl = document.getElementById("dre-resultado-status");
@@ -1552,11 +1569,11 @@ const app = {
     if (lucroEl) lucroEl.innerText = formatar(lucro);
     if (resultadoValorEl) resultadoValorEl.innerText = formatar(lucro);
 
-    const margem = resumo.faturamentoBrutoTotal > 0 ? (lucro / resumo.faturamentoBrutoTotal) * 100 : 0;
+    const margem = fatBrutoTotal > 0 ? (lucro / fatBrutoTotal) * 100 : 0;
     const margemEl = document.getElementById("dre-margem-lucro");
     if (margemEl) margemEl.innerText = `${margem.toFixed(1)}%`;
 
-    const markupMedio = resumo.custoTotalMercadorias > 0 ? (resumo.faturamentoBrutoTotal / resumo.custoTotalMercadorias) : 3.0;
+    const markupMedio = custoTotalMercadorias > 0 ? (fatBrutoTotal / custoTotalMercadorias) : 3.0;
     const markupEl = document.getElementById("dre-markup-medio");
     if (markupEl) markupEl.innerText = `${markupMedio.toFixed(1)}x`;
 

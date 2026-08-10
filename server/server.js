@@ -9,7 +9,7 @@ const rateLimit = require('express-rate-limit');
 const fs = require('fs');
 const path = require('path');
 require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
-const { MercadoPagoConfig, Preference, Payment } = require('mercadopago');
+const { MercadoPagoConfig, Preference, Payment, Preapproval } = require('mercadopago');
 const { criarCobranca, criarCobrancaPlanoSaaS, obterQrCodePix, obterCodigoBarrasBoleto } = require('./asaas-service');
 const comissaoService = require('./services/ComissaoService');
 const crypto = require('crypto');
@@ -537,7 +537,7 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
 
 // Auto-cadastro público de Gestora (Manager)
 app.post('/api/auth/signup', signupLimiter, async (req, res) => {
-  const { nome, email, senha, nomeLoja } = req.body;
+  const { nome, email, senha, nomeLoja, whatsapp } = req.body;
   if (!nome || !email || !senha || !nomeLoja) {
     return res.status(400).json({ error: 'Campos obrigatórios ausentes: nome, email, senha e nomeLoja.' });
   }
@@ -583,6 +583,7 @@ app.post('/api/auth/signup', signupLimiter, async (req, res) => {
       data: {
         nome,
         email,
+        whatsapp: whatsapp || null,
         pin,
         senhaHash,
         role: 'Manager',
@@ -2199,14 +2200,22 @@ app.get('/api/relatorios/dre', autenticarJWT, autorizarRole(['Manager', 'SuperAd
       descontoPerdas += a.valorDescontoPerda;
     });
 
+    // 3. Custo, Faturamento e Comissões das Vendas das Revendedoras (App)
+    let faturamentoVendasRevendedora = 0;
+    let comissoesVendasRevendedora = 0;
     let custoVendasConsignado = 0;
+
     vendasRevendedora.forEach(vr => {
+      const qtd = vr.quantidade || 1;
+      faturamentoVendasRevendedora += (vr.precoVenda * qtd);
+      comissoesVendasRevendedora += (vr.comissaoValor || 0);
+
       const prod = produtosIdMap.get(vr.produtoId) || produtosMap.get(vr.codigoProduto);
       const custoReal = prod ? (prod.custoBruto + prod.custoBanho + prod.custoLiquido) : 0;
       if (custoReal > 0) {
-        custoVendasConsignado += custoReal * vr.quantidade;
+        custoVendasConsignado += custoReal * qtd;
       } else {
-        custoVendasConsignado += vr.precoVenda * (cmvEstimado / 100) * vr.quantidade;
+        custoVendasConsignado += vr.precoVenda * (cmvEstimado / 100) * qtd;
       }
     });
 
@@ -2214,9 +2223,12 @@ app.get('/api/relatorios/dre', autenticarJWT, autorizarRole(['Manager', 'SuperAd
       custoVendasConsignado = faturamentoAcertos * (cmvEstimado / 100);
     }
 
-    const faturamentoBrutoTotal = faturamentoVendasDiretas + faturamentoAcertos;
+    const faturamentoBrutoTotal = faturamentoVendasDiretas + faturamentoAcertos + faturamentoVendasRevendedora;
+    const comissoesTotais = comissoesPagas + comissoesVendasRevendedora;
     const custoTotalMercadorias = custoVendasDiretas + custoVendasConsignado;
-    const lucroLiquidoEstimado = faturamentoBrutoTotal - comissoesPagas - custoTotalMercadorias + descontoPerdas;
+
+    // TODO: Revisar a regra de negócio do descontoPerdas (verificar se a perda foi descontada da revendedora = lucro da loja, ou se foi prejuízo assumido pela loja = dedução)
+    const lucroLiquidoEstimado = faturamentoBrutoTotal - comissoesTotais - custoTotalMercadorias + descontoPerdas;
     const markupMedioReal = custoTotalMercadorias > 0 ? (faturamentoBrutoTotal / custoTotalMercadorias) : 3.0;
     const margemLucroReal = faturamentoBrutoTotal > 0 ? ((lucroLiquidoEstimado / faturamentoBrutoTotal) * 100) : 0.0;
 
@@ -2228,12 +2240,17 @@ app.get('/api/relatorios/dre', autenticarJWT, autorizarRole(['Manager', 'SuperAd
       resumo: {
         faturamentoVendasDiretas,
         faturamentoAcertos,
+        faturamentoVendasRevendedora,
         faturamentoBrutoTotal,
         comissoesPagas,
+        comissoesVendasRevendedora,
+        comissoesTotais,
         descontoPerdas,
+        impostos: 0,
         custoVendasDiretas,
         custoVendasConsignado,
         custoTotalMercadorias,
+        despesasFixas: 0,
         lucroLiquidoEstimado,
         markupMedioReal,
         margemLucroReal
@@ -3075,10 +3092,16 @@ app.get('/api/config', autenticarJWTOpcional, identificarLoja, async (req, res) 
       where: { lojaId: req.lojaId }
     });
     if (!config) {
+      let lojaExiste = await prisma.loja.findUnique({ where: { id: req.lojaId } });
+      if (!lojaExiste) {
+        lojaExiste = await prisma.loja.create({
+          data: { id: req.lojaId, nome: 'Minha Marca de Semijoias' }
+        });
+      }
       config = await prisma.configuracao.create({
         data: {
-          lojaId: req.lojaId,
-          nomeEmpresa: 'Conecta Joias',
+          lojaId: lojaExiste.id,
+          nomeEmpresa: lojaExiste.nome || 'Conecta Joias',
           logoUrl: '',
           corPrimaria: '#d4af37',
           corSecundaria: '#111111',
@@ -3764,40 +3787,80 @@ app.post('/api/public/pagamento/:id/confirmar', async (req, res) => {
   }
 });
 
-// Rota para criar preferência de pagamento no Mercado Pago (Checkout Pro)
+// Rota para criar assinatura ou preferência de pagamento no Mercado Pago (Assinaturas / Checkout Pro)
+// Rota para criar assinatura ou preferência de pagamento no Mercado Pago (Assinaturas / Checkout Pro)
 app.post('/api/criar-pagamento', async (req, res) => {
   try {
     const { usuarioId, planoNome, preco } = req.body;
+    const nomePlanoClean = String(planoNome || 'Plano Gold').trim();
+    const precoNum = Number(preco) || 297;
+    const planoRefClean = nomePlanoClean.toUpperCase().includes('BRONZE') ? 'BRONZE' : (nomePlanoClean.toUpperCase().includes('PLATINUM') ? 'PLATINUM' : 'GOLD');
+    const externalRef = `${usuarioId || 'admin'}|${planoRefClean}`;
+    
+    // Frontend URL para redirecionamento do navegador do usuário pós-pagamento (Live Server)
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5500';
+    // Public URL / Ngrok para recebimento de webhooks do servidor do Mercado Pago
+    const publicUrl = process.env.PUBLIC_URL || 'http://localhost:5000';
 
+    // 1. Tenta criar link de assinatura recorrente mensal via Mercado Pago (Preapproval)
+    try {
+      if (typeof Preapproval !== 'undefined') {
+        const preapproval = new Preapproval(clientMercadoPago);
+        const response = await preapproval.create({
+          body: {
+            reason: `Assinatura ${nomePlanoClean} - Conecta Joias`,
+            auto_recurring: {
+              frequency: 1,
+              frequency_type: 'months',
+              transaction_amount: precoNum,
+              currency_id: 'BRL'
+            },
+            back_url: `${frontendUrl}/pages/sucesso.html`,
+            external_reference: externalRef,
+            status: 'authorized'
+          }
+        });
+
+        if (response && (response.init_point || response.sandbox_init_point)) {
+          const linkSub = response.init_point || response.sandbox_init_point;
+          console.log(`✅ [Mercado Pago Assinatura] Link recorrente gerado: ${linkSub}`);
+          return res.status(200).json({ linkDePagamento: linkSub });
+        }
+      }
+    } catch (subErr) {
+      console.warn('⚠️ Falha ao criar assinatura no MP, usando checkout padrão:', subErr.message || subErr);
+    }
+
+    // 2. Fallback: Preferência de Checkout Pro Mercado Pago
     const preference = new Preference(clientMercadoPago);
     const response = await preference.create({
       body: {
         items: [
           {
-            title: planoNome,
+            title: `Assinatura ${nomePlanoClean} - Conecta Joias`,
             quantity: 1,
-            unit_price: Number(preco)
+            unit_price: precoNum,
+            currency_id: 'BRL'
           }
         ],
-        external_reference: String(usuarioId),
-        notification_url: process.env.PUBLIC_URL + '/api/webhook/mercadopago',
+        external_reference: externalRef,
+        notification_url: `${publicUrl}/api/webhook/mercadopago`,
         back_urls: {
-          success: `${process.env.PUBLIC_URL}/pages/sucesso.html`,
-          failure: `${process.env.PUBLIC_URL}/pages/falha.html`,
-          pending: `${process.env.PUBLIC_URL}/pages/sucesso.html`
-        },
-        auto_return: 'approved'
+          success: `${frontendUrl}/pages/sucesso.html`,
+          failure: `${frontendUrl}/pages/falha.html`,
+          pending: `${frontendUrl}/pages/sucesso.html`
+        }
       }
     });
 
     return res.status(200).json({ linkDePagamento: response.init_point });
   } catch (error) {
-    console.error('Erro ao criar preferência de pagamento no Mercado Pago:', error);
+    console.error('Erro ao criar pagamento/assinatura no Mercado Pago:', error);
     return res.status(500).json({ error: 'Erro ao processar criação de pagamento no Mercado Pago' });
   }
 });
 
-// Webhook do Mercado Pago para notificação de pagamento
+// Webhook do Mercado Pago para notificação de pagamento, estorno e cancelamento
 app.post('/api/webhook/mercadopago', async (req, res) => {
   // Retorno imediato 200 OK exigido pelo Mercado Pago
   res.status(200).send('OK');
@@ -3805,53 +3868,57 @@ app.post('/api/webhook/mercadopago', async (req, res) => {
   const { type } = req.query;
   const paymentId = req.query['data.id'] || req.query.id;
 
-  if (type === 'payment' && paymentId) {
+  if (paymentId) {
     try {
       const payment = new Payment(clientMercadoPago);
       const pagamentoMP = await payment.get({ id: paymentId });
 
-      if (pagamentoMP && pagamentoMP.status === 'approved') {
-        const usuarioId = pagamentoMP.external_reference;
+      if (pagamentoMP) {
+        const rawRef = pagamentoMP.external_reference || '';
+        const parts = rawRef.split('|');
+        const usuarioId = parts[0];
+        const planoExt = parts[1] || 'GOLD';
 
         if (usuarioId) {
           const usuario = await prisma.usuario.findUnique({
             where: { id: usuarioId }
           });
 
-          if (usuario && usuario.lojaId) {
-            const dataVencimento = new Date();
-            dataVencimento.setDate(dataVencimento.getDate() + 30);
+          let lojaTargetId = (usuario && usuario.lojaId) ? usuario.lojaId : usuarioId;
+          const lojaExiste = await prisma.loja.findUnique({ where: { id: lojaTargetId } });
 
-            await prisma.loja.update({
-              where: { id: usuario.lojaId },
-              data: {
-                statusPlano: 'ATIVO',
-                vencimentoPlano: dataVencimento
-              }
-            });
-            console.log(`✅ [Webhook Mercado Pago] Pagamento aprovado! Plano ativado com sucesso para a Loja ${usuario.lojaId} (Usuário ${usuarioId}).`);
-          } else {
-            const loja = await prisma.loja.findUnique({ where: { id: usuarioId } });
-            if (loja) {
+          if (lojaExiste) {
+            if (pagamentoMP.status === 'approved') {
               const dataVencimento = new Date();
               dataVencimento.setDate(dataVencimento.getDate() + 30);
 
+              const novoPlanoFinal = lojaExiste.downgradePendente || planoExt;
+
               await prisma.loja.update({
-                where: { id: usuarioId },
+                where: { id: lojaTargetId },
                 data: {
                   statusPlano: 'ATIVO',
+                  plano: novoPlanoFinal,
+                  downgradePendente: null,
                   vencimentoPlano: dataVencimento
                 }
               });
-              console.log(`✅ [Webhook Mercado Pago] Pagamento aprovado! Plano ativado com sucesso para a Loja ${usuarioId}.`);
-            } else {
-              console.log(`⚠️ [Webhook Mercado Pago] Pagamento aprovado, porém ID (${usuarioId}) não foi encontrado na tabela Usuario/Loja.`);
+              console.log(`✅ [Webhook Mercado Pago] Pagamento APROVADO! Plano ${novoPlanoFinal} ativado com sucesso para a Loja ${lojaTargetId}.`);
+            } else if (['refunded', 'charged_back', 'cancelled', 'rejected'].includes(pagamentoMP.status)) {
+              await prisma.loja.update({
+                where: { id: lojaTargetId },
+                data: {
+                  statusPlano: 'SUSPENSO',
+                  plano: 'BASICO'
+                }
+              });
+              console.log(`⚠️ [Webhook Mercado Pago] Pagamento ${pagamentoMP.status.toUpperCase()}! Loja ${lojaTargetId} alterada para Plano BASICO / SUSPENSO.`);
             }
           }
         }
       }
-    } catch (error) {
-      console.error('❌ Erro ao processar webhook do Mercado Pago:', error);
+    } catch (err) {
+      console.error('Erro ao processar webhook do Mercado Pago:', err);
     }
   }
 });
@@ -4482,35 +4549,42 @@ app.get('/api/saas/meu-plano', autenticarJWT, async (req, res) => {
     }
 
     const loja = usuario.loja;
-    const planoStr = (loja.plano || 'BRONZE').toUpperCase();
+    const planoStr = (loja.plano || 'BASICO').toUpperCase();
 
     // Contar consultoras cadastradas
     const totalConsultoras = await prisma.usuario.count({
       where: { lojaId: loja.id, role: 'Consultant' }
     });
 
-    // Somar total de peças no estoque central da loja
-    const estoqueAgg = await prisma.produto.aggregate({
-      where: { lojaId: loja.id, deletado: false },
-      _sum: { quantidadeTotal: true }
+    // Somar total de produtos cadastrados no estoque da loja
+    const totalEstoque = await prisma.produto.count({
+      where: { lojaId: loja.id }
     });
-    const totalEstoque = estoqueAgg._sum.quantidadeTotal || 0;
 
-    // Limites de acordo com o plano
+    // Limites de acordo com os 4 planos
     const limites = {
+      BASICO: { consultoras: 0, estoque: 0, valor: 0.00 },
       BRONZE: { consultoras: 5, estoque: 300, valor: 147.00 },
       GOLD: { consultoras: 25, estoque: 1500, valor: 297.00 },
       PLATINUM: { consultoras: 9999, estoque: 99999, valor: 497.00 }
     };
 
-    const limiteAtual = limites[planoStr] || limites.BRONZE;
+    const limiteAtual = limites[planoStr] || limites.BASICO;
+
+    const excedeuConsultoras = totalConsultoras > limiteAtual.consultoras;
+    const excedeuEstoque = totalEstoque > limiteAtual.estoque;
+    const excedeuCota = (planoStr === 'BASICO') || (limiteAtual.consultoras !== 9999 && excedeuConsultoras) || (limiteAtual.estoque !== 99999 && excedeuEstoque);
 
     res.json({
       lojaId: loja.id,
       lojaNome: loja.nome,
       plano: planoStr,
-      statusPlano: loja.statusPlano || 'ATIVO',
+      statusPlano: loja.statusPlano || (planoStr === 'BASICO' ? 'PENDENTE' : 'ATIVO'),
       vencimentoPlano: loja.vencimentoPlano,
+      downgradePendente: loja.downgradePendente || null,
+      excedeuCota,
+      excedeuConsultoras,
+      excedeuEstoque,
       uso: {
         totalConsultoras,
         limiteConsultoras: limiteAtual.consultoras,
@@ -4526,6 +4600,46 @@ app.get('/api/saas/meu-plano', autenticarJWT, async (req, res) => {
   } catch (error) {
     console.error("Erro ao buscar dados do plano da loja:", error);
     res.status(500).json({ error: 'Erro ao buscar dados do plano.' });
+  }
+});
+
+// Rota para agendar Downgrade no fim do ciclo atual
+app.post('/api/saas/solicitar-downgrade', autenticarJWT, autorizarRole(['Manager', 'SuperAdmin']), async (req, res) => {
+  try {
+    const { novoPlano } = req.body;
+    const planoTarget = String(novoPlano || 'BRONZE').toUpperCase();
+
+    if (!['BRONZE', 'GOLD', 'BASICO'].includes(planoTarget)) {
+      return res.status(400).json({ error: 'Plano inválido para downgrade.' });
+    }
+
+    const usuario = await prisma.usuario.findUnique({
+      where: { id: req.user.id },
+      include: { loja: true }
+    });
+
+    if (!usuario || !usuario.lojaId) {
+      return res.status(404).json({ error: 'Loja não encontrada.' });
+    }
+
+    const loja = usuario.loja;
+    await prisma.loja.update({
+      where: { id: loja.id },
+      data: { downgradePendente: planoTarget }
+    });
+
+    const vencimentoStr = loja.vencimentoPlano 
+      ? new Date(loja.vencimentoPlano).toLocaleDateString('pt-BR')
+      : 'fim do ciclo atual';
+
+    res.json({
+      message: `Downgrade agendado com sucesso! Você continuará usando o Plano ${loja.plano} até ${vencimentoStr}. A partir desta data, sua assinatura passará para o Plano ${planoTarget}.`,
+      downgradePendente: planoTarget,
+      vencimentoPlano: loja.vencimentoPlano
+    });
+  } catch (error) {
+    console.error('Erro ao agendar downgrade:', error);
+    res.status(500).json({ error: 'Erro interno ao agendar downgrade.' });
   }
 });
 

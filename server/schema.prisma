@@ -11,9 +11,10 @@ model Loja {
   id           String             @id @default("default-loja")
   nome         String             @default("Loja Padrão")
   cnpj         String?            @unique
-  plano        String             @default("BRONZE") // "BRONZE" | "GOLD" | "PLATINUM"
-  statusPlano  String             @default("ATIVO") // "ATIVO" | "PENDENTE" | "SUSPENSO"
+  plano        String             @default("BASICO") // "BASICO" | "BRONZE" | "GOLD" | "PLATINUM"
+  statusPlano  String             @default("PENDENTE") // "ATIVO" | "PENDENTE" | "SUSPENSO"
   vencimentoPlano DateTime?
+  downgradePendente String?
   asaasCustomerId String?
   asaasSubscriptionId String?
   logoUrl      String?

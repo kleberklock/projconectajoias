@@ -22,6 +22,10 @@ const loginApp = {
     await this.carregarConfiguracoesLoja();
 
     const params = new URLSearchParams(window.location.search);
+    const planoParam = params.get("plano");
+    if (planoParam) {
+      localStorage.setItem("plano_selecionado", planoParam);
+    }
 
     // Se vier do redirecionamento com erro de logout
     const errorMsg = params.get("error");
@@ -564,13 +568,26 @@ const loginApp = {
   },
 
   redirecionarPorPerfil: function(role) {
+    const params = new URLSearchParams(window.location.search);
+    const plano = params.get("plano") || localStorage.getItem("plano_selecionado");
+    const isPagesDir = window.location.pathname.includes("/pages/");
+
     if (role === 'SuperAdmin') {
       sessionStorage.setItem('saas_super_admin', 'true');
-      window.location.href = "saasadmin.html";
-    } else if (role === 'Manager') {
-      window.location.href = "superadmin.html";
+      window.location.href = isPagesDir ? "saasadmin.html" : "pages/saasadmin.html";
+      return;
+    }
+
+    if (plano && role === 'Manager') {
+      localStorage.removeItem("plano_selecionado");
+      window.location.href = (isPagesDir ? "pagamento.html" : "pages/pagamento.html") + "?plano=" + encodeURIComponent(plano);
+      return;
+    }
+
+    if (role === 'Manager') {
+      window.location.href = isPagesDir ? "superadmin.html" : "pages/superadmin.html";
     } else {
-      window.location.href = "manager.html";
+      window.location.href = isPagesDir ? "manager.html" : "pages/manager.html";
     }
   },
 
@@ -582,10 +599,11 @@ const loginApp = {
     const nome     = document.getElementById("signup-name").value.trim();
     const email    = document.getElementById("signup-email").value.trim();
     const nomeLoja = document.getElementById("signup-loja").value.trim();
+    const whatsapp = document.getElementById("signup-whatsapp") ? document.getElementById("signup-whatsapp").value.trim() : "";
     const senha    = document.getElementById("signup-senha").value.trim();
     const errorBox = document.getElementById("signup-error-msg");
 
-    if (!nome || !email || !nomeLoja || !senha) {
+    if (!nome || !email || !nomeLoja || !whatsapp || !senha) {
       errorBox.innerText = "Por favor, preencha todos os campos obrigatórios.";
       errorBox.style.display = "block";
       return;
@@ -607,7 +625,7 @@ const loginApp = {
       const response = await fetch(`${this.apiUrl}/auth/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nome, email, senha, nomeLoja })
+        body: JSON.stringify({ nome, email, senha, nomeLoja, whatsapp })
       });
 
       const data = await response.json();
@@ -618,15 +636,7 @@ const loginApp = {
       localStorage.setItem("conectajoias_usuario", JSON.stringify(data.usuario));
       localStorage.setItem("conectajoias_loja_id", data.usuario.lojaId);
 
-      // Guardar para usar depois do wizard
-      this._cadastroData = data;
-
-      // Preencher nome comercial com nome da loja como sugestão no wizard
-      const nomeComercialEl = document.getElementById("wz-nome-comercial");
-      if (nomeComercialEl) nomeComercialEl.value = nomeLoja;
-
-      // Ir para o Wizard
-      this.iniciarWizard();
+      this.redirecionarPorPerfil(data.usuario.role);
 
     } catch (error) {
       console.error(error);

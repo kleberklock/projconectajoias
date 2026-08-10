@@ -2483,6 +2483,7 @@ const app = {
   },
 
   salvarNovoProduto: async function() {
+    if (!this.verificarPlanoAtivoAntesDeCriar()) return;
     const nome = document.getElementById("prod-nome").value.trim();
     const categoria = document.getElementById("prod-categoria").value;
     const quantidade = parseInt(document.getElementById("prod-quantidade").value) || 0;
@@ -3136,6 +3137,7 @@ const app = {
   },
 
   salvarNovaRevendedora: async function() {
+    if (!this.verificarPlanoAtivoAntesDeCriar()) return;
     const nome = document.getElementById("rev-nome").value.trim();
     const whatsapp = document.getElementById("rev-whatsapp").value.trim();
     const comissao = parseInt(document.getElementById("rev-comissao").value) || 30;
@@ -3446,6 +3448,7 @@ const app = {
   },
 
   processarConsignacao: async function() {
+    if (!this.verificarPlanoAtivoAntesDeCriar()) return;
     const rev = this.state.revendedoras.find(r => r.id === this.state.revendedoraSelecionadaId);
     if (!rev) return;
 
@@ -5295,6 +5298,9 @@ const app = {
           ? `<span style="color: #a5d6a7; font-weight: 700; font-size: 0.8rem;">R$ ${(v.lucroEstimado || 0).toFixed(2).replace(".", ",")} <small style="opacity:0.7;font-weight:400;">(lucro)</small></span>`
           : `R$ ${v.comissao.toFixed(2).replace(".", ",")}`;
 
+        const formaPagamentoTxt = v.formaPagamento || v.meioPagamento || (v.tipo === 'direta' ? 'Pix' : 'Dinheiro/Link');
+        const badgeFormaPagamento = `<span class="badge" style="background: rgba(212,175,55,0.1); color: var(--gold-light); border: 1px solid rgba(212,175,55,0.2); font-size: 0.78rem;">${formaPagamentoTxt}</span>`;
+
         const tr = document.createElement("tr");
         tr.innerHTML = `
           <td style="color: var(--text-secondary); font-size: 0.85rem;">${dataStr}</td>
@@ -5306,6 +5312,7 @@ const app = {
             R$ ${v.total.toFixed(2).replace(".", ",")}
             ${v.desconto > 0 ? `<br><small style="color: var(--danger); font-weight: 400;">(Desc: R$ ${v.desconto.toFixed(2).replace(".", ",")}${v.motivoDesconto ? ` - ${v.motivoDesconto}` : ''})</small>` : ''}
           </td>
+          <td>${badgeFormaPagamento}</td>
           <td style="color: #81c784; font-weight: 700;">${comissaoOuLucro}</td>
           <td>${clienteInfo}</td>
           <td>
@@ -5322,23 +5329,36 @@ const app = {
     document.getElementById("vendas-geral-comissoes").innerText = `R$ ${comissoesTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
   },
 
-  renderizarVendasIndividuaisRevendedora: function() {
+  renderizarVendasIndividuaisRevendedora: async function() {
     const tbody = document.getElementById("tbody-vendas-individuais-revendedora");
     if (!tbody) return;
-    tbody.innerHTML = "";
     
     const revId = this.state.revendedoraSelecionadaId;
-    if (!revId) return;
+    const rev = this.state.revendedoras.find(r => r.id === revId);
     
-    const vendasRev = this.state.vendasConsolidadas.filter(v => v.tipo === 'revendedora' && v.usuarioId === revId);
+    if (!rev) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-secondary); padding: 2rem;">Selecione uma revendedora para visualizar suas vendas.</td></tr>`;
+      return;
+    }
+
+    // Se as vendas consolidadas estiverem vazias, carrega da API
+    if (!this.state.vendasConsolidadas || this.state.vendasConsolidadas.length === 0) {
+      await this.carregarVendasConsolidadas();
+    }
+    
+    tbody.innerHTML = "";
+
+    const vendasRev = (this.state.vendasConsolidadas || []).filter(v => v.tipo === 'revendedora' && (v.usuarioId === revId || v.vendedor === rev.nome));
     
     if (vendasRev.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 2rem;">Nenhuma venda registrada para esta revendedora.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-secondary); padding: 2rem;">Nenhuma venda registrada para a revendedora ${rev.nome} ainda.</td></tr>`;
       return;
     }
     
     vendasRev.forEach(v => {
       const dataStr = new Date(v.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+      const formaPagamentoTxt = v.formaPagamento || v.meioPagamento || 'Pix';
+      
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td style="color: var(--text-secondary); font-size: 0.85rem;">${dataStr}</td>
@@ -5346,6 +5366,7 @@ const app = {
         <td>${v.quantidade} unid.</td>
         <td>R$ ${v.precoVenda.toFixed(2).replace(".", ",")}</td>
         <td style="color: var(--gold-primary); font-weight: 700;">R$ ${v.total.toFixed(2).replace(".", ",")}</td>
+        <td><span class="badge" style="background: rgba(212,175,55,0.1); color: var(--gold-light); border: 1px solid rgba(212,175,55,0.2); font-size: 0.78rem;">${formaPagamentoTxt}</span></td>
         <td style="color: #81c784; font-weight: 700;">R$ ${v.comissao.toFixed(2).replace(".", ",")}</td>
       `;
       tbody.appendChild(tr);
@@ -5689,6 +5710,7 @@ const app = {
   },
 
   salvarCliente: async function() {
+    if (!this.verificarPlanoAtivoAntesDeCriar()) return;
     const nome = document.getElementById("cliente-nome").value.trim();
     const whatsapp = document.getElementById("cliente-whatsapp").value.trim();
     const dataNascimento = document.getElementById("cliente-nascimento").value || null;
@@ -7012,27 +7034,29 @@ const app = {
         }
       });
     } catch (e) {
-      console.error("Erro ao ordenar widgets:", e);
+     verificarPlanoAtivoAntesDeCriar: function(acaoCallback) {
+    const statusPlano = (this.state.loja && this.state.loja.statusPlano) || localStorage.getItem("conectajoias_status_plano") || "PENDENTE";
+    const isSuperAdmin = this.state.usuarioLogado && this.state.usuarioLogado.role === "SuperAdmin";
+    
+    if (isSuperAdmin) {
+      if (typeof acaoCallback === "function") acaoCallback();
+      return true;
     }
-  },
 
-  toggleModoEdicaoWidgets: function() {
-    const grid = document.getElementById("admin-metrics-grid");
-    const btn = document.getElementById("btn-edit-admin-widgets");
-    if (!grid || !btn) return;
+    if (statusPlano === "ATIVO" && !this.state.excedeuCota) {
+      if (typeof acaoCallback === "function") acaoCallback();
+      return true;
+    }
 
-    const isEditing = grid.classList.toggle("edit-mode");
-    if (isEditing) {
-      btn.classList.add("active");
-      btn.innerHTML = '<i class="fa-solid fa-check"></i>';
-      btn.title = "Concluir Personalização";
-      this.toast("Modo de personalização ativado! Use as setas dos cards para ordenar.", "info");
+    const modal = document.getElementById("modal-bloqueio-plano");
+    if (modal) {
+      modal.style.display = "flex";
     } else {
-      btn.classList.remove("active");
-      btn.innerHTML = '<i class="fa-solid fa-pen"></i>';
-      btn.title = "Personalizar Painel";
-      this.toast("Personalização do painel salva com sucesso! ✨", "success");
+      alert("Para realizar esta ação, é necessário assinar um dos nossos planos ativos.");
+      const isPagesDir = window.location.pathname.includes("/pages/");
+      window.location.href = isPagesDir ? "pagamento.html" : "pages/pagamento.html";
     }
+    return false;
   },
 
   carregarMeuPlanoSaaS: async function() {
@@ -7040,11 +7064,21 @@ const app = {
       if (this.state.token && !this.state.token.startsWith("mock_")) {
         const res = await this.requisitarAPI('/saas/meu-plano');
         if (res) {
+          this.state.statusPlano = res.statusPlano || 'PENDENTE';
+          this.state.plano = res.plano || 'BASICO';
+          this.state.excedeuCota = !!res.excedeuCota;
+          this.state.downgradePendente = res.downgradePendente || null;
+          localStorage.setItem("conectajoias_status_plano", this.state.statusPlano);
+
           const elNome = document.getElementById("saas-plano-nome");
           const elStatus = document.getElementById("saas-plano-badge-status");
           const elVenc = document.getElementById("saas-plano-vencimento");
 
-          if (elNome) elNome.innerText = `Plano ${res.plano}`;
+          if (elNome) {
+            let txtPlano = `Plano ${res.plano}`;
+            if (res.downgradePendente) txtPlano += ` (Downgrade para ${res.downgradePendente} agendado)`;
+            elNome.innerText = txtPlano;
+          }
           if (elStatus) {
             elStatus.innerText = res.statusPlano || 'ATIVO';
             elStatus.style.borderColor = res.statusPlano === 'ATIVO' ? '#81c784' : 'var(--warning)';
@@ -7054,8 +7088,14 @@ const app = {
             if (res.vencimentoPlano) {
               elVenc.innerText = `Vence em ${new Date(res.vencimentoPlano).toLocaleDateString('pt-BR')}`;
             } else {
-              elVenc.innerText = 'Acesso Ativo (30 dias)';
+              elVenc.innerText = 'Acesso no Plano Básico';
             }
+          }
+
+          if (res.statusPlano === 'SUSPENSO') {
+            this.toast("Sua assinatura foi suspensa ou reembolsada. Acesso retornado ao Plano Básico.", "warning");
+          } else if (res.excedeuCota && res.plano !== 'BASICO') {
+            this.toast("Atenção: Os dados atuais excedem a cota do seu plano pós-downgrade. Faça upgrade para adicionar novos itens.", "warning");
           }
 
           const consultorasTxt = document.getElementById("saas-uso-consultoras-txt");
@@ -7063,6 +7103,22 @@ const app = {
           if (consultorasTxt && res.uso) consultorasTxt.innerText = `${res.uso.totalConsultoras} / ${res.uso.limiteConsultoras >= 999 ? 'Ilimitado' : res.uso.limiteConsultoras}`;
           if (consultorasBar && res.uso) {
             const pct = res.uso.limiteConsultoras >= 999 ? 10 : Math.min(100, Math.round((res.uso.totalConsultoras / res.uso.limiteConsultoras) * 100));
+            consultorasBar.style.width = `${pct}%`;
+          }
+
+          const estoqueTxt = document.getElementById("saas-uso-estoque-txt");
+          const estoqueBar = document.getElementById("saas-bar-estoque");
+          if (estoqueTxt && res.uso) estoqueTxt.innerText = `${res.uso.totalEstoque} / ${res.uso.limiteEstoque >= 9999 ? 'Ilimitado' : res.uso.limiteEstoque}`;
+          if (estoqueBar && res.uso) {
+            const pct = res.uso.limiteEstoque >= 9999 ? 10 : Math.min(100, Math.round((res.uso.totalEstoque / res.uso.limiteEstoque) * 100));
+            estoqueBar.style.width = `${pct}%`;
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Erro ao carregar dados do plano SaaS:", e);
+    }
+  },>= 999 ? 10 : Math.min(100, Math.round((res.uso.totalConsultoras / res.uso.limiteConsultoras) * 100));
             consultorasBar.style.width = `${pct}%`;
           }
 

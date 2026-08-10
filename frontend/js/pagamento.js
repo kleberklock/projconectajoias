@@ -2,9 +2,16 @@
  * Conecta Joias - Checkout de Pagamento Script (Real Integration with ASAAS)
  */
 
-const API_BASE_URL = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" 
-  ? "http://localhost:5000/api" 
-  : `${window.location.origin}/api`;
+function getApiBaseUrl() {
+  if (typeof app !== "undefined" && app.state && app.state.apiUrl) {
+    return app.state.apiUrl;
+  }
+  const savedUrl = localStorage.getItem("conectajoias_api_url");
+  if (savedUrl) return savedUrl;
+
+  const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+  return isLocal ? "http://localhost:5000/api" : `${window.location.origin}/api`;
+}
 
 const checkout = {
   linkId: null,
@@ -499,22 +506,16 @@ async function assinarPlano(planoNome, preco, event) {
     }
 
     if (!usuarioId) {
-      const msgSemSessao = "Usuário não autenticado. Por favor, faça login para assinar um plano.";
-      if (typeof checkout !== "undefined" && checkout.toast) {
-        checkout.toast(msgSemSessao, "warning");
-      } else {
-        alert(msgSemSessao);
-      }
-
-      if (btn) {
-        btn.disabled = false;
-        btn.innerHTML = originalHtml;
-      }
+      const planoClean = (planoNome || "gold").toLowerCase().includes("bronze") ? "bronze" : ((planoNome || "gold").toLowerCase().includes("platinum") ? "platinum" : "gold");
+      localStorage.setItem("plano_selecionado", planoClean);
+      const isPagesDir = window.location.pathname.includes("/pages/");
+      const loginUrl = (isPagesDir ? "login.html" : "pages/login.html") + "?cadastro=true&plano=" + encodeURIComponent(planoClean);
+      window.location.href = loginUrl;
       return;
     }
 
     // 3. Faz a requisição POST para a rota /api/criar-pagamento
-    const response = await fetch(`${API_BASE_URL}/criar-pagamento`, {
+    const response = await fetch(`${getApiBaseUrl()}/criar-pagamento`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"

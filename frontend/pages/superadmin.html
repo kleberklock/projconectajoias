@@ -388,10 +388,22 @@
                     <td style="padding-left: 2rem;">Acertos de Consignado</td>
                     <td id="dre-fat-consignado" style="text-align: right;">R$ 0,00</td>
                   </tr>
+                  <tr style="font-size: 0.9rem; color: var(--text-secondary);">
+                    <td style="padding-left: 2rem;">Vendas das Revendedoras (App)</td>
+                    <td id="dre-fat-revendedoras" style="text-align: right;">R$ 0,00</td>
+                  </tr>
                   
                   <tr style="color: var(--danger);">
-                    <td>(-) Deduções (Comissões Pagas)</td>
+                    <td>(-) Deduções (Comissões Pagas / Geradas)</td>
                     <td id="dre-comissoes" style="text-align: right;">R$ 0,00</td>
+                  </tr>
+                  <tr style="font-size: 0.85rem; color: var(--text-secondary);">
+                    <td style="padding-left: 2rem;">Comissões dos Acertos</td>
+                    <td id="dre-comissoes-acertos" style="text-align: right;">R$ 0,00</td>
+                  </tr>
+                  <tr style="font-size: 0.85rem; color: var(--text-secondary);">
+                    <td style="padding-left: 2rem;">Comissões de Vendas das Revendedoras (App)</td>
+                    <td id="dre-comissoes-revendedoras" style="text-align: right;">R$ 0,00</td>
                   </tr>
                   <tr style="font-size: 0.9rem; color: var(--text-secondary);">
                     <td style="padding-left: 2rem;">(+) Ajuste de Perdas (Cobrado das Revendedoras)</td>
@@ -1023,14 +1035,15 @@
                   <th>Qtd.</th>
                   <th>Preço Unit.</th>
                   <th>Valor Total</th>
-                  <th>Comissão</th>
+                  <th>Forma de Pagamento</th>
+                  <th>Comissão/Lucro</th>
                   <th>Cliente / Contato</th>
                   <th>Ações</th>
                 </tr>
               </thead>
               <tbody id="tbody-historico-vendas-geral">
                 <tr>
-                  <td colspan="8" style="text-align: center; color: var(--text-secondary); padding: 3rem;">Nenhuma venda registrada no sistema.</td>
+                  <td colspan="10" style="text-align: center; color: var(--text-secondary); padding: 3rem;">Nenhuma venda registrada no sistema.</td>
                 </tr>
               </tbody>
             </table>
@@ -2971,6 +2984,81 @@
         <button class="btn-confirm-action btn-confirm-yes" id="btn-confirm-yes">Confirmar</button>
       </div>
     </div>
+  <!-- ==========================================
+       MODAL: BLOQUEIO POR FALTA DE PLANO ATIVO
+       ========================================== -->
+  <!-- ==========================================
+       MODAL: BLOQUEIO POR FALTA DE PLANO ATIVO (PLANO BÁSICO)
+       ========================================== -->
+  <div class="modal-backdrop" id="modal-bloqueio-plano" style="display: none; z-index: 99999;">
+    <div class="modal-card" style="width: 720px; max-width: 95vw; text-align: center; padding: 2.2rem 1.8rem; background: var(--bg-card); border: 1px solid var(--border-gold); border-radius: var(--radius-lg); box-shadow: var(--shadow-premium);">
+      <button class="btn-close-modal" onclick="document.getElementById('modal-bloqueio-plano').style.display='none'" style="position: absolute; top: 15px; right: 15px; background: none; border: none; color: var(--text-secondary); font-size: 1.2rem; cursor: pointer;"><i class="fa-solid fa-xmark"></i></button>
+
+      <div style="width: 60px; height: 60px; border-radius: 50%; background: rgba(212, 175, 55, 0.1); border: 2px solid var(--gold-primary); display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem auto; color: var(--gold-primary); font-size: 1.8rem;">
+        <i class="fa-solid fa-lock"></i>
+      </div>
+
+      <h3 style="font-family: var(--font-title); font-size: 1.4rem; color: var(--gold-light); margin-bottom: 0.4rem;">Você está no Plano Básico (Sem Acesso)</h3>
+      <p style="color: var(--text-secondary); font-size: 0.88rem; line-height: 1.5; margin-bottom: 1.5rem; max-width: 580px; margin-left: auto; margin-right: auto;">
+        No Plano Básico você não tem permissão para cadastrar produtos, revendedoras ou realizar vendas. Assine um dos planos abaixo para liberar acesso instantâneo!
+      </p>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; text-align: left; margin-bottom: 1.5rem;">
+        <!-- Card Bronze -->
+        <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(205, 127, 50, 0.4); border-radius: var(--radius-md); padding: 1.2rem; display: flex; flex-direction: column; justify-content: space-between;">
+          <div>
+            <h4 style="color: #cd7f32; margin: 0 0 0.3rem 0; font-size: 1rem;">Bronze</h4>
+            <div style="font-size: 1.3rem; font-weight: bold; color: #fff; margin-bottom: 0.6rem;">R$ 147,00<span style="font-size: 0.75rem; color: var(--text-secondary);">/mês</span></div>
+            <ul style="list-style: none; padding: 0; margin: 0 0 1rem 0; font-size: 0.78rem; color: var(--text-secondary); display: flex; flex-direction: column; gap: 0.3rem;">
+              <li><i class="fa-solid fa-check" style="color: #cd7f32;"></i> Até 300 produtos</li>
+              <li><i class="fa-solid fa-check" style="color: #cd7f32;"></i> Até 5 revendedoras</li>
+            </ul>
+          </div>
+          <button class="btn-checkout" onclick="assinarPlano('Plano Bronze', 147, event)" style="width: 100%; padding: 0.6rem; font-size: 0.8rem; background: rgba(205, 127, 50, 0.2); border: 1px solid #cd7f32; color: #fff; border-radius: 8px; cursor: pointer;">
+            <i class="fa-solid fa-bolt"></i> Assinar Bronze
+          </button>
+        </div>
+
+        <!-- Card Gold (Destaque) -->
+        <div style="background: rgba(212, 175, 55, 0.08); border: 2px solid var(--gold-primary); border-radius: var(--radius-md); padding: 1.2rem; display: flex; flex-direction: column; justify-content: space-between; position: relative;">
+          <span style="position: absolute; top: -10px; right: 12px; background: var(--gold-gradient); color: #000; font-size: 0.6rem; font-weight: bold; padding: 2px 6px; border-radius: 6px;">MAIS POPULAR</span>
+          <div>
+            <h4 style="color: var(--gold-primary); margin: 0 0 0.3rem 0; font-size: 1rem;">Gold</h4>
+            <div style="font-size: 1.3rem; font-weight: bold; color: var(--gold-primary); margin-bottom: 0.6rem;">R$ 297,00<span style="font-size: 0.75rem; color: var(--text-secondary);">/mês</span></div>
+            <ul style="list-style: none; padding: 0; margin: 0 0 1rem 0; font-size: 0.78rem; color: var(--text-secondary); display: flex; flex-direction: column; gap: 0.3rem;">
+              <li><i class="fa-solid fa-check" style="color: var(--gold-primary);"></i> Até 1.500 produtos</li>
+              <li><i class="fa-solid fa-check" style="color: var(--gold-primary);"></i> Até 25 revendedoras</li>
+              <li><i class="fa-solid fa-check" style="color: var(--gold-primary);"></i> White-Label Completo</li>
+            </ul>
+          </div>
+          <button class="btn-checkout" onclick="assinarPlano('Plano Gold', 297, event)" style="width: 100%; padding: 0.6rem; font-size: 0.8rem; background: var(--gold-gradient); border: none; color: #000; font-weight: bold; border-radius: 8px; cursor: pointer;">
+            <i class="fa-solid fa-crown"></i> Assinar Gold
+          </button>
+        </div>
+
+        <!-- Card Platinum -->
+        <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(229, 228, 226, 0.4); border-radius: var(--radius-md); padding: 1.2rem; display: flex; flex-direction: column; justify-content: space-between;">
+          <div>
+            <h4 style="color: #e5e4e2; margin: 0 0 0.3rem 0; font-size: 1rem;">Platinum</h4>
+            <div style="font-size: 1.3rem; font-weight: bold; color: #fff; margin-bottom: 0.6rem;">R$ 497,00<span style="font-size: 0.75rem; color: var(--text-secondary);">/mês</span></div>
+            <ul style="list-style: none; padding: 0; margin: 0 0 1rem 0; font-size: 0.78rem; color: var(--text-secondary); display: flex; flex-direction: column; gap: 0.3rem;">
+              <li><i class="fa-solid fa-check" style="color: #e5e4e2;"></i> Produtos Ilimitados</li>
+              <li><i class="fa-solid fa-check" style="color: #e5e4e2;"></i> Revendedoras Ilimitadas</li>
+              <li><i class="fa-solid fa-check" style="color: #e5e4e2;"></i> Automação WhatsApp</li>
+            </ul>
+          </div>
+          <button class="btn-checkout" onclick="assinarPlano('Plano Platinum', 497, event)" style="width: 100%; padding: 0.6rem; font-size: 0.8rem; background: rgba(255,255,255,0.1); border: 1px solid #e5e4e2; color: #fff; border-radius: 8px; cursor: pointer;">
+            <i class="fa-solid fa-star"></i> Assinar Platinum
+          </button>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: center; gap: 1rem;">
+        <button class="btn-outline-gold" onclick="document.getElementById('modal-bloqueio-plano').style.display='none'" style="padding: 0.5rem 1.5rem; font-size: 0.85rem;">
+          Continuar Visualizando em Modo Básico
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- 2. Biblioteca Robusta de CSV (PapaParse) -->
@@ -2983,6 +3071,8 @@
   <script src="../js/superadmin-vendas.js"></script>
   <!-- 5. Módulo de Tutorial Interativo (Onboarding Tour) -->
   <script src="../js/superadmin-tour.js"></script>
+  <!-- 6. Módulo de Checkout de Pagamento e Assinaturas -->
+  <script src="../js/pagamento.js"></script>
 
   <!-- Script de Autolimpeza imperativa de Cache e Service Workers do Navegador -->
   <script>

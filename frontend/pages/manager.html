@@ -349,14 +349,30 @@
                     <td style="padding-left: 2rem;">Acertos de Consignado</td>
                     <td id="dre-fat-consignado" style="text-align: right;">R$ 0,00</td>
                   </tr>
+                  <tr style="font-size: 0.9rem; color: var(--text-secondary);">
+                    <td style="padding-left: 2rem;">Vendas das Revendedoras (App)</td>
+                    <td id="dre-fat-revendedoras" style="text-align: right;">R$ 0,00</td>
+                  </tr>
                   
                   <tr style="color: var(--danger);">
-                    <td>(-) Deduções (Comissões Pagas)</td>
+                    <td>(-) Deduções (Comissões Pagas / Geradas)</td>
                     <td id="dre-comissoes" style="text-align: right;">R$ 0,00</td>
+                  </tr>
+                  <tr style="font-size: 0.85rem; color: var(--text-secondary);">
+                    <td style="padding-left: 2rem;">Comissões dos Acertos</td>
+                    <td id="dre-comissoes-acertos" style="text-align: right;">R$ 0,00</td>
+                  </tr>
+                  <tr style="font-size: 0.85rem; color: var(--text-secondary);">
+                    <td style="padding-left: 2rem;">Comissões de Vendas das Revendedoras (App)</td>
+                    <td id="dre-comissoes-revendedoras" style="text-align: right;">R$ 0,00</td>
                   </tr>
                   <tr style="font-size: 0.9rem; color: var(--text-secondary);">
                     <td style="padding-left: 2rem;">(+) Ajuste de Perdas (Cobrado das Revendedoras)</td>
                     <td id="dre-perdas-ajuste" style="text-align: right; color: var(--gold-primary);">R$ 0,00</td>
+                  </tr>
+                  <tr style="color: var(--danger); font-size: 0.9rem;">
+                    <td style="padding-left: 2rem;">(-) Impostos Deduzidos</td>
+                    <td id="dre-impostos" style="text-align: right;">R$ 0,00</td>
                   </tr>
                   
                   <tr style="font-weight: bold;">
@@ -377,8 +393,13 @@
                     <td id="dre-custo-consignado" style="text-align: right;">R$ 0,00</td>
                   </tr>
                   
+                  <tr style="color: var(--danger);">
+                    <td>(-) Despesas Fixas Mensais</td>
+                    <td id="dre-despesas-fixas" style="text-align: right;">R$ 0,00</td>
+                  </tr>
+                  
                   <tr style="font-weight: bold; font-size: 1.15rem; border-top: 2px solid var(--border-color);" id="dre-lucro-row">
-                    <td>(=) LUCRO LÍQUIDO ESTIMADO</td>
+                    <td>(=) LUCRO LÍQUIDO REAL</td>
                     <td id="dre-lucro-liquido" style="text-align: right; color: #66bb6a;">R$ 0,00</td>
                   </tr>
                 </tbody>
