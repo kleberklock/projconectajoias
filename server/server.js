@@ -9,7 +9,7 @@ const rateLimit = require('express-rate-limit');
 const fs = require('fs');
 const path = require('path');
 require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
-const { MercadoPagoConfig, Preference } = require('mercadopago');
+const { MercadoPagoConfig, Preference, Payment } = require('mercadopago');
 const { criarCobranca, criarCobrancaPlanoSaaS, obterQrCodePix, obterCodigoBarrasBoleto } = require('./asaas-service');
 const comissaoService = require('./services/ComissaoService');
 const crypto = require('crypto');
@@ -905,6 +905,7 @@ app.post('/api/produtos', autenticarJWT, autorizarRole(['Manager', 'SuperAdmin']
         return res.status(403).json({ error: `Limite de peças do plano ${plano} atingido (${totalEstoqueAtual}/${limite} peças em estoque central). Não é possível cadastrar mais ${quantidade} peças sem fazer o upgrade do seu plano.` });
       }
     }
+    const qtdInt = parseInt(quantidade) || 0;
     const novoProduto = await prisma.produto.create({
       data: {
         codigo: cod,
@@ -922,7 +923,7 @@ app.post('/api/produtos', autenticarJWT, autorizarRole(['Manager', 'SuperAdmin']
             sku: `${cod}-UN-OU`,
             tamanho: "Único",
             banho: "OURO",
-            quantidade: parseInt(quantidade) || 0,
+            quantidade: qtdInt,
             quantidadeDefeito: parseInt(quantidadeDefeito) || 0
           }
         }
@@ -961,6 +962,7 @@ app.put('/api/produtos/:id', autenticarJWT, autorizarRole(['Manager', 'SuperAdmi
       return res.status(403).json({ error: 'Acesso negado ou produto não encontrado nesta loja.' });
     }
 
+    const qtdInt = parseInt(quantidade) || 0;
     const produtoAtualizado = await prisma.produto.update({
       where: { id },
       data: {
@@ -1481,18 +1483,28 @@ app.post('/api/consignacoes', autenticarJWT, autorizarRole(['Manager', 'SuperAdm
       variacao = await prisma.produtoVariacao.findFirst({
         where: { 
           produtoId: produtoId,
-          lojaId: req.lojaId,
-          tamanho: "Único",
-          banho: "OURO"
+          lojaId: req.lojaId
         },
         include: { produto: true }
       });
-      if (!variacao) {
-        variacao = await prisma.produtoVariacao.findFirst({
-          where: { produtoId: produtoId, lojaId: req.lojaId },
-          include: { produto: true }
-        });
+    }
+
+    if (!variacao && produtoId) {
+      const prodPai = await prisma.produto.findFirst({ where: { id: produtoId, lojaId: req.lojaId } });
+      if (!prodPai) {
+        return res.status(404).json({ error: 'Produto não encontrado nesta loja.' });
       }
+      variacao = await prisma.produtoVariacao.create({
+        data: {
+          lojaId: req.lojaId,
+          produtoId: prodPai.id,
+          sku: `${prodPai.codigo || 'PROD'}-UN-OU`,
+          tamanho: "Único",
+          banho: "OURO",
+          quantidade: prodPai.quantidade || 0
+        },
+        include: { produto: true }
+      });
     }
 
     if (!variacao) {
@@ -1501,24 +1513,41 @@ app.post('/api/consignacoes', autenticarJWT, autorizarRole(['Manager', 'SuperAdm
 
     const variacaoIdReal = variacao.id;
 
-    if (variacao.quantidade < qtdParsed) {
-      return res.status(400).json({ error: 'Estoque central insuficiente para esta variação de semijoia.' });
+    // Calcula estoque real combinando produto pai e variações do produto
+    let estoqueDisponivelReal = Math.max(variacao.quantidade || 0, variacao.produto ? (variacao.produto.quantidade || 0) : 0);
+
+    const prodIdTarget = produtoId || (variacao.produto ? variacao.produto.id : null);
+    if (prodIdTarget) {
+      const prodBanco = await prisma.produto.findFirst({
+        where: { id: prodIdTarget, lojaId: req.lojaId },
+        include: { variacoes: true }
+      });
+      if (prodBanco) {
+        const somaVariacoes = (prodBanco.variacoes || []).reduce((acc, v) => acc + (v.quantidade || 0), 0);
+        estoqueDisponivelReal = Math.max(estoqueDisponivelReal, prodBanco.quantidade || 0, somaVariacoes);
+      }
     }
 
-    const revendedora = await prisma.usuario.findFirst({ where: { id: usuarioId, role: 'Consultant', lojaId: req.lojaId } });
+    if (estoqueDisponivelReal < qtdParsed) {
+      return res.status(400).json({ error: `Estoque central insuficiente para esta semijoia. Disponível: ${estoqueDisponivelReal} unidade(s).` });
+    }
+
+    const revendedora = await prisma.usuario.findFirst({ where: { id: usuarioId, lojaId: req.lojaId } });
     if (!revendedora) {
       return res.status(404).json({ error: 'Revendedora não encontrada nesta loja.' });
     }
 
     // Calcula preço de venda atualizado com base nos custos e markup do produto-pai
     const produto = variacao.produto;
-    const custoTotal = produto.custoBruto + produto.custoBanho + produto.custoLiquido;
-    const precoVendaCalculado = custoTotal * produto.markup;
+    const custoTotal = (produto.custoBruto || 0) + (produto.custoBanho || 0) + (produto.custoLiquido || 0);
+    const precoVendaCalculado = custoTotal * (produto.markup || 1);
 
-    // Deduz do estoque central da variação de forma atômica para evitar race conditions
+    const novoEstoqueConsolidado = Math.max(0, estoqueDisponivelReal - qtdParsed);
+
+    // Deduz do estoque central da variação
     await prisma.produtoVariacao.update({
       where: { id: variacaoIdReal },
-      data: { quantidade: { decrement: qtdParsed } }
+      data: { quantidade: novoEstoqueConsolidado }
     });
 
     // Cria ou atualiza o registro de consignação
@@ -3753,9 +3782,9 @@ app.post('/api/criar-pagamento', async (req, res) => {
         external_reference: String(usuarioId),
         notification_url: process.env.PUBLIC_URL + '/api/webhook/mercadopago',
         back_urls: {
-          success: `${process.env.PUBLIC_URL}/success`,
-          failure: `${process.env.PUBLIC_URL}/failure`,
-          pending: `${process.env.PUBLIC_URL}/pending`
+          success: `${process.env.PUBLIC_URL}/pages/sucesso.html`,
+          failure: `${process.env.PUBLIC_URL}/pages/falha.html`,
+          pending: `${process.env.PUBLIC_URL}/pages/sucesso.html`
         },
         auto_return: 'approved'
       }
@@ -3765,6 +3794,65 @@ app.post('/api/criar-pagamento', async (req, res) => {
   } catch (error) {
     console.error('Erro ao criar preferência de pagamento no Mercado Pago:', error);
     return res.status(500).json({ error: 'Erro ao processar criação de pagamento no Mercado Pago' });
+  }
+});
+
+// Webhook do Mercado Pago para notificação de pagamento
+app.post('/api/webhook/mercadopago', async (req, res) => {
+  // Retorno imediato 200 OK exigido pelo Mercado Pago
+  res.status(200).send('OK');
+
+  const { type } = req.query;
+  const paymentId = req.query['data.id'] || req.query.id;
+
+  if (type === 'payment' && paymentId) {
+    try {
+      const payment = new Payment(clientMercadoPago);
+      const pagamentoMP = await payment.get({ id: paymentId });
+
+      if (pagamentoMP && pagamentoMP.status === 'approved') {
+        const usuarioId = pagamentoMP.external_reference;
+
+        if (usuarioId) {
+          const usuario = await prisma.usuario.findUnique({
+            where: { id: usuarioId }
+          });
+
+          if (usuario && usuario.lojaId) {
+            const dataVencimento = new Date();
+            dataVencimento.setDate(dataVencimento.getDate() + 30);
+
+            await prisma.loja.update({
+              where: { id: usuario.lojaId },
+              data: {
+                statusPlano: 'ATIVO',
+                vencimentoPlano: dataVencimento
+              }
+            });
+            console.log(`✅ [Webhook Mercado Pago] Pagamento aprovado! Plano ativado com sucesso para a Loja ${usuario.lojaId} (Usuário ${usuarioId}).`);
+          } else {
+            const loja = await prisma.loja.findUnique({ where: { id: usuarioId } });
+            if (loja) {
+              const dataVencimento = new Date();
+              dataVencimento.setDate(dataVencimento.getDate() + 30);
+
+              await prisma.loja.update({
+                where: { id: usuarioId },
+                data: {
+                  statusPlano: 'ATIVO',
+                  vencimentoPlano: dataVencimento
+                }
+              });
+              console.log(`✅ [Webhook Mercado Pago] Pagamento aprovado! Plano ativado com sucesso para a Loja ${usuarioId}.`);
+            } else {
+              console.log(`⚠️ [Webhook Mercado Pago] Pagamento aprovado, porém ID (${usuarioId}) não foi encontrado na tabela Usuario/Loja.`);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ Erro ao processar webhook do Mercado Pago:', error);
+    }
   }
 });
 

@@ -22,8 +22,13 @@ class ComissaoService {
         ? revendedora.faixasComissao
         : (revendedora.loja && revendedora.loja.faixasComissao ? revendedora.loja.faixasComissao : []);
       
-      const faixa = this.encontrarFaixaComissao(faturamentoVolumeAcumulado, faixas);
-      percentualComissao = faixa ? faixa.percentual : revendedora.comissao;
+      const faixasOrdenadas = faixas && faixas.length > 0 ? [...faixas].sort((a, b) => a.valorMin - b.valorMin) : [];
+      const faixa = this.encontrarFaixaComissao(faturamentoVolumeAcumulado, faixasOrdenadas);
+      if (faixasOrdenadas.length > 0) {
+        percentualComissao = faixa ? faixa.percentual : (faturamentoVolumeAcumulado >= faixasOrdenadas[0].valorMin ? faixasOrdenadas[0].percentual : 0);
+      } else {
+        percentualComissao = revendedora.comissao || 30;
+      }
       comissaoBruta = valorBaseComissao * (percentualComissao / 100);
 
     } else if (revendedora.tipoComissao === 'META_UNICA') {

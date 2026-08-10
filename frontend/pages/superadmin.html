@@ -111,6 +111,9 @@
           <li class="nav-item" data-target="admin-treinamentos">
             <button id="btn-tab-admin-treinamentos"><i class="fa-solid fa-graduation-cap"></i>Treinamentos</button>
           </li>
+          <li class="nav-item" data-target="meu-plano-saas" id="menu-meu-plano-saas">
+            <button id="btn-tab-meu-plano-saas"><i class="fa-solid fa-crown"></i>Meu Plano & Assinatura</button>
+          </li>
           <li class="nav-item" data-target="planilhas">
             <button id="btn-tab-planilhas"><i class="fa-solid fa-file-excel"></i>Planilhas Excel</button>
           </li>
@@ -719,11 +722,15 @@
               <div>
                 <h3 id="detalhe-nome-revendedora">Nome da Revendedora</h3>
                 <p><i class="fa-brands fa-whatsapp"></i> <span id="detalhe-whatsapp-revendedora">(00) 99999-9999</span></p>
-                <p style="margin-top: 0.3rem;">
-                  <i class="fa-solid fa-percent"></i> Comissão: <span id="detalhe-comissao-revendedora">30%</span>
-                  <span style="margin-left: 1.5rem;">
-                    <i class="fa-solid fa-key"></i> PIN: <strong id="detalhe-pin-revendedora" style="color: var(--gold-primary);">0000</strong>
-                    <button class="btn-qty" onclick="app.regenerarPINRevendedora()" title="Regenerar PIN e Senha" style="padding: 2px 6px; font-size: 0.75rem; vertical-align: middle; margin-left: 5px; display: inline-flex; align-items: center; justify-content: center; height: auto;"><i class="fa-solid fa-rotate"></i> Resetar</button>
+                <p style="margin-top: 0.5rem; display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap;">
+                  <span><i class="fa-solid fa-percent" style="color: var(--gold-primary); margin-right: 4px;"></i> Comissão: <span id="detalhe-comissao-revendedora" style="font-weight: 600;">30%</span></span>
+                  <span style="display: inline-flex; align-items: center; gap: 0.4rem; background: rgba(212, 175, 55, 0.08); padding: 3px 10px; border-radius: 6px; border: 1px solid rgba(212, 175, 55, 0.2);">
+                    <i class="fa-solid fa-key" style="color: var(--gold-primary); font-size: 0.8rem;"></i>
+                    <span style="font-size: 0.85rem; color: var(--text-secondary);">PIN:</span>
+                    <strong id="detalhe-pin-revendedora" style="color: var(--gold-primary); font-family: monospace; font-size: 0.95rem; letter-spacing: 1px;">0000</strong>
+                    <button type="button" onclick="app.regenerarPINRevendedora()" title="Regenerar PIN e Senha" style="background: rgba(212, 175, 55, 0.15); border: 1px solid rgba(212, 175, 55, 0.3); color: var(--gold-light); border-radius: 4px; padding: 2px 8px; font-size: 0.75rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; transition: all 0.2s ease;">
+                      <i class="fa-solid fa-rotate"></i> Resetar
+                    </button>
                   </span>
                 </p>
               </div>
@@ -1592,6 +1599,131 @@
               <button class="btn-gold" onclick="app.cadastrarTreinamento()" style="width: 100%; justify-content: center;"><i class="fa-solid fa-circle-check"></i> Cadastrar Conteúdo</button>
             </div>
           </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           ABA: MEU PLANO & ASSINATURA SAAS
+           ========================================== -->
+      <section id="meu-plano-saas" class="app-section">
+        <div class="section-header">
+          <div class="section-title">
+            <h2>Meu Plano & Assinatura SaaS</h2>
+            <p>Gerencie sua assinatura da plataforma Conecta Joias, acompanhe seus limites e faça upgrade a qualquer momento.</p>
+          </div>
+        </div>
+
+        <!-- Banner do Plano Atual + Limites -->
+        <div class="dashboard-panel" style="margin-bottom: 2rem; border: 1px solid var(--border-gold); background: radial-gradient(circle at top left, rgba(212, 175, 55, 0.08) 0%, rgba(15, 15, 15, 0.9) 100%);">
+          <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1.5rem; border-bottom: 1px solid rgba(212, 175, 55, 0.15); padding-bottom: 1.2rem; margin-bottom: 1.2rem;">
+            <div>
+              <span style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px;">Plano Ativo no Momento</span>
+              <div style="display: flex; align-items: center; gap: 0.8rem; margin-top: 0.3rem;">
+                <h2 id="saas-plano-nome" style="font-family: var(--font-title); font-size: 1.8rem; color: var(--gold-primary); margin: 0;">Plano Bronze</h2>
+                <span id="saas-plano-badge-status" class="badge-status" style="background: rgba(129, 199, 132, 0.15); color: #81c784; border: 1px solid #81c784; font-size: 0.75rem; padding: 4px 10px; border-radius: 20px; font-weight: bold;">ATIVO</span>
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <span style="font-size: 0.8rem; color: var(--text-secondary);">Renovação / Vencimento:</span>
+              <div id="saas-plano-vencimento" style="font-size: 1.1rem; font-weight: bold; color: var(--text-primary); margin-top: 0.2rem;">30 dias de acesso</div>
+            </div>
+          </div>
+
+          <!-- Uso de Limites -->
+          <div class="kpi-grid" style="grid-template-columns: repeat(2, 1fr); gap: 1.5rem;">
+            <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); padding: 1rem; border-radius: var(--radius-md);">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.85rem;">
+                <span style="color: var(--text-secondary);"><i class="fa-solid fa-users" style="color: var(--gold-primary); margin-right: 6px;"></i> Consultoras Cadastradas</span>
+                <span id="saas-uso-consultoras-txt" style="font-weight: bold; color: var(--text-primary);">0 / 5</span>
+              </div>
+              <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+                <div id="saas-bar-consultoras" style="width: 0%; height: 100%; background: var(--gold-gradient); transition: width 0.4s ease;"></div>
+              </div>
+            </div>
+            <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); padding: 1rem; border-radius: var(--radius-md);">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.85rem;">
+                <span style="color: var(--text-secondary);"><i class="fa-solid fa-gem" style="color: var(--gold-primary); margin-right: 6px;"></i> Peças em Estoque Central</span>
+                <span id="saas-uso-estoque-txt" style="font-weight: bold; color: var(--text-primary);">0 / 300</span>
+              </div>
+              <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+                <div id="saas-bar-estoque" style="width: 0%; height: 100%; background: var(--gold-gradient); transition: width 0.4s ease;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Opções de Planos para Upgrade -->
+        <h3 style="font-family: var(--font-title); font-size: 1.3rem; color: var(--gold-primary); margin-bottom: 1rem;">Opções de Assinatura & Upgrade</h3>
+        <div class="kpi-grid" style="grid-template-columns: repeat(3, 1fr); gap: 1.5rem;">
+          
+          <!-- Bronze Card -->
+          <div class="dashboard-panel" style="display: flex; flex-direction: column; justify-content: space-between; border: 1px solid rgba(212, 175, 55, 0.2);">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
+                <h3 style="color: #cd7f32; font-size: 1.2rem; font-family: var(--font-title);">Plano Bronze</h3>
+                <span style="font-size: 0.7rem; background: rgba(205, 127, 50, 0.15); color: #cd7f32; padding: 2px 8px; border-radius: 12px; font-weight: bold;">Inicial</span>
+              </div>
+              <div style="font-size: 1.8rem; font-weight: bold; color: var(--text-primary); margin-bottom: 1rem;">
+                R$ 147<span style="font-size: 0.85rem; color: var(--text-secondary);">/mês</span>
+              </div>
+              <ul style="list-style: none; padding: 0; font-size: 0.85rem; color: var(--text-secondary); line-height: 2;">
+                <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Até <strong>5 Consultoras</strong></li>
+                <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Até <strong>300 Peças</strong> em Estoque</li>
+                <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Gestão de Maletas e Consignado</li>
+                <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Controle financeiro básico</li>
+              </ul>
+            </div>
+            <button class="btn-outline-gold" style="width: 100%; margin-top: 1.5rem;" onclick="assinarPlano('Bronze', 147, event)">
+              <i class="fa-solid fa-sync"></i> Assinar Bronze
+            </button>
+          </div>
+
+          <!-- Gold Card (Recomendado) -->
+          <div class="dashboard-panel" style="display: flex; flex-direction: column; justify-content: space-between; border: 2px solid var(--gold-primary); background: rgba(212, 175, 55, 0.04); position: relative;">
+            <div style="position: absolute; top: -12px; right: 20px; background: var(--gold-gradient); color: #000; font-size: 0.65rem; font-weight: 800; padding: 3px 10px; border-radius: 10px; text-transform: uppercase;">Mais Popular</div>
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
+                <h3 style="color: var(--gold-primary); font-size: 1.3rem; font-family: var(--font-title);">Plano Gold</h3>
+              </div>
+              <div style="font-size: 1.8rem; font-weight: bold; color: var(--gold-primary); margin-bottom: 1rem;">
+                R$ 297<span style="font-size: 0.85rem; color: var(--text-secondary);">/mês</span>
+              </div>
+              <ul style="list-style: none; padding: 0; font-size: 0.85rem; color: var(--text-secondary); line-height: 2;">
+                <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Até <strong>25 Consultoras</strong></li>
+                <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Até <strong>1.500 Peças</strong> em Estoque</li>
+                <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> <strong>Links de Pagamento Mercado Pago</strong></li>
+                <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Termos de Maleta Digital no WhatsApp</li>
+                <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Baixa Automática de Vendas</li>
+              </ul>
+            </div>
+            <button class="btn-gold" style="width: 100%; margin-top: 1.5rem;" onclick="assinarPlano('Gold', 297, event)">
+              <i class="fa-solid fa-crown"></i> Fazer Upgrade Gold
+            </button>
+          </div>
+
+          <!-- Platinum Card -->
+          <div class="dashboard-panel" style="display: flex; flex-direction: column; justify-content: space-between; border: 1px solid rgba(255, 255, 255, 0.2);">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
+                <h3 style="color: #e5e4e2; font-size: 1.2rem; font-family: var(--font-title);">Plano Platinum</h3>
+                <span style="font-size: 0.7rem; background: rgba(255, 255, 255, 0.15); color: #e5e4e2; padding: 2px 8px; border-radius: 12px; font-weight: bold;">Enterprise</span>
+              </div>
+              <div style="font-size: 1.8rem; font-weight: bold; color: var(--text-primary); margin-bottom: 1rem;">
+                R$ 497<span style="font-size: 0.85rem; color: var(--text-secondary);">/mês</span>
+              </div>
+              <ul style="list-style: none; padding: 0; font-size: 0.85rem; color: var(--text-secondary); line-height: 2;">
+                <li><i class="fa-solid fa-star" style="color: var(--gold-primary); margin-right: 6px;"></i> Consultoras <strong>ILIMITADAS</strong></li>
+                <li><i class="fa-solid fa-star" style="color: var(--gold-primary); margin-right: 6px;"></i> Estoque Central <strong>ILIMITADO</strong></li>
+                <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Todos os recursos Gold inclusos</li>
+                <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Múltiplas lojas / franquias</li>
+                <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Suporte prioritário 24/7</li>
+              </ul>
+            </div>
+            <button class="btn-outline-gold" style="width: 100%; margin-top: 1.5rem;" onclick="assinarPlano('Platinum', 497, event)">
+              <i class="fa-solid fa-gem"></i> Fazer Upgrade Platinum
+            </button>
+          </div>
+
         </div>
       </section>
 

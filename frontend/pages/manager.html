@@ -151,9 +151,6 @@
           <li class="nav-item" data-target="links-pagamento">
             <button id="btn-tab-links-pagamento"><i class="fa-solid fa-link"></i>Links de Pagamento</button>
           </li>
-          <li class="nav-item" data-target="meu-plano-saas" id="menu-meu-plano-saas">
-            <button id="btn-tab-meu-plano-saas"><i class="fa-solid fa-crown"></i>Meu Plano & Assinatura</button>
-          </li>
           <li class="nav-item" data-target="termos-maleta">
             <button id="btn-tab-termos-maleta"><i class="fa-solid fa-file-contract"></i>Termos de Maleta</button>
           </li>
@@ -162,6 +159,9 @@
           </li>
           <li class="nav-item" data-target="treinamento-demand">
             <button id="btn-tab-treinamentos"><i class="fa-solid fa-graduation-cap"></i>Treinamentos</button>
+          </li>
+          <li class="nav-item" data-target="meu-plano-saas" id="menu-meu-plano-saas">
+            <button id="btn-tab-meu-plano-saas"><i class="fa-solid fa-crown"></i>Meu Plano & Assinatura</button>
           </li>
         </ul>
       </nav>
@@ -818,11 +818,15 @@
               <div>
                 <h3 id="detalhe-nome-revendedora">Nome da Revendedora</h3>
                 <p><i class="fa-brands fa-whatsapp"></i> <span id="detalhe-whatsapp-revendedora">(00) 99999-9999</span></p>
-                <p style="margin-top: 0.3rem;">
-                  <i class="fa-solid fa-percent"></i> Comissão: <span id="detalhe-comissao-revendedora">30%</span>
-                  <span style="margin-left: 1.5rem;">
-                    <i class="fa-solid fa-key"></i> PIN: <strong id="detalhe-pin-revendedora" style="color: var(--gold-primary);">0000</strong>
-                    <button class="btn-qty" onclick="app.regenerarPINRevendedora()" title="Regenerar PIN e Senha" style="padding: 2px 6px; font-size: 0.75rem; vertical-align: middle; margin-left: 5px; display: inline-flex; align-items: center; justify-content: center; height: auto;"><i class="fa-solid fa-rotate"></i> Resetar</button>
+                <p style="margin-top: 0.5rem; display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap;">
+                  <span><i class="fa-solid fa-percent" style="color: var(--gold-primary); margin-right: 4px;"></i> Comissão: <span id="detalhe-comissao-revendedora" style="font-weight: 600;">30%</span></span>
+                  <span style="display: inline-flex; align-items: center; gap: 0.4rem; background: rgba(212, 175, 55, 0.08); padding: 3px 10px; border-radius: 6px; border: 1px solid rgba(212, 175, 55, 0.2);">
+                    <i class="fa-solid fa-key" style="color: var(--gold-primary); font-size: 0.8rem;"></i>
+                    <span style="font-size: 0.85rem; color: var(--text-secondary);">PIN:</span>
+                    <strong id="detalhe-pin-revendedora" style="color: var(--gold-primary); font-family: monospace; font-size: 0.95rem; letter-spacing: 1px;">0000</strong>
+                    <button type="button" onclick="app.regenerarPINRevendedora()" title="Regenerar PIN e Senha" style="background: rgba(212, 175, 55, 0.15); border: 1px solid rgba(212, 175, 55, 0.3); color: var(--gold-light); border-radius: 4px; padding: 2px 8px; font-size: 0.75rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; transition: all 0.2s ease;">
+                      <i class="fa-solid fa-rotate"></i> Resetar
+                    </button>
                   </span>
                 </p>
               </div>
@@ -1898,6 +1902,13 @@
             </div>
           </div>
 
+          <!-- Checkout Pro Mercado Pago Direct -->
+          <div style="margin-bottom: 1rem;">
+            <button type="button" class="btn-gold" style="width: 100%; padding: 0.8rem; background: linear-gradient(135deg, #009ee3 0%, #007eb5 100%); color: #fff; border: none; font-weight: 700; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem;" onclick="assinarPlano(app.planoSaasSelecionado === 'BRONZE' ? 'Plano Bronze' : (app.planoSaasSelecionado === 'PLATINUM' ? 'Plano Platinum' : 'Plano Gold'), app.planoSaasSelecionado === 'BRONZE' ? 147 : (app.planoSaasSelecionado === 'PLATINUM' ? 497 : 297), event)">
+              <i class="fa-solid fa-hand-holding-dollar"></i> Assinar via Mercado Pago (Checkout Pro)
+            </button>
+          </div>
+
           <!-- Abas de Pagamento -->
           <div class="payment-tabs" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-bottom: 1rem;">
             <button type="button" class="pay-tab active" id="tab-saas-pix" onclick="app.selecionarFormaSaas('pix')">
@@ -2839,7 +2850,9 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <!-- 3. Funções de Manipulação do Excel/CSV -->
   <script src="../js/excel-handler.js"></script>
-  <!-- 3. Lógica do Aplicativo Principal -->
+  <!-- 4. Integração de Pagamento Mercado Pago -->
+  <script src="../js/pagamento.js"></script>
+  <!-- 5. Lógica do Aplicativo Principal -->
   <script src="../js/manager.js"></script>
 
   <!-- Script de Autolimpeza imperativa de Cache e Service Workers do Navegador -->

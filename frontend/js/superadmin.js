@@ -1571,6 +1571,9 @@ const app = {
     if (tabId === "admin-treinamentos") {
       this.carregarTreinamentosAdmin();
     }
+    if (tabId === "meu-plano-saas") {
+      this.carregarMeuPlanoSaaS();
+    }
   },
 
   renderizarAbas: function() {
@@ -2677,12 +2680,22 @@ const app = {
       document.getElementById("detalhe-nome-revendedora").innerText = revSelecionada.nome;
       document.getElementById("detalhe-whatsapp-revendedora").innerText = revSelecionada.whatsapp;
       
-      const tipoComissaoLabel = {
-        'FIXA': 'Fixa',
-        'PROGRESSIVA': 'Progressiva',
-        'META_UNICA': 'Meta Única'
-      }[revSelecionada.tipoComissao || 'FIXA'] || 'Fixa';
-      document.getElementById("detalhe-comissao-revendedora").innerHTML = `${revSelecionada.comissao}% <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted); margin-left: 0.3rem;">(${tipoComissaoLabel})</span>`;
+      let textoComissaoHtml = `${revSelecionada.comissao || 30}% <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted); margin-left: 0.3rem;">(Fixa)</span>`;
+      if (revSelecionada.tipoComissao === 'PROGRESSIVA') {
+        const faixas = revSelecionada.faixasComissao || (this.state.lojaConfig && this.state.lojaConfig.faixasComissao ? this.state.lojaConfig.faixasComissao : []);
+        if (faixas && faixas.length > 0) {
+          const ordenadas = [...faixas].sort((a, b) => a.valorMin - b.valorMin);
+          const minPct = ordenadas[0].percentual;
+          const maxPct = ordenadas[ordenadas.length - 1].percentual;
+          const faixasStr = minPct === maxPct ? `${minPct}%` : `${minPct}% a ${maxPct}%`;
+          textoComissaoHtml = `Progressiva <span style="font-size: 0.85rem; font-weight: 600; color: var(--gold-light); margin-left: 0.3rem;">(${faixasStr})</span>`;
+        } else {
+          textoComissaoHtml = `Progressiva <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted); margin-left: 0.3rem;">(Por Faixas)</span>`;
+        }
+      } else if (revSelecionada.tipoComissao === 'META_UNICA') {
+        textoComissaoHtml = `${revSelecionada.comissao || 30}% <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted); margin-left: 0.3rem;">(Meta Única)</span>`;
+      }
+      document.getElementById("detalhe-comissao-revendedora").innerHTML = textoComissaoHtml;
       
       document.getElementById("detalhe-pin-revendedora").innerText = revSelecionada.pin || "N/A";
 
@@ -2735,7 +2748,7 @@ const app = {
             <td>R$ ${Number(item.precoVenda).toFixed(2).replace(".", ",")}</td>
             <td style="color: var(--gold-primary); font-weight: 600;">R$ ${subtotal.toFixed(2).replace(".", ",")}</td>
             <td>
-              <button class="btn-qty" style="color: var(--gold-light); border-color: rgba(212,175,55,0.2);" onclick="app.devolverEstoqueConsignado('${item.id}', ${qDisp})" title="Devolver ao Estoque Central">
+              <button type="button" class="btn-devolver-item" onclick="app.devolverEstoqueConsignado('${item.id}', ${qDisp})" title="Devolver ao Estoque Central" style="background: rgba(212, 175, 55, 0.12); border: 1px solid rgba(212, 175, 55, 0.3); color: var(--gold-primary); padding: 4px 10px; border-radius: 6px; font-size: 0.78rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.2s ease;" onmouseover="this.style.background='var(--gold-primary)'; this.style.color='#000';" onmouseout="this.style.background='rgba(212, 175, 55, 0.12)'; this.style.color='var(--gold-primary)';">
                 <i class="fa-solid fa-arrow-rotate-left"></i> Devolver
               </button>
             </td>
@@ -4006,7 +4019,11 @@ const app = {
           faixaAtual = sortedFaixas[i];
         }
       }
-      pctComissao = faixaAtual ? faixaAtual.percentual : (Number(rev.comissao) || 30);
+      if (sortedFaixas.length > 0) {
+        pctComissao = faixaAtual ? faixaAtual.percentual : (faturamentoVolumeParaFaixa >= sortedFaixas[0].valorMin ? sortedFaixas[0].percentual : 0);
+      } else {
+        pctComissao = Number(rev.comissao) || 30;
+      }
       comissaoBruta = valorBaseComissao * (pctComissao / 100);
     } else if (rev.tipoComissao === 'META_UNICA') {
       const atingiuMeta = faturamentoVolumeParaFaixa >= (rev.metaUnicaValor || 0);
@@ -4234,7 +4251,11 @@ const app = {
           faixaAtual = sortedFaixas[i];
         }
       }
-      pctComissao = faixaAtual ? faixaAtual.percentual : (Number(rev.comissao) || 30);
+      if (sortedFaixas.length > 0) {
+        pctComissao = faixaAtual ? faixaAtual.percentual : (faturamentoBruto >= sortedFaixas[0].valorMin ? sortedFaixas[0].percentual : 0);
+      } else {
+        pctComissao = Number(rev.comissao) || 30;
+      }
       comissaoBruta = valorBaseComissao * (pctComissao / 100);
     } else if (rev.tipoComissao === 'META_UNICA') {
       const atingiuMeta = faturamentoBruto >= (rev.metaUnicaValor || 0);
@@ -7011,6 +7032,51 @@ const app = {
       btn.innerHTML = '<i class="fa-solid fa-pen"></i>';
       btn.title = "Personalizar Painel";
       this.toast("Personalização do painel salva com sucesso! ✨", "success");
+    }
+  },
+
+  carregarMeuPlanoSaaS: async function() {
+    try {
+      if (this.state.token && !this.state.token.startsWith("mock_")) {
+        const res = await this.requisitarAPI('/saas/meu-plano');
+        if (res) {
+          const elNome = document.getElementById("saas-plano-nome");
+          const elStatus = document.getElementById("saas-plano-badge-status");
+          const elVenc = document.getElementById("saas-plano-vencimento");
+
+          if (elNome) elNome.innerText = `Plano ${res.plano}`;
+          if (elStatus) {
+            elStatus.innerText = res.statusPlano || 'ATIVO';
+            elStatus.style.borderColor = res.statusPlano === 'ATIVO' ? '#81c784' : 'var(--warning)';
+            elStatus.style.color = res.statusPlano === 'ATIVO' ? '#81c784' : 'var(--warning)';
+          }
+          if (elVenc) {
+            if (res.vencimentoPlano) {
+              elVenc.innerText = `Vence em ${new Date(res.vencimentoPlano).toLocaleDateString('pt-BR')}`;
+            } else {
+              elVenc.innerText = 'Acesso Ativo (30 dias)';
+            }
+          }
+
+          const consultorasTxt = document.getElementById("saas-uso-consultoras-txt");
+          const consultorasBar = document.getElementById("saas-bar-consultoras");
+          if (consultorasTxt && res.uso) consultorasTxt.innerText = `${res.uso.totalConsultoras} / ${res.uso.limiteConsultoras >= 999 ? 'Ilimitado' : res.uso.limiteConsultoras}`;
+          if (consultorasBar && res.uso) {
+            const pct = res.uso.limiteConsultoras >= 999 ? 10 : Math.min(100, Math.round((res.uso.totalConsultoras / res.uso.limiteConsultoras) * 100));
+            consultorasBar.style.width = `${pct}%`;
+          }
+
+          const estoqueTxt = document.getElementById("saas-uso-estoque-txt");
+          const estoqueBar = document.getElementById("saas-bar-estoque");
+          if (estoqueTxt && res.uso) estoqueTxt.innerText = `${res.uso.totalEstoque} / ${res.uso.limiteEstoque >= 9999 ? 'Ilimitado' : res.uso.limiteEstoque}`;
+          if (estoqueBar && res.uso) {
+            const pct = res.uso.limiteEstoque >= 9999 ? 10 : Math.min(100, Math.round((res.uso.totalEstoque / res.uso.limiteEstoque) * 100));
+            estoqueBar.style.width = `${pct}%`;
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Erro ao carregar dados do plano SaaS:", e);
     }
   }
 

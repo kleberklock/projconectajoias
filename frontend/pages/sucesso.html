@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Pagamento Aprovado - Conecta Joias</title>
+  
+  <!-- Favicon e Ícones -->
+  <link rel="icon" type="image/png" href="../assets/favicon.png">
+  <link rel="apple-touch-icon" href="../assets/favicon.png">
+  
+  <!-- Estilos Globais -->
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: radial-gradient(circle at center, #151515 0%, #050505 100%);
+      padding: 1.5rem;
+      margin: 0;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    .sucesso-container {
+      width: 100%;
+      max-width: 520px;
+      background: var(--bg-card);
+      border: var(--border-gold);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-premium);
+      padding: 2.5rem 2rem;
+      text-align: center;
+      animation: fadeIn 0.8s ease;
+    }
+
+    .success-icon-badge {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      background: rgba(46, 125, 50, 0.15);
+      border: 3px solid #81c784;
+      color: #81c784;
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 3rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 0 25px rgba(129, 199, 132, 0.25);
+      animation: scaleUp 0.5s ease-out;
+    }
+
+    .sucesso-title {
+      font-family: var(--font-title);
+      color: var(--gold-primary);
+      font-size: 1.8rem;
+      margin: 0 0 0.8rem 0;
+    }
+
+    .sucesso-subtitle {
+      color: var(--text-secondary);
+      font-size: 1rem;
+      line-height: 1.6;
+      margin-bottom: 2rem;
+    }
+
+    .redirect-box {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(212, 175, 55, 0.15);
+      border-radius: var(--radius-md);
+      padding: 1.2rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .redirect-box p {
+      margin: 0;
+      color: var(--gold-light);
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+    }
+
+    .btn-painel {
+      width: 100%;
+      padding: 0.9rem;
+      border: none;
+      border-radius: var(--radius-sm);
+      background: var(--gold-gradient);
+      color: var(--text-dark);
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: var(--transition);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 0.5rem;
+      text-decoration: none;
+    }
+
+    .btn-painel:hover {
+      box-shadow: var(--shadow-glow);
+      transform: translateY(-2px);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(15px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes scaleUp {
+      from { transform: scale(0.6); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="sucesso-container">
+    <div class="success-icon-badge">
+      <i class="fa-solid fa-circle-check"></i>
+    </div>
+    
+    <h1 class="sucesso-title">Pagamento Aprovado!</h1>
+    <p class="sucesso-subtitle">
+      Seu plano foi ativado com sucesso. Você já tem acesso total a todos os recursos da sua conta Conecta Joias!
+    </p>
+
+    <div class="redirect-box">
+      <p>
+        <i class="fa-solid fa-spinner fa-spin" style="color: var(--gold-primary);"></i>
+        Redirecionando para o painel em <strong id="countdown" style="color: var(--gold-primary); font-size: 1.1rem;">4</strong> segundos...
+      </p>
+    </div>
+
+    <a href="manager.html" class="btn-painel">
+      <i class="fa-solid fa-gauge-high"></i> Acessar Painel Agora
+    </a>
+  </div>
+
+  <script>
+    // 1. Atualiza os dados do usuário no localStorage para refletir status 'ATIVO'
+    (function atualizarSessaoLocal() {
+      try {
+        const usuarioRaw = localStorage.getItem("conectajoias_usuario");
+        if (usuarioRaw) {
+          const user = JSON.parse(usuarioRaw);
+          user.statusPlano = 'ATIVO';
+          user.status = 'ATIVO';
+          localStorage.setItem("conectajoias_usuario", JSON.stringify(user));
+        }
+
+        const usuarioGenerico = localStorage.getItem("usuario");
+        if (usuarioGenerico) {
+          const userGen = JSON.parse(usuarioGenerico);
+          userGen.statusPlano = 'ATIVO';
+          userGen.status = 'ATIVO';
+          localStorage.setItem("usuario", JSON.stringify(userGen));
+        }
+
+        const lojaRaw = localStorage.getItem("conectajoias_loja");
+        if (lojaRaw) {
+          const loja = JSON.parse(lojaRaw);
+          loja.statusPlano = 'ATIVO';
+          localStorage.setItem("conectajoias_loja", JSON.stringify(loja));
+        }
+
+        console.log("✅ [Checkout Sucesso] Status do plano atualizado para ATIVO no localStorage.");
+      } catch (err) {
+        console.warn("Aviso ao atualizar localStorage pós-pagamento:", err.message);
+      }
+    })();
+
+    // 2. Redireciona o usuário para manager.html em 4 segundos
+    let segundos = 4;
+    const countEl = document.getElementById("countdown");
+
+    const timer = setInterval(() => {
+      segundos--;
+      if (countEl) countEl.innerText = segundos;
+      if (segundos <= 0) {
+        clearInterval(timer);
+        window.location.href = "manager.html";
+      }
+    }, 1000);
+  </script>
+</body>
+</html>

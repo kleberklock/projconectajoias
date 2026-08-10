@@ -18,7 +18,15 @@ const checkout = {
     if (this.linkId) {
       this.carregarDadosLink();
     } else {
-      this.toast("ID do pagamento inválido.", "error");
+      const planosSection = document.getElementById("planos-selection-section");
+      const summarySection = document.querySelector(".payment-summary");
+      const tabsSection = document.querySelector(".payment-tabs");
+      const tabContents = document.querySelectorAll(".tab-content");
+      
+      if (planosSection) planosSection.style.display = "block";
+      if (summarySection) summarySection.style.display = "none";
+      if (tabsSection) tabsSection.style.display = "none";
+      tabContents.forEach(c => c.style.display = "none");
     }
   },
 
@@ -449,6 +457,108 @@ async function confirmarCartaoReal(e) {
     btn.innerHTML = originalHtml;
   }
 }
+
+/**
+ * Inicia o checkout de assinatura via Mercado Pago Checkout Pro
+ * @param {string} planoNome - Nome do plano selecionado (ex: "Plano Bronze", "Plano Gold", "Plano Platinum")
+ * @param {number|string} preco - Valor mensal do plano
+ * @param {Event} [event] - Evento acionado pelo clique no botão
+ */
+async function assinarPlano(planoNome, preco, event) {
+  let btn = null;
+  let originalHtml = "";
+
+  if (event) {
+    if (event.currentTarget) btn = event.currentTarget;
+    else if (event.target) btn = event.target.closest("button") || event.target;
+  }
+
+  // 1. Desabilita o botão clicado e altera o texto para "Processando..."
+  if (btn) {
+    originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Processando...`;
+  }
+
+  try {
+    // 2. Recupera o ID do usuário logado (armazenado no localStorage após login)
+    let usuarioId = null;
+    const usuarioRaw = localStorage.getItem("conectajoias_usuario") || localStorage.getItem("usuario");
+    
+    if (usuarioRaw) {
+      try {
+        const usuarioObj = JSON.parse(usuarioRaw);
+        usuarioId = usuarioObj.id || usuarioObj._id || usuarioObj.usuarioId;
+      } catch (e) {
+        console.warn("Erro ao converter usuário de localStorage:", e);
+      }
+    }
+
+    if (!usuarioId) {
+      usuarioId = localStorage.getItem("conectajoias_usuario_id") || localStorage.getItem("usuario_id");
+    }
+
+    if (!usuarioId) {
+      const msgSemSessao = "Usuário não autenticado. Por favor, faça login para assinar um plano.";
+      if (typeof checkout !== "undefined" && checkout.toast) {
+        checkout.toast(msgSemSessao, "warning");
+      } else {
+        alert(msgSemSessao);
+      }
+
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+      }
+      return;
+    }
+
+    // 3. Faz a requisição POST para a rota /api/criar-pagamento
+    const response = await fetch(`${API_BASE_URL}/criar-pagamento`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        usuarioId,
+        planoNome,
+        preco: Number(preco)
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Erro ao gerar preferência no Mercado Pago.");
+    }
+
+    // 4. Se o link existir, redireciona o usuário para o Mercado Pago Checkout Pro
+    if (data && data.linkDePagamento) {
+      window.location.href = data.linkDePagamento;
+    } else {
+      throw new Error("Link de pagamento não retornado pela API.");
+    }
+
+  } catch (error) {
+    console.error("Erro ao iniciar assinatura do plano:", error);
+    const mensagemErro = error.message || "Erro ao conectar com a API de pagamentos.";
+
+    if (typeof checkout !== "undefined" && checkout.toast) {
+      checkout.toast(mensagemErro, "error");
+    } else {
+      alert(mensagemErro);
+    }
+
+    // 5. Reabilita o botão de compra original em caso de falha
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
+  }
+}
+
+// Exporta globalmente a função assinarPlano
+window.assinarPlano = assinarPlano;
 
 // Inicializar na carga da página
 document.addEventListener("DOMContentLoaded", () => {

@@ -496,7 +496,8 @@ const app = {
     const divHeaderActions = document.querySelector("#dashboard .header-actions");
     const menuVendasGeral = document.getElementById("menu-vendas-geral");
     const menuConfiguracoes = document.getElementById("menu-configuracoes");
- 
+    const menuMeuPlanoSaaS = document.getElementById("menu-meu-plano-saas");
+
     if (role === "Consultant" || role === "VENDEDORA" || role === "revendedora") {
       if (menuPlanilhas) menuPlanilhas.style.display = "none";
       if (menuRevendedoras) menuRevendedoras.style.display = "none";
@@ -506,10 +507,13 @@ const app = {
       if (menuVendasGeral) menuVendasGeral.style.display = "none";
       if (menuClientes) menuClientes.style.display = "block";
       if (menuConfiguracoes) menuConfiguracoes.style.display = "none";
+      if (menuMeuPlanoSaaS) menuMeuPlanoSaaS.style.display = "none";
       if (btnCadastrarProduto) btnCadastrarProduto.style.display = "none";
       if (divHeaderActions) divHeaderActions.style.display = "none";
       if (menuMinhaMaleta) menuMinhaMaleta.style.display = "block";
-      this.state.abaAtiva = "minha-maleta";
+      if (this.state.abaAtiva === "meu-plano-saas") {
+        this.state.abaAtiva = "minha-maleta";
+      }
     } else {
       if (menuPlanilhas) menuPlanilhas.style.display = "block";
       if (menuRevendedoras) menuRevendedoras.style.display = "block";
@@ -519,6 +523,7 @@ const app = {
       if (menuVendasGeral) menuVendasGeral.style.display = "block";
       if (menuClientes) menuClientes.style.display = "block";
       if (menuConfiguracoes) menuConfiguracoes.style.display = "block";
+      if (menuMeuPlanoSaaS) menuMeuPlanoSaaS.style.display = "block";
       if (menuMinhaMaleta) menuMinhaMaleta.style.display = "none";
       if (btnCadastrarProduto) btnCadastrarProduto.style.display = "inline-flex";
       if (divHeaderActions) divHeaderActions.style.display = "block";
@@ -914,14 +919,22 @@ const app = {
     }
 
     // Calcula o total vendido no período:
-    // = Vendas já persistidas no banco (ciclo atual) + Vendas registradas na sessão ainda não sincronizadas
-    const totalVendidoCicloAPI = this.state.totalVendidoCiclo || 0;
-    let totalVendidoPendente = 0;
-    const vendasPendentes = this.state.vendasPendentes || [];
-    vendasPendentes.forEach(v => {
-      totalVendidoPendente += Number(v.precoVenda || 0) * Number(v.quantidade || 1);
-    });
-    const totalVendidoPeriodo = totalVendidoCicloAPI + totalVendidoPendente;
+    // Em modo API (online), this.state.totalVendidoCiclo vindo do backend já inclui todas as vendas salvas do ciclo.
+    // Adicionamos apenas vendas locais pendentes de sincronização offline.
+    let totalVendidoPeriodo = 0;
+    if (this.state.token && !this.state.token.startsWith("mock_")) {
+      const vendasOffline = (this.state.vendasPendentes || []).filter(v => v.offline || v.synced === false);
+      let totalOffline = 0;
+      vendasOffline.forEach(v => {
+        totalOffline += Number(v.precoVenda || 0) * Number(v.quantidade || 1);
+      });
+      totalVendidoPeriodo = (typeof this.state.totalVendidoCiclo === 'number' ? this.state.totalVendidoCiclo : 0) + totalOffline;
+    } else {
+      const vendas = this.state.vendasSessao || [];
+      vendas.forEach(v => {
+        totalVendidoPeriodo += Number(v.precoVenda || 0) * Number(v.quantidade || 1);
+      });
+    }
 
     // Utilitário para formatar moeda
     const fmt = (v) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -1525,10 +1538,9 @@ const app = {
         }
       }
 
-      // Adiciona à lista de vendas da sessão e às pendentes para a barra de comissão
+      // Adiciona à lista de vendas da sessão e atualiza o faturamento do ciclo
       this.state.vendasSessao.unshift(resp.venda);
-      if (!this.state.vendasPendentes) this.state.vendasPendentes = [];
-      this.state.vendasPendentes.unshift(resp.venda);
+      this.state.totalVendidoCiclo = (this.state.totalVendidoCiclo || 0) + (Number(resp.venda.precoVenda || 0) * Number(resp.venda.quantidade || 1));
       // Atualiza barra de comissão em tempo real após nova venda
       this.atualizarProgressaoComissaoVendedora();
 
@@ -3445,9 +3457,22 @@ const app = {
       document.getElementById("placeholder-detalhes-revendedora").style.display = "none";
       document.getElementById("painel-detalhes-revendedora").style.display = "block";
 
-      document.getElementById("detalhe-nome-revendedora").innerText = revSelecionada.nome;
-      document.getElementById("detalhe-whatsapp-revendedora").innerText = revSelecionada.whatsapp;
-      document.getElementById("detalhe-comissao-revendedora").innerText = `${revSelecionada.comissao}%`;
+      let textoComissaoHtml = `${revSelecionada.comissao || 30}% <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted); margin-left: 0.3rem;">(Fixa)</span>`;
+      if (revSelecionada.tipoComissao === 'PROGRESSIVA') {
+        const faixas = revSelecionada.faixasComissao || (this.state.lojaConfig && this.state.lojaConfig.faixasComissao ? this.state.lojaConfig.faixasComissao : []);
+        if (faixas && faixas.length > 0) {
+          const ordenadas = [...faixas].sort((a, b) => a.valorMin - b.valorMin);
+          const minPct = ordenadas[0].percentual;
+          const maxPct = ordenadas[ordenadas.length - 1].percentual;
+          const faixasStr = minPct === maxPct ? `${minPct}%` : `${minPct}% a ${maxPct}%`;
+          textoComissaoHtml = `Progressiva <span style="font-size: 0.85rem; font-weight: 600; color: var(--gold-light); margin-left: 0.3rem;">(${faixasStr})</span>`;
+        } else {
+          textoComissaoHtml = `Progressiva <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted); margin-left: 0.3rem;">(Por Faixas)</span>`;
+        }
+      } else if (revSelecionada.tipoComissao === 'META_UNICA') {
+        textoComissaoHtml = `${revSelecionada.comissao || 30}% <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted); margin-left: 0.3rem;">(Meta Única)</span>`;
+      }
+      document.getElementById("detalhe-comissao-revendedora").innerHTML = textoComissaoHtml;
       document.getElementById("detalhe-pin-revendedora").innerText = revSelecionada.pin || "N/A";
 
       // Atualiza card de ciclo
@@ -3518,6 +3543,11 @@ const app = {
             <td>${item.quantidadeConsignada} unidades</td>
             <td>R$ ${Number(item.precoVenda).toFixed(2).replace(".", ",")}</td>
             <td style="color: var(--gold-primary); font-weight: 600;">R$ ${subtotal.toFixed(2).replace(".", ",")}</td>
+            <td>
+              <button type="button" class="btn-devolver-item" onclick="app.devolverEstoqueConsignado('${item.id}', ${item.quantidadeConsignada})" title="Devolver ao Estoque Central" style="background: rgba(212, 175, 55, 0.12); border: 1px solid rgba(212, 175, 55, 0.3); color: var(--gold-primary); padding: 4px 10px; border-radius: 6px; font-size: 0.78rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.2s ease;" onmouseover="this.style.background='var(--gold-primary)'; this.style.color='#000';" onmouseout="this.style.background='rgba(212, 175, 55, 0.12)'; this.style.color='var(--gold-primary)';">
+                <i class="fa-solid fa-arrow-rotate-left"></i> Devolver
+              </button>
+            </td>
           `;
           tableItensBody.appendChild(tr);
         });
@@ -3559,17 +3589,9 @@ const app = {
 
     if (this.state.token) {
       try {
-        const resp = await this.requisitarAPI(`/revendedoras/${revId}/reset-pin`, "PUT");
-        
-        const rev = this.state.revendedoras.find(r => r.id === revId);
-        if (rev) {
-          rev.pin = resp.pin;
-        }
-
+        const resp = await this.requisitarAPI(`/usuarios/${revId}/regenerar-pin`, "POST");
         alert(`NOVO PIN E SENHA GERADOS COM SUCESSO!\n\nPIN: ${resp.pin}\nSenha: ${resp.senha}\n\nCopie e anote estes dados com segurança antes de fechar este aviso.`);
-        
-        this.salvarDadosNoLocalStorage();
-        this.renderizarRevendedoras();
+        await this.carregarDadosIniciais();
       } catch (err) {
         console.error("Erro ao regenerar PIN na API:", err);
         this.toast("Erro ao tentar regenerar PIN e senha no servidor.", "error");
@@ -3586,6 +3608,55 @@ const app = {
       alert(`[MODO LOCAL] NOVO PIN E SENHA GERADOS!\n\nPIN: ${novoPin}\nSenha: ${novaSenha}\n\n(Apenas local, não persistido no servidor).`);
       this.salvarDadosNoLocalStorage();
       this.renderizarRevendedoras();
+    }
+  },
+
+  devolverEstoqueConsignado: async function(consignadoId, qtdMaxima) {
+    const qtdStr = prompt(`Digite a quantidade de peças que deseja devolver ao estoque central (Máximo: ${qtdMaxima}):`, qtdMaxima);
+    if (qtdStr === null) return; 
+    
+    const qtd = parseInt(qtdStr);
+    if (isNaN(qtd) || qtd <= 0 || qtd > qtdMaxima) {
+      this.toast(`Por favor, insira uma quantidade válida entre 1 e ${qtdMaxima}.`, "warning");
+      return;
+    }
+
+    try {
+      if (this.state.token && !this.state.token.startsWith("mock_")) {
+        await this.requisitarAPI("/consignacoes/devolver", "POST", {
+          consignadoId: consignadoId,
+          quantidadeDevolver: qtd
+        });
+      } else {
+        const rev = this.state.revendedoras.find(r => r.id === this.state.revendedoraSelecionadaId);
+        if (rev && rev.consignado) {
+          const item = rev.consignado.find(c => c.id === consignadoId);
+          if (item) {
+            item.quantidadeConsignada -= qtd;
+            const prod = this.state.produtos.find(p => p.id === item.produtoId);
+            if (prod) {
+              prod.quantidade += qtd;
+              if (prod._valoresDinamicos) {
+                prod._valoresDinamicos["Estoque Central"] = prod.quantidade;
+              }
+            }
+            if (item.quantidadeConsignada <= 0) {
+              rev.consignado = rev.consignado.filter(c => c.id !== consignadoId);
+            }
+          }
+        }
+      }
+
+      this.toast("Peças devolvidas ao estoque central com sucesso!", "success");
+      
+      if (this.state.token && !this.state.token.startsWith("mock_")) {
+        await this.carregarDadosIniciais();
+      } else {
+        this.salvarDadosNoLocalStorage();
+        this.renderizarListaRevendedoras();
+      }
+    } catch (err) {
+      this.toast("Erro ao devolver peças: " + err.message, "error");
     }
   },
 
@@ -3953,8 +4024,8 @@ const app = {
           if (prod && Number(prod.quantidade || 0) >= qtdConsignar) {
             algumaPecaAdicionada = true;
             
-            // Sincroniza com o banco Azure SQL
-            if (this.state.token) {
+            // Sincroniza com o banco de dados via API
+            if (this.state.token && !this.state.token.startsWith("mock_")) {
               await this.requisitarAPI("/consignacoes", "POST", {
                 usuarioId: rev.id,
                 produtoId: prodId,

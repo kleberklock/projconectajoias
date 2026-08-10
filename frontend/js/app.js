@@ -458,8 +458,9 @@ const app = {
     const divHeaderActions = document.querySelector("#dashboard .header-actions");
     const menuVendasGeral = document.getElementById("menu-vendas-geral");
     const menuConfiguracoes = document.getElementById("menu-configuracoes");
- 
-    if (role === "VENDEDORA") {
+    const menuMeuPlanoSaaS = document.getElementById("menu-meu-plano-saas");
+
+    if (role === "VENDEDORA" || role === "Consultant" || role === "revendedora") {
       if (menuPlanilhas) menuPlanilhas.style.display = "none";
       if (menuRevendedoras) menuRevendedoras.style.display = "none";
       if (menuEstoque) menuEstoque.style.display = "none";
@@ -468,10 +469,13 @@ const app = {
       if (menuVendasGeral) menuVendasGeral.style.display = "none";
       if (menuClientes) menuClientes.style.display = "none";
       if (menuConfiguracoes) menuConfiguracoes.style.display = "none";
+      if (menuMeuPlanoSaaS) menuMeuPlanoSaaS.style.display = "none";
       if (btnCadastrarProduto) btnCadastrarProduto.style.display = "none";
       if (divHeaderActions) divHeaderActions.style.display = "none";
       if (menuMinhaMaleta) menuMinhaMaleta.style.display = "block";
-      this.state.abaAtiva = "minha-maleta";
+      if (this.state.abaAtiva === "meu-plano-saas") {
+        this.state.abaAtiva = "minha-maleta";
+      }
     } else {
       if (menuPlanilhas) menuPlanilhas.style.display = "block";
       if (menuRevendedoras) menuRevendedoras.style.display = "block";
@@ -481,6 +485,7 @@ const app = {
       if (menuVendasGeral) menuVendasGeral.style.display = "block";
       if (menuClientes) menuClientes.style.display = "block";
       if (menuConfiguracoes) menuConfiguracoes.style.display = "block";
+      if (menuMeuPlanoSaaS) menuMeuPlanoSaaS.style.display = "block";
       if (menuMinhaMaleta) menuMinhaMaleta.style.display = "none";
       if (btnCadastrarProduto) btnCadastrarProduto.style.display = "inline-flex";
       if (divHeaderActions) divHeaderActions.style.display = "block";
@@ -2269,9 +2274,22 @@ const app = {
       document.getElementById("placeholder-detalhes-revendedora").style.display = "none";
       document.getElementById("painel-detalhes-revendedora").style.display = "block";
 
-      document.getElementById("detalhe-nome-revendedora").innerText = revSelecionada.nome;
-      document.getElementById("detalhe-whatsapp-revendedora").innerText = revSelecionada.whatsapp;
-      document.getElementById("detalhe-comissao-revendedora").innerText = `${revSelecionada.comissao}%`;
+      let textoComissaoHtml = `${revSelecionada.comissao || 30}% <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted); margin-left: 0.3rem;">(Fixa)</span>`;
+      if (revSelecionada.tipoComissao === 'PROGRESSIVA') {
+        const faixas = revSelecionada.faixasComissao || (this.state.lojaConfig && this.state.lojaConfig.faixasComissao ? this.state.lojaConfig.faixasComissao : []);
+        if (faixas && faixas.length > 0) {
+          const ordenadas = [...faixas].sort((a, b) => a.valorMin - b.valorMin);
+          const minPct = ordenadas[0].percentual;
+          const maxPct = ordenadas[ordenadas.length - 1].percentual;
+          const faixasStr = minPct === maxPct ? `${minPct}%` : `${minPct}% a ${maxPct}%`;
+          textoComissaoHtml = `Progressiva <span style="font-size: 0.85rem; font-weight: 600; color: var(--gold-light); margin-left: 0.3rem;">(${faixasStr})</span>`;
+        } else {
+          textoComissaoHtml = `Progressiva <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted); margin-left: 0.3rem;">(Por Faixas)</span>`;
+        }
+      } else if (revSelecionada.tipoComissao === 'META_UNICA') {
+        textoComissaoHtml = `${revSelecionada.comissao || 30}% <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted); margin-left: 0.3rem;">(Meta Única)</span>`;
+      }
+      document.getElementById("detalhe-comissao-revendedora").innerHTML = textoComissaoHtml;
       document.getElementById("detalhe-pin-revendedora").innerText = revSelecionada.pin || "N/A";
 
       // Atualiza indicadores internos
@@ -2687,8 +2705,8 @@ const app = {
           if (prod && Number(prod.quantidade || 0) >= qtdConsignar) {
             algumaPecaAdicionada = true;
             
-            // Sincroniza com o banco Azure SQL
-            if (this.state.token) {
+            // Sincroniza com o banco de dados via API
+            if (this.state.token && !this.state.token.startsWith("mock_")) {
               await this.requisitarAPI("/consignacoes", "POST", {
                 usuarioId: rev.id,
                 produtoId: prodId,
