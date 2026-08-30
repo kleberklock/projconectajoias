@@ -14,8 +14,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   
-  <!-- Estilos Globais -->
+  <!-- Estilos Globais & PWA -->
+  <link rel="manifest" href="../manifest.json">
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/pwa-install.css">
   
   <!-- FontAwesome para Ícones de Alta Qualidade -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -148,6 +150,63 @@
     .wz-btn-next:hover { opacity:.9; }
     .wz-btn-next:disabled { opacity:.5; cursor:not-allowed; }
 
+    /* Badge de Sucesso - Loja Configurada */
+    .store-success-badge {
+      position: relative;
+      width: 88px;
+      height: 88px;
+      margin: 0 auto 1.2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .store-success-glow {
+      position: absolute;
+      inset: -8px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(212,175,55,0.45) 0%, rgba(212,175,55,0) 75%);
+      animation: storeGlowPulse 2.4s infinite ease-in-out;
+    }
+    .store-success-circle {
+      position: relative;
+      width: 80px;
+      height: 80px;
+      background: linear-gradient(135deg, rgba(30, 27, 20, 0.95), rgba(15, 15, 15, 0.98));
+      border: 2px solid var(--gold-primary);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 25px rgba(212, 175, 55, 0.35), inset 0 0 15px rgba(212, 175, 55, 0.15);
+      animation: popInBadge 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .store-icon-bg {
+      font-size: 2.2rem;
+      background: linear-gradient(135deg, #ffffff 0%, var(--gold-primary) 60%, #b8860b 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+    }
+    .check-badge {
+      position: absolute;
+      bottom: -2px;
+      right: -2px;
+      font-size: 1.4rem;
+      color: #10b981;
+      background: #0a0a0a;
+      border-radius: 50%;
+      box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+    }
+
+    @keyframes storeGlowPulse {
+      0%, 100% { transform: scale(1); opacity: 0.5; }
+      50% { transform: scale(1.15); opacity: 0.9; }
+    }
+    @keyframes popInBadge {
+      0% { transform: scale(0.4); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
     /* credenciais finais */
     .cred-box {
       background:rgba(212,175,55,.05);
@@ -201,6 +260,7 @@
       
       <div style="margin-top: 1.5rem; text-align: center; font-size: 0.85rem;">
         <p>Não possui uma conta? <a href="#" id="link-ir-para-cadastro" style="color: var(--gold-primary); text-decoration: none; font-weight: 500;">Cadastre sua Marca</a></p>
+        <p style="margin-top: 0.6rem;"><a href="#" id="link-esqueci-senha" style="color: var(--text-secondary); text-decoration: none; font-size: 0.8rem;"><i class="fa-solid fa-key" style="margin-right: 4px;"></i> Esqueci minha senha / PIN</a></p>
       </div>
       
       <div class="login-footer">
@@ -209,6 +269,47 @@
           <a href="termos_uso.html" target="_blank" style="color: var(--text-secondary); text-decoration: underline;">Termos de Uso</a>
           <a href="politica_privacidade.html" target="_blank" style="color: var(--text-secondary); text-decoration: underline;">Política de Privacidade</a>
         </p>
+      </div>
+    </div>
+
+    <!-- Card de Recuperação de Senha -->
+    <div class="login-card" id="recuperar-senha-card" style="display: none;">
+      <div class="login-logo">
+        <img src="../assets/logo.png" alt="Conecta Joias" id="recuperar-logo-img">
+      </div>
+      <h2>Recuperar Acesso</h2>
+      <p>Informe seu e-mail, PIN de 4 dígitos ou WhatsApp</p>
+      
+      <div id="recuperar-error-msg" class="login-error-box" style="display: none;"></div>
+      <div id="recuperar-success-msg" style="display: none; background: rgba(129, 199, 132, 0.15); border: 1px solid #81c784; color: #81c784; padding: 0.8rem; border-radius: 8px; font-size: 0.85rem; margin-bottom: 1rem; text-align: center;"></div>
+
+      <div id="recuperar-form-step1">
+        <div class="form-group">
+          <label for="recuperar-identificador">E-mail, PIN ou WhatsApp *</label>
+          <input type="text" id="recuperar-identificador" class="form-control" placeholder="Seu e-mail ou PIN" required>
+        </div>
+
+        <button class="btn-gold" id="btn-solicitar-codigo-recuperacao" style="width: 100%; justify-content: center; padding: 1.1rem; margin-top: 1.2rem; font-size: 1rem;">
+          <i class="fa-solid fa-paper-plane"></i> Enviar Código de Verificação
+        </button>
+      </div>
+
+      <div id="recuperar-form-step2" style="display: none;">
+        <div class="form-group">
+          <label for="recuperar-codigo">Código de Verificação (6 dígitos) *</label>
+          <input type="text" id="recuperar-codigo" class="form-control" placeholder="123456" maxlength="6" required>
+        </div>
+        <div class="form-group">
+          <label for="recuperar-nova-senha">Nova Senha *</label>
+          <input type="password" id="recuperar-nova-senha" class="form-control" placeholder="Mínimo 6 caracteres" required>
+        </div>
+        <button class="btn-gold" id="btn-confirmar-redefinicao-senha" style="width: 100%; justify-content: center; padding: 1.1rem; margin-top: 1.2rem; font-size: 1rem;">
+          <i class="fa-solid fa-lock-open"></i> Redefinir Senha
+        </button>
+      </div>
+
+      <div class="login-footer" style="margin-top: 1.5rem;">
+        <p><a href="#" id="link-voltar-login" style="color: var(--gold-primary); text-decoration: none; font-weight: 500;"><i class="fa-solid fa-arrow-left"></i> Voltar para o Login</a></p>
       </div>
     </div>
 
@@ -236,6 +337,10 @@
         <div class="form-group">
           <label for="signup-loja">Nome da Loja / Marca *</label>
           <input type="text" id="signup-loja" class="form-control" placeholder="Sua Marca de Semijoias" required>
+          <div id="signup-slug-preview-container" style="display: none; margin-top: 0.4rem; font-size: 0.78rem; color: var(--gold-light); background: rgba(212,175,55,0.08); padding: 0.4rem 0.7rem; border-radius: 6px; border: 1px dashed rgba(212,175,55,0.3);">
+            <i class="fa-solid fa-link" style="margin-right: 4px;"></i> <span id="signup-slug-url">https://sualoja.conectajoias.com.br</span> 
+            <span style="margin-left: 6px; color: #81c784; font-weight: 600;"><i class="fa-solid fa-circle-check"></i> URL Disponível</span>
+          </div>
         </div>
 
         <div class="form-group">
@@ -245,7 +350,21 @@
 
         <div class="form-group">
           <label for="signup-senha">Senha de Acesso *</label>
-          <input type="password" id="signup-senha" class="form-control" placeholder="••••••••" required>
+          <div style="position: relative; display: flex; align-items: center;">
+            <input type="password" id="signup-senha" class="form-control" placeholder="••••••••" required style="padding-right: 2.8rem;">
+            <button type="button" id="btn-toggle-signup-senha" style="position: absolute; right: 10px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer; padding: 5px; font-size: 0.95rem;" title="Mostrar/Ocultar Senha">
+              <i class="fa-solid fa-eye" id="icon-toggle-signup-senha"></i>
+            </button>
+          </div>
+          <div id="signup-password-meter-box" style="display: none; margin-top: 0.4rem;">
+            <div style="height: 4px; width: 100%; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; margin-bottom: 0.2rem;">
+              <div id="signup-password-meter-bar" style="height: 100%; width: 0%; transition: all 0.3s ease; background: #ef5350;"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.72rem;">
+              <span id="signup-password-meter-text" style="color: var(--text-secondary);">Força da Senha: Fraca</span>
+              <span id="signup-password-hints" style="color: var(--text-muted); font-size: 0.68rem;">Mínimo 6 caracteres</span>
+            </div>
+          </div>
         </div>
 
         <button class="btn-gold" id="btn-executar-cadastro" style="width: 100%; justify-content: center; padding: 1.1rem; margin-top: 1.2rem; font-size: 1rem;">
@@ -264,7 +383,7 @@
     <!-- ══════════════════════════════════════════════
          WIZARD DE PERSONALIZAÇÃO (7 passos)
          ══════════════════════════════════════════════ -->
-    <div id="onboarding-wizard-card">
+    <div id="onboarding-wizard-card" style="display: none !important;">
 
       <div class="wz-header">
         <h2><i class="fa-solid fa-wand-magic-sparkles"></i> Personalize sua Loja</h2>
@@ -364,7 +483,7 @@
 
       <!-- PASSO 5 — Estilo Visual -->
       <div class="wz-step" id="wz-step-5">
-        <i class="wz-step-icon fa-solid fa-sparkles"></i>
+        <i class="wz-step-icon fa-solid fa-wand-magic-sparkles"></i>
         <h3>Qual é o estilo visual da sua marca?</h3>
         <p class="wz-hint">Isso define a linguagem visual dos materiais e painéis.</p>
         <div class="wz-radio-grid cols-2">
@@ -400,41 +519,59 @@
     <!-- ══════════════════════════════════════════════
          TELA FINAL — CREDENCIAIS DE ACESSO
          ══════════════════════════════════════════════ -->
-    <div class="login-card" id="credentials-card" style="display:none; max-width:440px;">
-      <div style="text-align:center; margin-bottom:1.5rem;">
-        <div style="width:64px; height:64px; background:rgba(212,175,55,.1); border:2px solid var(--gold-primary); border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto .8rem;">
-          <i class="fa-solid fa-check" style="color:var(--gold-primary); font-size:1.6rem;"></i>
+    <div class="login-card" id="credentials-card" style="display:none; max-width: 500px; width: 95%; margin: 0 auto; text-align: center; background: radial-gradient(circle at top left, #1a1a1a, #0d0d0d); border: 1px solid rgba(212,175,55,0.4); box-shadow: 0 20px 50px rgba(0,0,0,0.8); border-radius: 16px; padding: 2.2rem;">
+      
+      <div style="text-align:center; margin-bottom: 1.5rem;">
+        <div style="width: 70px; height: 70px; background: rgba(212, 175, 55, 0.12); border: 1.5px solid var(--gold-primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem auto; box-shadow: 0 0 25px rgba(212, 175, 55, 0.3);">
+          <i class="fa-solid fa-crown" style="color: var(--gold-primary); font-size: 2rem;"></i>
         </div>
-        <h2 style="font-family:'Montserrat',sans-serif; color:#fff; font-size:1.2rem; margin-bottom:.25rem;">Loja Configurada!</h2>
-        <p style="color:var(--text-secondary); font-size:.85rem;">Guarde com segurança suas credenciais de acesso</p>
+        <h2 style="font-family:'Montserrat',sans-serif; color:#fff; font-size: 1.5rem; font-weight: 700; margin-bottom: 0.4rem; letter-spacing: -0.3px;">Sua Loja Foi Criada! ✨</h2>
+        <p style="color: var(--text-secondary); font-size: 0.88rem; line-height: 1.4;">Sua conta foi registrada com sucesso. Guarde suas credenciais abaixo:</p>
       </div>
 
-      <div class="cred-box">
-        <h4><i class="fa-solid fa-key"></i> Suas Credenciais de Acesso</h4>
-        <div class="cred-item">
-          <strong>E-mail de Login:</strong>
-          <span id="cred-email">—</span>
+      <div class="cred-box" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 12px; padding: 1.2rem; margin-bottom: 1.5rem; text-align: left;">
+        <h4 style="font-size: 0.9rem; color: var(--gold-primary); margin-bottom: 1rem; display: flex; align-items: center; gap: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
+          <i class="fa-solid fa-key"></i> Dados de Acesso à sua Conta
+        </h4>
+        
+        <div class="cred-item" style="margin-bottom: 0.8rem; display: flex; flex-direction: column; gap: 2px;">
+          <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">E-mail de Login</span>
+          <span id="cred-email" style="font-size: 0.95rem; color: #fff; font-weight: 600;">—</span>
         </div>
-        <div class="cred-item">
-          <strong>PIN de Acesso Rápido:</strong>
-          <span id="cred-pin" class="pin-val">—</span>
+        
+        <div class="cred-item" style="margin-bottom: 0.8rem; display: flex; align-items: center; justify-content: space-between; background: rgba(212,175,55,0.08); padding: 0.6rem 0.8rem; border-radius: 8px; border: 1px solid rgba(212,175,55,0.25);">
+          <div>
+            <span style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; display: block;">PIN de Acesso Rápido</span>
+            <span id="cred-pin" class="pin-val" style="font-size: 1.2rem; color: var(--gold-primary); font-weight: 700; letter-spacing: 2px;">—</span>
+          </div>
+          <button type="button" onclick="loginApp.copiarPIN()" style="background: rgba(212,175,55,0.15); color: var(--gold-primary); border: 1px solid rgba(212,175,55,0.4); padding: 5px 12px; border-radius: 6px; font-size: 0.78rem; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: all 0.2s;">
+            <i class="fa-solid fa-copy"></i> <span id="lbl-copiar-pin">Copiar PIN</span>
+          </button>
         </div>
-        <div class="cred-item">
-          <strong>Senha:</strong>
-          <span>A senha que você escolheu no cadastro</span>
+
+        <div class="cred-item" style="margin-bottom: 0.8rem; display: flex; flex-direction: column; gap: 2px;">
+          <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Senha</span>
+          <span style="font-size: 0.88rem; color: #ccc;">A senha cadastrada por você</span>
         </div>
-        <div class="cred-item">
-          <strong>Link da sua Loja (Copie e Salve!):</strong>
-          <span id="cred-link">—</span>
+
+        <div class="cred-item" style="margin-bottom: 0.4rem; display: flex; flex-direction: column; gap: 4px; background: rgba(255,255,255,0.02); padding: 0.6rem 0.8rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Link de Acesso Direto</span>
+            <button type="button" onclick="loginApp.copiarLink()" style="background: transparent; color: var(--gold-primary); border: none; font-size: 0.78rem; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+              <i class="fa-solid fa-copy"></i> <span id="lbl-copiar-link">Copiar</span>
+            </button>
+          </div>
+          <span id="cred-link" style="font-size: 0.8rem; color: var(--gold-light); word-break: break-all;">—</span>
         </div>
-        <p style="font-size:.73rem; color:#ffb74d; margin-top:.8rem; line-height:1.4; text-align:center;">
-          <i class="fa-solid fa-triangle-exclamation"></i>
-          Você pode entrar pelo E-mail ou pelo PIN + sua senha.
+
+        <p style="font-size: 0.72rem; color: #ffb74d; margin-top: 0.8rem; margin-bottom: 0; line-height: 1.4; text-align: center;">
+          <i class="fa-solid fa-circle-info"></i>
+          Você poderá acessar seu painel usando tanto seu E-mail quanto seu PIN + Senha.
         </p>
       </div>
 
-      <button class="btn-gold" id="btn-ir-para-painel" style="width:100%; justify-content:center; padding:1.1rem; font-size:1rem;">
-        <i class="fa-solid fa-arrow-right-to-bracket"></i> Entrar no Painel
+      <button class="btn-gold" id="btn-ir-para-painel" style="width: 100%; justify-content: center; padding: 1.1rem; font-size: 1.05rem; font-weight: 700; border-radius: 10px; box-shadow: 0 4px 20px rgba(212, 175, 55, 0.3); cursor: pointer;">
+        <i class="fa-solid fa-rocket"></i> Acessar Meu Painel Agora
       </button>
     </div>
 
@@ -464,5 +601,6 @@
     }
   </script>
 
+  <script src="../js/pwa-install.js"></script>
 </body>
 </html>

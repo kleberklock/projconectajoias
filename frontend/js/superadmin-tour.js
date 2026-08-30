@@ -17,11 +17,6 @@
       description: 'Monitore o Demonstrativo de Resultados do Exercício (DRE), margens de lucro, faturamento bruto/líquido e a saúde financeira completa da sua empresa em tempo real.'
     },
     {
-      elementSelector: '#btn-tab-meu-plano-saas',
-      title: '👑 Meu Plano & Assinaturas',
-      description: 'Gerencie sua assinatura (Básico, Bronze, Gold ou Platinum), acompanhe seu consumo de cotas de produtos e revendedoras ou faça upgrade/downgrade a qualquer momento.'
-    },
-    {
       elementSelector: '#btn-tab-estoque',
       title: '📦 Estoque & Custos',
       description: 'Gerencie suas semijoias brutas. Cadastre peças, configure markups de banho, custos operacionais e defina automaticamente a margem de faturamento ideal de cada joia.'
@@ -57,6 +52,11 @@
       description: 'Vídeos tutoriais rápidos e caprichados para capacitar você e sua equipe administrativa a usarem 100% do potencial da plataforma.'
     },
     {
+      elementSelector: '#btn-tab-meu-plano-saas',
+      title: '👑 Meu Plano & Assinaturas',
+      description: 'Gerencie sua assinatura (Básico, Bronze, Gold ou Platinum), acompanhe seu consumo de cotas de produtos e revendedoras ou faça upgrade/downgrade a qualquer momento.'
+    },
+    {
       elementSelector: '#btn-tab-planilhas',
       title: '📊 Planilhas Excel',
       description: 'Importe seu estoque existente em segundos ou exporte relatórios consolidados em planilhas Excel de forma prática e segura.'
@@ -81,7 +81,7 @@
       box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7);
       z-index: 999999;
       border-radius: 8px;
-      pointer-events: none;
+      pointer-events: auto;
       transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     }
     
@@ -93,7 +93,8 @@
       height: 100vh;
       z-index: 999998;
       background: transparent;
-      cursor: default;
+      pointer-events: auto;
+      cursor: pointer;
     }
     
     .tour-popover {
@@ -288,7 +289,7 @@
     popoverEl.innerHTML = `
       <div class="tour-popover-header">
         <h3 id="tour-title">Título</h3>
-        <button class="tour-skip-link" id="tour-btn-skip">Pular</button>
+        <button class="tour-skip-link" id="tour-btn-skip"><i class="fa-solid fa-xmark"></i> Fechar</button>
       </div>
       <p id="tour-desc">Descrição explicativa...</p>
       <div class="tour-popover-footer">
@@ -325,26 +326,75 @@
     }
   }
 
+  let scrollListenerAttached = false;
+
+  function updatePosition() {
+    if (!backdropEl || !popoverEl || currentStepIdx < 0 || currentStepIdx >= tourSteps.length) return;
+    const step = tourSteps[currentStepIdx];
+    if (!step) return;
+    const element = document.querySelector(step.elementSelector);
+    if (!element) return;
+
+    const rect = element.getBoundingClientRect();
+    const scrollX = window.pageXOffset || document.documentElement.scrollLeft;
+    const scrollY = window.pageYOffset || document.documentElement.scrollTop;
+
+    // 1. Posicionar o holofote
+    backdropEl.style.left = `${rect.left + scrollX - 5}px`;
+    backdropEl.style.top = `${rect.top + scrollY - 4}px`;
+    backdropEl.style.width = `${rect.width + 10}px`;
+    backdropEl.style.height = `${rect.height + 8}px`;
+
+    // 2. Posicionar o popover (apenas em telas maiores que mobile)
+    if (window.innerWidth > 768) {
+      popoverEl.style.left = `${rect.right + 20 + scrollX}px`;
+      const popoverHeight = popoverEl.offsetHeight || 220;
+      let topPos = rect.top + scrollY + (rect.height / 2) - (popoverHeight / 2);
+      popoverEl.style.top = `${Math.max(10, topPos)}px`;
+    }
+  }
+
+  function attachScrollListeners() {
+    if (scrollListenerAttached) return;
+    window.addEventListener('scroll', updatePosition, { passive: true });
+    window.addEventListener('resize', updatePosition, { passive: true });
+
+    const sidebar = document.querySelector('.sidebar');
+    if (sidebar) {
+      sidebar.addEventListener('scroll', updatePosition, { passive: true });
+    }
+    scrollListenerAttached = true;
+  }
+
+  function detachScrollListeners() {
+    window.removeEventListener('scroll', updatePosition);
+    window.removeEventListener('resize', updatePosition);
+    const sidebar = document.querySelector('.sidebar');
+    if (sidebar) {
+      sidebar.removeEventListener('scroll', updatePosition);
+    }
+    scrollListenerAttached = false;
+  }
+
   // Encerrar tour
   function endTour() {
     localStorage.setItem('conectajoias_tutorial_completo', 'true');
-    
+    detachScrollListeners();
+
     if (popoverEl) popoverEl.classList.remove('active');
-    
+
     document.querySelectorAll('.tour-backdrop, .tour-popover, .tour-click-blocker').forEach(el => el.remove());
-    
+
     backdropEl = null;
     popoverEl = null;
     clickBlockerEl = null;
-
-    // Ativa aba padrão de dashboard para fechar
-    const btn = document.querySelector('#btn-tab-dashboard');
-    if (btn) btn.click();
   }
+  window.endTour = endTour;
 
   // Renderizar o passo ativo
   function renderStep(idx) {
     createTourElements();
+    attachScrollListeners();
 
     const step = tourSteps[idx];
     const element = document.querySelector(step.elementSelector);
@@ -355,32 +405,28 @@
       return;
     }
 
-    // Scroll inteligente no mobile para garantir que a sidebar apareça no topo
-    if (window.innerWidth <= 768) {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Scroll automático inteligente para colocar o elemento centralizado em tela (funciona na sidebar e na janela)
+    try {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+    } catch (e) {
+      element.scrollIntoView(true);
     }
 
-    // Simular o clique no botão lateral correspondente para trocar de aba na SPA
-    element.click();
-
-    // Pequeno timeout para dar tempo da interface SPA renderizar a aba e atualizar geometrias
+    // Timeout para permitir que a animação de scroll termine antes de calcular as coordenadas finais
     setTimeout(() => {
-      const rect = element.getBoundingClientRect();
-      const scrollX = window.pageXOffset || document.documentElement.scrollLeft;
-      const scrollY = window.pageYOffset || document.documentElement.scrollTop;
+      if (!backdropEl || !popoverEl) return;
 
-      // 1. Posicionar o holofote
-      backdropEl.style.left = `${rect.left + scrollX - 5}px`;
-      backdropEl.style.top = `${rect.top + scrollY - 4}px`;
-      backdropEl.style.width = `${rect.width + 10}px`;
-      backdropEl.style.height = `${rect.height + 8}px`;
+      updatePosition();
 
-      // 2. Atualizar textos do popover
-      document.getElementById('tour-title').innerText = step.title;
-      document.getElementById('tour-desc').innerText = step.description;
-      document.getElementById('tour-progress-lbl').innerText = `${idx + 1} de ${tourSteps.length}`;
+      // Atualizar textos do popover
+      const titleEl = document.getElementById('tour-title');
+      const descEl = document.getElementById('tour-desc');
+      const progressEl = document.getElementById('tour-progress-lbl');
+      if (titleEl) titleEl.innerText = step.title;
+      if (descEl) descEl.innerText = step.description;
+      if (progressEl) progressEl.innerText = `${idx + 1} de ${tourSteps.length}`;
 
-      // 3. Habilitar/Desabilitar botões
+      // Habilitar/Desabilitar botões
       const btnPrev = document.getElementById('tour-btn-prev');
       const btnNext = document.getElementById('tour-btn-next');
 
@@ -393,35 +439,25 @@
         }
       }
 
-      // 4. Posicionar o popover (apenas em telas maiores que mobile)
-      if (window.innerWidth > 768) {
-        popoverEl.style.left = `${rect.right + 20 + scrollX}px`;
-        popoverEl.style.top = `${rect.top + scrollY + (rect.height / 2) - (popoverEl.offsetHeight / 2)}px`;
-      }
-
       // Ativar animação de surgimento
       popoverEl.classList.add('active');
 
-    }, 150);
+    }, 250);
   }
 
-  // Inicializar o Onboarding Tour
+  // Inicializar o Onboarding Tour (Apenas quando disparado manualmente pelo usuário)
   window.initOnboardingTour = function(force = false) {
-    const isCompleted = localStorage.getItem('conectajoias_tutorial_completo');
-    
-    // Inicia se for a primeira vez ou se for forçado pelo botão
-    if (!isCompleted || force) {
-      currentStepIdx = 0;
-      renderStep(0);
-    }
+    // Se não for disparado manualmente pelo botão de tutorial, não exibe
+    if (!force) return;
+
+    currentStepIdx = 0;
+    renderStep(0);
   };
 
-  // Autoinicialização quando a página carregar
+  // Garante a remoção de qualquer elemento residual de tour ao carregar a página
   window.addEventListener('load', () => {
-    // Timeout para esperar a API/Mocks do superadmin.js carregarem as variáveis no localStorage
-    setTimeout(() => {
-      window.initOnboardingTour(false);
-    }, 1200);
+    localStorage.setItem('conectajoias_tutorial_completo', 'true');
+    document.querySelectorAll('.tour-backdrop, .tour-popover, .tour-click-blocker').forEach(el => el.remove());
   });
 
 })();

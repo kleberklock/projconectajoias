@@ -1,0 +1,267 @@
+/* ── ESTILOS DO BOTÃO FLUTUANTE & TUTORIAL PWA (CONECTA JOIAS) ── */
+
+:root {
+  --pwa-gold: #d4af37;
+  --pwa-gold-gradient: linear-gradient(135deg, #bf953f 0%, #fcf6ba 25%, #b38728 50%, #fbf5b7 75%, #aa771c 100%);
+  --pwa-bg-dark: #0f0f12;
+  --pwa-card-bg: #16161a;
+  --pwa-border-gold: rgba(212, 175, 55, 0.25);
+  --pwa-text-main: #f5f5f7;
+  --pwa-text-muted: #8e8e93;
+}
+
+/* Pílula Flutuante Discreta */
+.pwa-install-pill {
+  position: fixed;
+  bottom: 25px;
+  left: 25px;
+  z-index: 9990;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  background: var(--pwa-card-bg);
+  border: 1px solid var(--pwa-border-gold);
+  border-radius: 50px;
+  padding: 0.65rem 1.2rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 15px rgba(212, 175, 55, 0.15);
+  cursor: pointer;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.pwa-install-pill:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 14px 35px rgba(0, 0, 0, 0.7), 0 0 25px rgba(212, 175, 55, 0.3);
+}
+
+.pwa-pill-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--pwa-gold-gradient);
+  color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.pwa-pill-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.pwa-pill-title {
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.pwa-pill-sub {
+  color: var(--pwa-gold);
+  font-size: 0.68rem;
+  font-weight: 500;
+}
+
+.pwa-pill-close {
+  background: none;
+  border: none;
+  color: var(--pwa-text-muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0 0.2rem;
+  margin-left: 0.3rem;
+  transition: color 0.2s ease;
+}
+
+.pwa-pill-close:hover {
+  color: #fff;
+}
+
+/* Modal Tutorial PWA */
+.pwa-tutorial-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.pwa-tutorial-backdrop.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.pwa-tutorial-modal {
+  width: 92%;
+  max-width: 580px;
+  background: var(--pwa-bg-dark);
+  border: 1px solid var(--pwa-border-gold);
+  border-radius: 24px;
+  padding: 2.2rem;
+  position: relative;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.9);
+  transform: scale(0.92);
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pwa-tutorial-backdrop.active .pwa-tutorial-modal {
+  transform: scale(1);
+}
+
+.pwa-modal-close {
+  position: absolute;
+  top: 1.2rem;
+  right: 1.5rem;
+  background: none;
+  border: none;
+  color: var(--pwa-text-muted);
+  font-size: 1.8rem;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.pwa-modal-close:hover {
+  color: #fff;
+}
+
+.pwa-modal-header {
+  text-align: center;
+  margin-bottom: 1.8rem;
+}
+
+.pwa-modal-header h3 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.8rem;
+  color: #fff;
+  margin-bottom: 0.4rem;
+}
+
+.pwa-modal-header p {
+  color: var(--pwa-text-muted);
+  font-size: 0.85rem;
+}
+
+/* Tabs por Dispositivo (iOS / Android / Desktop) */
+.pwa-device-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-bottom: 1.8rem;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 0.4rem;
+  border-radius: 50px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.pwa-device-tab {
+  flex: 1;
+  padding: 0.6rem 0.8rem;
+  border-radius: 50px;
+  border: none;
+  background: transparent;
+  color: var(--pwa-text-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  transition: all 0.25s ease;
+}
+
+.pwa-device-tab.active {
+  background: var(--pwa-gold-gradient);
+  color: #000;
+  font-weight: 700;
+}
+
+/* Lista de Passos Passo-a-Passo */
+.pwa-steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  margin-bottom: 1.8rem;
+}
+
+.pwa-step-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  background: var(--pwa-card-bg);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 1rem 1.2rem;
+  border-radius: 16px;
+}
+
+.pwa-step-num {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(212, 175, 55, 0.12);
+  border: 1px solid var(--pwa-border-gold);
+  color: var(--pwa-gold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.pwa-step-content h4 {
+  color: #fff;
+  font-size: 0.9rem;
+  margin-bottom: 0.2rem;
+}
+
+.pwa-step-content p {
+  color: var(--pwa-text-muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.pwa-modal-btn {
+  width: 100%;
+  padding: 1rem;
+  border-radius: 50px;
+  background: var(--pwa-gold-gradient);
+  color: #000;
+  font-weight: 700;
+  font-size: 0.9rem;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.pwa-modal-btn:hover {
+  opacity: 0.92;
+}
+
+@media (max-width: 600px) {
+  .pwa-install-pill {
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 80px; /* Acima da sticky mobile bar */
+    width: 90%;
+    max-width: 340px;
+    justify-content: space-between;
+  }
+  .pwa-install-pill:hover {
+    transform: translateX(-50%) translateY(-2px);
+  }
+}

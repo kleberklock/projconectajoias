@@ -3,9 +3,18 @@
  */
 
 const saasApp = {
-  apiUrl: window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" 
-    ? "http://localhost:5000/api" 
-    : `${window.location.origin}/api`,
+  apiUrl: (function() {
+    const saved = localStorage.getItem("conectajoias_api_url");
+    if (saved) return saved;
+    const port = window.location.port;
+    const hostname = window.location.hostname;
+    const isDevPort = ["5500", "8080", "3000", "5501", "5000"].includes(port);
+    const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1" || /^192\.168\./.test(hostname) || /^10\./.test(hostname);
+    if (isDevPort || isLocalHost) {
+      return `${window.location.protocol}//${hostname}:5000/api`;
+    }
+    return `${window.location.origin}/api`;
+  })(),
   token: null,
   usuarioLogado: null,
   usandoDemo: false, // Flag se o backend estiver offline
@@ -89,6 +98,9 @@ const saasApp = {
       if (respLogs.ok) {
         this.state.logs = await respLogs.json();
       }
+
+      // 3.4. Buscar Reportes de Erros
+      this.carregarReportesErros();
 
       this.usandoDemo = false;
       document.getElementById("connection-badge").innerHTML = `
@@ -830,6 +842,108 @@ const saasApp = {
 
   formatarMoeda: function(valor) {
     return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valor || 0);
+  },
+
+  carregarReportesErros: async function() {
+    if (this.usandoDemo) {
+      this.renderizarReportesErros([
+        {
+          id: "demo-1",
+          createdAt: new Date().toISOString(),
+          nomeUsuario: "Maria Revendedora",
+          roleUsuario: "Consultant",
+          loja: { nome: "Semijoias Chic" },
+          categoria: "BUG",
+          titulo: "Erro ao registrar venda",
+          descricao: "Ocorre erro na maleta ao clicar em vendi.",
+          prioridade: "ALTA",
+          status: "PENDENTE",
+          anexoUrl: null,
+          respostaAdmin: null
+        }
+      ]);
+      return;
+    }
+
+    try {
+      const resp = await fetch(`${this.apiUrl}/saas/reportes-erro`, {
+        headers: { "Authorization": `Bearer ${this.token}` }
+      });
+      if (resp.ok) {
+        const reportes = await resp.json();
+        this.renderizarReportesErros(reportes);
+      }
+    } catch (err) {
+      console.warn("Erro ao carregar reportes de erros:", err);
+    }
+  },
+
+  renderizarReportesErros: function(reportes) {
+    const tbody = document.getElementById("tbody-saas-reportes");
+    if (!tbody) return;
+
+    if (!reportes || reportes.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">Nenhum chamado de erro encontrado no sistema. 🎉</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = reportes.map(r => {
+      const dataFmt = new Date(r.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      
+      let statusBadge = `<span class="status-badge pending"><i class="fa-solid fa-clock"></i> Pendente</span>`;
+      if (r.status === 'EM_ANALISE') statusBadge = `<span class="status-badge" style="background: rgba(41,182,246,0.15); color: #29b6f6; border: 1px solid rgba(41,182,246,0.3);"><i class="fa-solid fa-magnifying-glass"></i> Em Análise</span>`;
+      if (r.status === 'RESOLVIDO') statusBadge = `<span class="status-badge active"><i class="fa-solid fa-circle-check"></i> Resolvido</span>`;
+
+      return `
+        <tr>
+          <td style="font-size: 0.8rem; color: var(--text-secondary);">${dataFmt}</td>
+          <td>
+            <strong style="color: #fff; display: block; font-size: 0.85rem;">${this.escaparHTML(r.nomeUsuario)}</strong>
+            <span style="font-size: 0.72rem; color: var(--gold-primary);">${r.loja ? r.loja.nome : 'Sem Loja'} (${r.roleUsuario || 'User'})</span>
+          </td>
+          <td><span style="font-size: 0.75rem; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px;">${r.categoria}</span></td>
+          <td>
+            <strong style="color: #fff; display: block; font-size: 0.88rem;">${this.escaparHTML(r.titulo)}</strong>
+            <p style="font-size: 0.78rem; color: var(--text-secondary); margin: 4px 0 0 0; max-width: 300px; white-space: pre-wrap;">${this.escaparHTML(r.descricao)}</p>
+            ${r.anexoUrl ? `<a href="${r.anexoUrl}" target="_blank" style="color: var(--gold-primary); font-size: 0.75rem; text-decoration: underline; margin-top: 4px; display: inline-block;"><i class="fa-solid fa-paperclip"></i> Ver Print da Tela</a>` : ''}
+            ${r.respostaAdmin ? `<p style="font-size: 0.75rem; color: #81c784; margin-top: 4px;"><strong>Sua resposta:</strong> ${this.escaparHTML(r.respostaAdmin)}</p>` : ''}
+          </td>
+          <td><span class="log-badge ${r.prioridade === 'ALTA' ? 'danger' : 'info'}">${r.prioridade}</span></td>
+          <td>${statusBadge}</td>
+          <td>
+            ${r.status !== 'RESOLVIDO' ? `
+              <button class="btn-sm btn-gold" style="font-size: 0.75rem; padding: 4px 10px;" onclick="saasApp.alterarStatusReporte('${r.id}', 'RESOLVIDO')">
+                <i class="fa-solid fa-check"></i> Marcar Resolvido
+              </button>
+            ` : `<span style="font-size: 0.75rem; color: #81c784;"><i class="fa-solid fa-circle-check"></i> Concluído</span>`}
+          </td>
+        </tr>
+      `;
+    }).join("");
+  },
+
+  alterarStatusReporte: async function(id, novoStatus) {
+    const nota = prompt("Digite a resposta ou nota de resolução para o usuário (ou clique em OK para enviar sem nota):", "Problema analisado e resolvido com sucesso.");
+    if (nota === null) return;
+
+    try {
+      const resp = await fetch(`${this.apiUrl}/saas/reportes-erro/${id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${this.token}`
+        },
+        body: JSON.stringify({ status: novoStatus, respostaAdmin: nota })
+      });
+
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "Erro ao atualizar chamado.");
+
+      this.mostrarToast("Chamado marcado como RESOLVIDO!", "success");
+      this.carregarReportesErros();
+    } catch (err) {
+      this.mostrarToast("Erro: " + err.message, "error");
+    }
   },
 
   escaparHTML: function(str) {

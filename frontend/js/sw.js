@@ -1,4 +1,4 @@
-const CACHE_NAME = "conectajoias-v2";
+const CACHE_NAME = "conectajoias-v3";
 const ASSETS = [
   "./",
   "./index.html",

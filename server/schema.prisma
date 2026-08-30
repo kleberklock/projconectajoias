@@ -1,6 +1,11 @@
+// =========================================================================
+// BANCO DE DADOS LOCAL (SQLite): provider = "sqlite"
+// BANCO DE DADOS EM PRODUÇÃO (Supabase PostgreSQL): alterar para provider = "postgresql"
+// =========================================================================
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 generator client {
@@ -29,6 +34,7 @@ model Loja {
   configuracao Configuracao[]
   notificacoes Notificacao[]
   faixasComissao FaixaComissao[]
+  reportesErros  ReporteErro[]
 }
 
 model Usuario {
@@ -70,6 +76,7 @@ model Usuario {
   clientes     Cliente[]
   createdAt    DateTime           @default(now())
   faixasComissao FaixaComissao[]
+  reportesErros  ReporteErro[]
 
   @@index([lojaId])
   @@index([role])
@@ -172,7 +179,7 @@ model VendaDireta {
   whatsappCliente String?
   nomeCliente     String?
   clienteId       String?
-  cliente         Cliente? @relation(fields: [clienteId], references: [id])
+  cliente         Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
   desconto        Float    @default(0.0)
   motivoDesconto  String?
   formaPagamento  String?  @default("Pix")
@@ -196,7 +203,7 @@ model VendaRevendedora {
   precoVenda      Float
   comissaoValor   Float
   clienteId       String?
-  cliente         Cliente? @relation(fields: [clienteId], references: [id])
+  cliente         Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
 
   // Novos campos para controle de links de pagamento e canal
   canalPagamento  String             @default("DINHEIRO_REVENDEDORA") // "LINK_PAGO_ADMIN" | "DINHEIRO_REVENDEDORA"
@@ -318,6 +325,7 @@ model LinkPagamento {
   updatedAt      DateTime @updatedAt
 }
 
+
 model MensagemWhatsapp {
   id        String   @id @default(uuid())
   lojaId    String   @default("default-loja")
@@ -327,6 +335,7 @@ model MensagemWhatsapp {
   status    String   @default("PENDENTE") // "PENDENTE" | "ENVIADO" | "ERRO"
   createdAt DateTime @default(now())
 }
+
 
 model DocumentoUsuario {
   id          String   @id @default(uuid())
@@ -362,3 +371,29 @@ model Treinamento {
   url       String
   createdAt DateTime @default(now())
 }
+
+model ReporteErro {
+  id           String   @id @default(uuid())
+  lojaId       String?  @default("default-loja")
+  loja         Loja?    @relation(fields: [lojaId], references: [id], onDelete: Cascade)
+  usuarioId    String?
+  usuario      Usuario? @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  nomeUsuario  String
+  emailUsuario String?
+  roleUsuario  String?
+  titulo       String
+  descricao    String
+  categoria    String   @default("BUG") // "BUG" | "DUVIDA" | "SUGESTAO" | "OUTRO"
+  prioridade   String   @default("MEDIA") // "BAIXA" | "MEDIA" | "ALTA"
+  status       String   @default("PENDENTE") // "PENDENTE" | "EM_ANALISE" | "RESOLVIDO" | "REJEITADO"
+  urlOrigem    String?
+  anexoUrl     String?
+  respostaAdmin String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([lojaId])
+  @@index([status])
+  @@index([createdAt])
+}
+

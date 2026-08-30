@@ -11,6 +11,6 @@ echo IMPORTANTE: Deixe este terminal aberto enquanto navega nos dados.
 echo Pressione Ctrl + C neste terminal para encerrar.
 echo ==========================================================
 echo.
-cd ../server
+cd /d "%~dp0..\server"
 npx prisma studio
 pause

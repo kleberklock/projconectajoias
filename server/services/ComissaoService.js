@@ -7,21 +7,27 @@ class ComissaoService {
    * @param {number} faturamentoBruto - Faturamento bruto das vendas do acerto
    * @param {number} faturamentoVolumeAcumulado - Faturamento do mês (para progressiva/metas)
    * @param {number} valorDescontoPerda - Total descontado por perdas de peças
+   * @param {number} custoTotalPecasVendidas - Custo total das peças vendidas (custoBruto + custoBanho + custoLiquido)
    * @returns {Object} { percentualComissao, comissaoBruta, comissaoPaga, liquidoConectaJoias }
    */
-  calcularComissao(revendedora, faturamentoBruto, faturamentoVolumeAcumulado, valorDescontoPerda) {
+  calcularComissao(revendedora, faturamentoBruto, faturamentoVolumeAcumulado, valorDescontoPerda, custoTotalPecasVendidas = 0) {
+    // Se a base for LÍQUIDO, a comissão incide sobre a Margem Líquida Real (Faturamento - Custo das Peças - Perdas)
     const valorBaseComissao = (revendedora.baseCalculo === 'LIQUIDO')
-      ? Math.max(0, faturamentoBruto - valorDescontoPerda)
+      ? Math.max(0, faturamentoBruto - custoTotalPecasVendidas - valorDescontoPerda)
       : faturamentoBruto;
 
     let percentualComissao = revendedora.comissao;
     let comissaoBruta = 0;
+    // O bônus fixo (META_UNICA com FIXO) é separado da comissaoBruta para que
+    // nunca seja engolido pelo max(0,...) que clipa as perdas no modo BRUTO.
+    // Ele é somado DEPOIS da clipagem, garantindo que seja sempre pago se a meta foi atingida.
+    let bonusFixo = 0;
 
     if (revendedora.tipoComissao === 'PROGRESSIVA') {
       const faixas = (revendedora.faixasComissao && revendedora.faixasComissao.length > 0)
         ? revendedora.faixasComissao
         : (revendedora.loja && revendedora.loja.faixasComissao ? revendedora.loja.faixasComissao : []);
-      
+
       const faixasOrdenadas = faixas && faixas.length > 0 ? [...faixas].sort((a, b) => a.valorMin - b.valorMin) : [];
       const faixa = this.encontrarFaixaComissao(faturamentoVolumeAcumulado, faixasOrdenadas);
       if (faixasOrdenadas.length > 0) {
@@ -35,11 +41,14 @@ class ComissaoService {
       const atingiuMeta = faturamentoVolumeAcumulado >= (revendedora.metaUnicaValor || 0);
       if (atingiuMeta) {
         if (revendedora.metaUnicaTipoBonus === 'PERCENTUAL') {
+          // Bônus percentual: soma ao percentual base, incide sobre toda a base
           percentualComissao = revendedora.comissao + (revendedora.metaUnicaBonus || 0);
           comissaoBruta = valorBaseComissao * (percentualComissao / 100);
-        } else { // Bônus Fixo em Dinheiro
+        } else {
+          // Bônus fixo em dinheiro: mantido separado para não ser clipado pelas perdas
           percentualComissao = revendedora.comissao;
-          comissaoBruta = (valorBaseComissao * (percentualComissao / 100)) + (revendedora.metaUnicaBonus || 0);
+          comissaoBruta = valorBaseComissao * (percentualComissao / 100);
+          bonusFixo = revendedora.metaUnicaBonus || 0;
         }
       } else {
         percentualComissao = revendedora.comissao;
@@ -50,9 +59,13 @@ class ComissaoService {
       comissaoBruta = valorBaseComissao * (percentualComissao / 100);
     }
 
-    const comissaoPaga = (revendedora.baseCalculo === 'LIQUIDO')
+    // No modo BRUTO: desconta a perda da comissão percentual, depois soma o bônus fixo.
+    // No modo LIQUIDO: a perda já foi subtraída da base de cálculo; apenas clipa em zero e soma o bônus.
+    // O bonusFixo é sempre somado APÓS o max(0,...) para não ser engolido por perdas grandes.
+    const comissaoPercentualLiquida = (revendedora.baseCalculo === 'LIQUIDO')
       ? Math.max(0, comissaoBruta)
       : Math.max(0, comissaoBruta - valorDescontoPerda);
+    const comissaoPaga = comissaoPercentualLiquida + bonusFixo;
     const liquidoConectaJoias = faturamentoBruto - comissaoPaga;
 
     return {
@@ -108,7 +121,38 @@ class ComissaoService {
 
       const faturamentoTotalCiclo = vendasCiclo.reduce((sum, v) => sum + (Number(v.precoVenda || 0) * Number(v.quantidade || 0)), 0);
 
-      const calc = this.calcularComissao(revendedora, faturamentoTotalCiclo, faturamentoTotalCiclo, 0);
+      // Determina o volume de faturamento para enquadramento em faixa/meta,
+      // respeitando o periodoAcumulo — idêntico ao que o acerto final já faz.
+      let faturamentoVolumeParaFaixa = faturamentoTotalCiclo;
+      if (revendedora.periodoAcumulo === 'MENSAL') {
+        const agora = new Date();
+        const inicioMes = new Date(agora.getFullYear(), agora.getMonth(), 1, 0, 0, 0, 0);
+        const vendasMes = await prismaClient.vendaRevendedora.findMany({
+          where: {
+            usuarioId,
+            lojaId,
+            data: { gte: inicioMes }
+          }
+        });
+        const faturamentoMes = vendasMes.reduce((sum, v) => sum + (Number(v.precoVenda || 0) * Number(v.quantidade || 0)), 0);
+        // Usa o maior entre o volume do mês e o do ciclo para não sub-enquadrar
+        if (faturamentoMes > faturamentoVolumeParaFaixa) {
+          faturamentoVolumeParaFaixa = faturamentoMes;
+        }
+      }
+
+      // Busca os produtos das vendas para somar o Custo Total das peças vendidas no ciclo
+      const produtosLoja = await prismaClient.produto.findMany({ where: { lojaId } });
+      const produtosMap = new Map(produtosLoja.map(p => [p.id, p]));
+
+      let custoTotalPecasCiclo = 0;
+      for (const v of vendasCiclo) {
+        const p = produtosMap.get(v.produtoId);
+        const custoUnitario = p ? ((p.custoBruto || 0) + (p.custoBanho || 0) + (p.custoLiquido || 0)) : 0;
+        custoTotalPecasCiclo += custoUnitario * Number(v.quantidade || 0);
+      }
+
+      const calc = this.calcularComissao(revendedora, faturamentoTotalCiclo, faturamentoVolumeParaFaixa, 0, custoTotalPecasCiclo);
       const percentualAplicado = calc.percentualComissao;
 
       // Atualiza retroativamente todas as vendas do ciclo em aberto

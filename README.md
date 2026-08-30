@@ -171,8 +171,9 @@ projbelklock/
 │                              # (temas claro/escuro, cores white-label)
 │
 ├── 📄 export-code.js          # Utilitário: exporta código para análise no Gemini
-├── 📄 start.bat               # Inicialização rápida (Windows)
 │
+└── 📁 scripts/                # Scripts utilitários e de inicialização
+    └── 📄 start.bat           # Inicialização rápida (Windows)
 └── 📁 server/                 # Backend Node.js
     ├── 📄 server.js           # Servidor Express com todos os endpoints
     │                          # (~3600 linhas)
@@ -274,7 +275,7 @@ node seed.js  # (opcional) dados de exemplo
 ### 4. Iniciar tudo de uma vez (Windows)
 ```bash
 # Na raiz do projeto:
-start.bat
+scripts\start.bat
 ```
 
 ### 4. Ou iniciar manualmente

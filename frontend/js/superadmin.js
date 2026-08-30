@@ -7,9 +7,18 @@
 const app = {
   // 1. Estado da Aplicação
   state: {
-    apiUrl: window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" 
-      ? "http://localhost:5000/api" 
-      : `${window.location.origin}/api`,
+    apiUrl: (function() {
+      const saved = localStorage.getItem("conectajoias_api_url");
+      if (saved) return saved;
+      const port = window.location.port;
+      const hostname = window.location.hostname;
+      const isDevPort = ["5500", "8080", "3000", "5501", "5000"].includes(port);
+      const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1" || /^192\.168\./.test(hostname) || /^10\./.test(hostname);
+      if (isDevPort || isLocalHost) {
+        return `${window.location.protocol}//${hostname}:5000/api`;
+      }
+      return `${window.location.origin}/api`;
+    })(),
     token: null,
     usuarioLogado: null,
     produtos: [],
@@ -382,10 +391,6 @@ const app = {
         const config = await response.json();
         this.aplicarConfiguracoes(config);
         
-        // Se o onboarding não estiver completo, abre o wizard do onboarding
-        if (config.onboardingCompleto === false) {
-          this.abrirOnboardingWizard();
-        }
         return;
       }
     } catch (error) {
@@ -594,6 +599,7 @@ const app = {
       if (el) el.innerText = `Olá, ${this.state.usuarioLogado.nome.split(' ')[0]}! 💎`;
     }
     
+    this.atualizarCadeadosUI();
     console.log("Conecta Joias inicializado com sucesso!");
   },
 
@@ -605,21 +611,38 @@ const app = {
     // Interceptador para o Modo de Demonstração (Mocks / Offline)
     if (this.state.token && this.state.token.startsWith("mock_")) {
       console.warn(`[requisitarAPI] Modo de Demonstração Interceptado no Administrador: ${metodo} ${endpoint}`);
+      const upperMetodo = metodo.toUpperCase();
       
       // Simulação das respostas de endpoints para o modo demo
       if (endpoint.startsWith("/produtos/defeitos")) {
         return this.state.produtosComDefeito || [];
       }
       if (endpoint.startsWith("/produtos")) {
+        if (upperMetodo === "POST") {
+          return { id: 'prod_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6), ...body };
+        }
+        if (upperMetodo === "PUT") {
+          return { ...body };
+        }
+        if (upperMetodo === "DELETE") {
+          return { success: true };
+        }
         return this.state.produtos || [];
       }
       if (endpoint.startsWith("/revendedoras")) {
+        if (upperMetodo === "POST") return { id: 'rev_' + Date.now(), pin: "1234", ...body };
+        if (upperMetodo === "PUT") return { ...body };
+        if (upperMetodo === "DELETE") return { success: true };
         return this.state.revendedoras || [];
       }
       if (endpoint.startsWith("/clientes")) {
+        if (upperMetodo === "POST") return { id: 'cli_' + Date.now(), ...body };
+        if (upperMetodo === "PUT") return { ...body };
+        if (upperMetodo === "DELETE") return { success: true };
         return this.state.clientes || [];
       }
       if (endpoint.startsWith("/vendas-diretas") || endpoint.startsWith("/vendas-revendedora") || endpoint.startsWith("/acertos")) {
+        if (upperMetodo === "POST") return { id: 'venda_' + Date.now(), ...body };
         return this.state.vendasConsolidadas || [];
       }
       if (endpoint.startsWith("/whatsapp/fila")) {
@@ -1209,6 +1232,11 @@ const app = {
 
   // 5. Registro e escuta de eventos na UI
   registrarEventosUI: function() {
+    const addListenerSafe = (id, event, callback) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener(event, callback);
+    };
+
     // Botão de Logout na Sidebar
     const btnLogout = document.getElementById("btn-logout");
     if (btnLogout) {
@@ -1233,13 +1261,12 @@ const app = {
     if (filtroStatus) filtroStatus.addEventListener("change", () => this.renderizarEstoque());
 
     // Botões rápidos do Dashboard
-    document.getElementById("btn-quick-sale").addEventListener("click", () => this.abrirModalVendaRapida());
-    document.getElementById("btn-view-all-stock").addEventListener("click", () => this.abrirModalTodosAlertas());
+    addListenerSafe("btn-view-all-stock", "click", () => this.abrirModalTodosAlertas());
 
     // Eventos de Input da Calculadora no Modal de Produto
     const inputsPrecificacao = ["prod-bruto", "prod-banho", "prod-liquido", "prod-markup"];
     inputsPrecificacao.forEach(id => {
-      document.getElementById(id).addEventListener("input", () => this.calcularPrecificacaoDinamicamente());
+      addListenerSafe(id, "input", () => this.calcularPrecificacaoDinamicamente());
     });
 
     // Modais e seus gatilhos
@@ -1247,7 +1274,6 @@ const app = {
     this.configurarModal("modal-revendedora", "btn-open-modal-revendedora", "btn-close-modal-revendedora", "btn-cancelar-revendedora");
     this.configurarModal("modal-consignar", "btn-open-modal-consignar", "btn-close-modal-consignar", "btn-cancelar-consignar");
     this.configurarModal("modal-acerto", "btn-open-modal-acerto", "btn-close-modal-acerto", "btn-cancelar-acerto");
-    this.configurarModal("modal-venda-rapida", null, "btn-close-modal-venda-rapida", "btn-cancelar-venda-rapida");
     this.configurarModal("modal-todos-alertas", null, "btn-close-modal-todos-alertas", "btn-fechar-todos-alertas");
     this.configurarModal("modal-notificacoes", "btn-notificacoes", "btn-close-modal-notificacoes", "btn-fechar-notificacoes");
 
@@ -1273,10 +1299,6 @@ const app = {
     syncColor("cfg-bg-card", "cfg-bg-card-hex");
 
     // Modal de Venda Direta da Administradora
-    const addListenerSafe = (id, event, callback) => {
-      const el = document.getElementById(id);
-      if (el) el.addEventListener(event, callback);
-    };
     addListenerSafe("btn-open-modal-venda-admin", "click", () => this.abrirModalVendaAdmin());
     addListenerSafe("btn-close-modal-venda-admin", "click", () => {
       const m = document.getElementById("modal-venda-admin");
@@ -1289,70 +1311,9 @@ const app = {
     addListenerSafe("btn-confirmar-venda-admin", "click", () => this.confirmarVendaAdmin());
 
 
-    // Salvar Produto
-    document.getElementById("btn-salvar-produto").addEventListener("click", () => this.salvarNovoProduto());
-
-    // Upload automático de imagem do produto ao selecionar arquivo
-    const inputFotoFile = document.getElementById("prod-foto-file");
-    if (inputFotoFile) {
-      inputFotoFile.addEventListener("change", async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        const formData = new FormData();
-        formData.append("imagem", file);
-
-        try {
-          const previewImg = document.getElementById("prod-foto-preview");
-          const previewContainer = document.getElementById("prod-foto-preview-container");
-          if (previewContainer) previewContainer.style.display = "block";
-          if (previewImg) {
-            previewImg.src = "assets/logo.png"; 
-            previewImg.style.opacity = "0.5";
-          }
-
-          const response = await fetch(`${this.state.apiUrl}/uploads`, {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${this.state.token}`
-            },
-            body: formData
-          });
-
-          if (!response.ok) throw new Error("Erro ao realizar upload de imagem.");
-          const resData = await response.json();
-
-          document.getElementById("prod-foto-url").value = resData.url;
-          this.atualizarPreviewFotoProduto();
-        } catch (err) {
-          console.error(err);
-          this.toast("Falha ao fazer upload da imagem: " + err.message, "error");
-        }
-      });
-    }
-
-    // Salvar Revendedora
-    document.getElementById("btn-salvar-revendedora").addEventListener("click", () => this.salvarNovaRevendedora());
-
-    // Adicionar Faixa de Comissão na UI
-    const btnAddFaixaUi = document.getElementById("btn-add-faixa-ui");
-    if (btnAddFaixaUi) {
-      btnAddFaixaUi.addEventListener("click", () => this.adicionarFaixaLinha());
-    }
-
-    // Consignar Peças (Confirmar envio)
-    document.getElementById("btn-confirmar-consignar").addEventListener("click", () => this.processarConsignacao());
-
-    // Excluir Revendedora
-    document.getElementById("btn-excluir-revendedora").addEventListener("click", () => this.excluirRevendedoraSelecionada());
-
-    // Editar Revendedora
-    document.getElementById("btn-editar-revendedora").addEventListener("click", () => this.editarRevendedoraSelecionada());
-
-    // Fechamento de acertos
-    document.getElementById("btn-salvar-acerto-apenas").addEventListener("click", () => this.finalizarAcerto(false));
-    document.getElementById("btn-finalizar-acerto-whats").addEventListener("click", () => this.finalizarAcerto(true));
-    document.getElementById("btn-finalizar-acerto-excel").addEventListener("click", () => this.exportarExcelAcerto());
+    // Excluir e Editar Revendedora
+    addListenerSafe("btn-excluir-revendedora", "click", () => this.excluirRevendedoraSelecionada());
+    addListenerSafe("btn-editar-revendedora", "click", () => this.editarRevendedoraSelecionada());
 
     // Notificações
     const btnMarcarLidas = document.getElementById("btn-marcar-todas-lidas");
@@ -1396,30 +1357,12 @@ const app = {
     document.getElementById("btn-backup-exportar").addEventListener("click", () => this.exportarBackupGeralJSON());
     document.getElementById("btn-backup-importar").addEventListener("click", () => document.getElementById("input-backup-json").click());
     document.getElementById("input-backup-json").addEventListener("change", (e) => this.importarBackupGeralJSON(e));
-
-    // WhatsApp Venda Rápida (Confirmar)
-    document.getElementById("btn-enviar-venda-rapida").addEventListener("click", () => this.processarVendaRapidaWhats());
-
     // Modal de Clientes
     this.configurarModal("modal-cliente", null, "btn-close-modal-cliente", "btn-cancelar-cliente");
     document.getElementById("btn-open-modal-cliente").addEventListener("click", () => this.abrirModalCliente());
     document.getElementById("btn-salvar-cliente").addEventListener("click", () => this.salvarCliente());
     const clienteWhatsInput = document.getElementById("cliente-whatsapp");
     if (clienteWhatsInput) clienteWhatsInput.addEventListener("input", (e) => this.aplicarMascaraWhatsApp(e.target));
-
-    // WhatsApp Mask no Venda Rápida (novo campo)
-    const vrClienteWhats = document.getElementById("vr-cliente-whatsapp");
-    if (vrClienteWhats) vrClienteWhats.addEventListener("input", (e) => this.aplicarMascaraWhatsApp(e.target));
-    
-    // Selector de cliente na Venda Rápida: mostra/oculta box de novo cliente
-    const vrSelect = document.getElementById("vr-cliente-select");
-    if (vrSelect) {
-      vrSelect.addEventListener("change", () => {
-        const novoBox = document.getElementById("vr-novo-cliente-box");
-        if (novoBox) novoBox.style.display = vrSelect.value ? "none" : "block";
-      });
-    }
-
     // Configuração Drag and Drop da planilha
     const dropzone = document.getElementById("dropzone-excel");
     if (dropzone) {
@@ -1455,6 +1398,144 @@ const app = {
     }
   },
 
+  abrirModalProduto: function() {
+    const modal = document.getElementById("modal-produto");
+    if (!modal) return;
+    this.limparFormProduto();
+    this.calcularPrecificacaoDinamicamente();
+    modal.style.display = "flex";
+    modal.classList.add("active");
+  },
+
+  abrirModalRevendedora: function() {
+    const modal = document.getElementById("modal-revendedora");
+    if (!modal) return;
+    this.limparFormRevendedora();
+    modal.style.display = "flex";
+    modal.classList.add("active");
+  },
+
+  abrirModalConsignar: function() {
+    const modal = document.getElementById("modal-consignar");
+    if (!modal) return;
+    const buscaInput = document.getElementById("consignar-busca");
+    const filtroCat = document.getElementById("consignar-filtro-categoria");
+    if (buscaInput) buscaInput.value = "";
+    if (filtroCat) filtroCat.value = "";
+    const totPecas = document.getElementById("consignar-total-pecas");
+    const valTotal = document.getElementById("consignar-valor-total");
+    if (totPecas) totPecas.innerText = "0 pçs";
+    if (valTotal) valTotal.innerText = "R$ 0,00";
+    if (typeof this.renderizarTabelaSelecaoConsignado === "function") {
+      this.renderizarTabelaSelecaoConsignado();
+    }
+    modal.style.display = "flex";
+    modal.classList.add("active");
+  },
+
+  abrirModalAcerto: function() {
+    const modal = document.getElementById("modal-acerto");
+    if (!modal) return;
+    const buscaInput = document.getElementById("acerto-busca");
+    if (buscaInput) buscaInput.value = "";
+    if (typeof this.renderizarTabelaPreencherAcerto === "function") {
+      this.renderizarTabelaPreencherAcerto();
+    }
+    modal.style.display = "flex";
+    modal.classList.add("active");
+  },
+
+  abrirModalCliente: function() {
+    const modal = document.getElementById("modal-cliente");
+    if (!modal) return;
+    if (typeof this.limparFormCliente === "function") {
+      this.limparFormCliente();
+    }
+    modal.style.display = "flex";
+    modal.classList.add("active");
+  },
+
+  fecharModalProduto: function() {
+    const modal = document.getElementById("modal-produto");
+    if (modal) {
+      modal.style.display = "none";
+      modal.classList.remove("active");
+    }
+  },
+
+  fecharModalRevendedora: function() {
+    const modal = document.getElementById("modal-revendedora");
+    if (modal) {
+      modal.style.display = "none";
+      modal.classList.remove("active");
+    }
+  },
+
+  fecharModalConsignar: function() {
+    const modal = document.getElementById("modal-consignar");
+    if (modal) {
+      modal.style.display = "none";
+      modal.classList.remove("active");
+    }
+  },
+
+  fecharModalAcerto: function() {
+    const modal = document.getElementById("modal-acerto");
+    if (modal) {
+      modal.style.display = "none";
+      modal.classList.remove("active");
+    }
+  },
+
+  fecharModalCliente: function() {
+    const modal = document.getElementById("modal-cliente");
+    if (modal) {
+      modal.style.display = "none";
+      modal.classList.remove("active");
+    }
+  },
+
+
+
+  abrirModalVendaRev: function() {
+    if (typeof this._abrirModalVendaRevInterno === "function") {
+      this._abrirModalVendaRevInterno();
+    } else {
+      const modal = document.getElementById("modal-venda-rev");
+      if (modal) {
+        modal.style.display = "flex";
+        modal.classList.add("active");
+      }
+    }
+  },
+
+  fecharModalVendaRev: function() {
+    const modal = document.getElementById("modal-venda-rev");
+    if (modal) {
+      modal.style.display = "none";
+      modal.classList.remove("active");
+    }
+  },
+
+  abrirModalVendaAdmin: function() {
+    const modal = document.getElementById("modal-venda-admin");
+    if (modal) {
+      if (typeof this.renderizarSelectsVendaAdmin === "function") {
+        this.renderizarSelectsVendaAdmin();
+      }
+      modal.style.display = "flex";
+      modal.classList.add("active");
+    }
+  },
+
+  fecharModalVendaAdmin: function() {
+    const modal = document.getElementById("modal-venda-admin");
+    if (modal) {
+      modal.style.display = "none";
+      modal.classList.remove("active");
+    }
+  },
+
   configurarModal: function(modalId, triggerId, closeBtnId, cancelBtnId) {
     const modal = document.getElementById(modalId);
     const trigger = triggerId ? document.getElementById(triggerId) : null;
@@ -1462,37 +1543,53 @@ const app = {
     const cancelBtn = document.getElementById(cancelBtnId);
 
     const abrir = () => {
-      modal.classList.add("active");
-      if (modalId === "modal-produto") {
-        this.limparFormProduto();
-        this.calcularPrecificacaoDinamicamente();
+      const isSuperAdmin = this.state.usuarioLogado && this.state.usuarioLogado.role === 'SuperAdmin';
+      const plano = (this.state.usuarioLogado && this.state.usuarioLogado.planoLoja || 'BASICO').toUpperCase();
+
+      if (modalId === "modal-produto" && !isSuperAdmin) {
+        let limiteEstoque = 300;
+        if (plano === 'BASICO') limiteEstoque = 50;
+        else if (plano === 'BRONZE') limiteEstoque = 300;
+        else if (plano === 'GOLD') limiteEstoque = 1500;
+        else if (plano === 'PLATINUM') limiteEstoque = 999999;
+
+        const totalEstoqueAtual = this.state.produtos.reduce((sum, p) => sum + (p.quantidade || 0), 0);
+        if (totalEstoqueAtual >= limiteEstoque) {
+          this.exibirAvisoUpgradePlano("Estoque do Plano", `Seu plano atual (${plano}) atingiu o limite de ${limiteEstoque} peças em estoque central. Faça o upgrade do seu plano para cadastrar mais produtos.`, plano === 'BASICO' ? 'BRONZE' : (plano === 'BRONZE' ? 'GOLD' : 'PLATINUM'));
+          return;
+        }
       }
-      if (modalId === "modal-revendedora") {
-        this.limparFormRevendedora();
+
+      if (modalId === "modal-revendedora" && !isSuperAdmin) {
+        let limiteConsultoras = 5;
+        if (plano === 'BASICO') limiteConsultoras = 2;
+        else if (plano === 'BRONZE') limiteConsultoras = 5;
+        else if (plano === 'GOLD') limiteConsultoras = 25;
+        else if (plano === 'PLATINUM') limiteConsultoras = 99999;
+
+        const totalConsultoras = this.state.revendedoras.length;
+        if (totalConsultoras >= limiteConsultoras) {
+          this.exibirAvisoUpgradePlano("Limite de Revendedoras", `Seu plano atual (${plano}) atingiu o limite de ${limiteConsultoras} revendedoras. Faça o upgrade do seu plano para cadastrar mais.`, plano === 'BASICO' ? 'BRONZE' : (plano === 'BRONZE' ? 'GOLD' : 'PLATINUM'));
+          return;
+        }
       }
-      if (modalId === "modal-consignar") {
-        const buscaInput = document.getElementById("consignar-busca");
-        const filtroCat = document.getElementById("consignar-filtro-categoria");
-        if (buscaInput) buscaInput.value = "";
-        if (filtroCat) filtroCat.value = "";
-        const totPecas = document.getElementById("consignar-total-pecas");
-        const valTotal = document.getElementById("consignar-valor-total");
-        if (totPecas) totPecas.innerText = "0 pçs";
-        if (valTotal) valTotal.innerText = "R$ 0,00";
-        this.renderizarTabelaSelecaoConsignado();
-      }
-      if (modalId === "modal-acerto") {
-        const buscaInput = document.getElementById("acerto-busca");
-        if (buscaInput) buscaInput.value = "";
-        this.renderizarTabelaPreencherAcerto();
-      }
-      if (modalId === "modal-notificacoes") {
-        this.renderizarNotificacoes();
+
+      if (modalId === "modal-produto") this.abrirModalProduto();
+      else if (modalId === "modal-revendedora") this.abrirModalRevendedora();
+      else if (modalId === "modal-consignar") this.abrirModalConsignar();
+      else if (modalId === "modal-acerto") this.abrirModalAcerto();
+      else if (modalId === "modal-cliente") this.abrirModalCliente();
+      else if (modal) {
+        modal.style.display = "flex";
+        modal.classList.add("active");
       }
     };
 
     const fechar = () => {
-      modal.classList.remove("active");
+      if (modal) {
+        modal.style.display = "none";
+        modal.classList.remove("active");
+      }
     };
 
     if (trigger) trigger.addEventListener("click", abrir);
@@ -1520,6 +1617,21 @@ const app = {
   // Navegação SPA
   navegacaoListenersConfigurada: false,
   navegarParaAba: function(tabId) {
+    if (typeof window.endTour === "function") {
+      window.endTour();
+    }
+    
+    // Mapeamento de abas para recursos do plano
+    const abasMapeadas = {
+      'planilhas': 'importar-excel',
+      'notas-fiscais': 'links-pagamento'
+    };
+
+    if (abasMapeadas[tabId]) {
+      const temAcesso = this.validarAcessoRecurso(abasMapeadas[tabId]);
+      if (!temAcesso) return; // Cancela navegação
+    }
+
     this.state.abaAtiva = tabId;
     this.fecharSidebarMobile();
     this.renderizarAbas();
@@ -1562,12 +1674,7 @@ const app = {
     if (tabId === "configuracoes") {
       this.renderizarConfiguracoes();
     }
-    if (tabId === "notas-fiscais") {
-      this.carregarNotasFiscais();
-    }
-    if (tabId === "central-whatsapp") {
-      this.carregarCentralWhatsApp();
-    }
+
     if (tabId === "admin-treinamentos") {
       this.carregarTreinamentosAdmin();
     }
@@ -1809,6 +1916,31 @@ const app = {
   },
 
   carregarDRE: async function() {
+    const plano = (this.state.usuarioLogado && this.state.usuarioLogado.planoLoja || 'BASICO').toUpperCase();
+    const temDRE = plano === 'GOLD' || plano === 'PLATINUM' || (this.state.usuarioLogado && this.state.usuarioLogado.role === 'SuperAdmin');
+    const drePanel = document.getElementById("dashboard-dre-panel");
+
+    if (!temDRE) {
+      if (drePanel) {
+        drePanel.innerHTML = `
+          <div class="panel-header">
+            <h2><i class="fa-solid fa-calculator"></i> Demonstrativo do Resultado do Exercício (DRE)</h2>
+          </div>
+          <div style="padding: 3rem 1.5rem; text-align: center; background: rgba(0,0,0,0.15); border: 1px dashed rgba(212,175,55,0.25); border-radius: var(--radius-md); margin-top: 1.5rem;">
+            <i class="fa-solid fa-lock" style="font-size: 2.5rem; color: var(--gold-primary); opacity: 0.8; margin-bottom: 1rem; display: block;"></i>
+            <h3 style="font-family: var(--font-title); color: var(--gold-light); font-size: 1.35rem; margin-bottom: 0.5rem;">Demonstrativo DRE Avançado</h3>
+            <p style="color: var(--text-secondary); max-width: 480px; margin: 0 auto 1.5rem; font-size: 0.88rem; line-height: 1.5;">
+              Monitore a saúde financeira da sua marca em tempo real. Veja faturamento consolidado, comissões pagas, custos de mercadorias (CMV) e lucro líquido.
+            </p>
+            <button class="btn-gold" onclick="app.navegarParaAba('meu-plano-saas')" style="padding: 0.55rem 1.5rem; font-size: 0.82rem; margin: 0 auto; display: inline-flex;">
+              <i class="fa-solid fa-crown"></i> Liberar no Plano Gold
+            </button>
+          </div>
+        `;
+      }
+      return;
+    }
+
     const inputInicio = document.getElementById("dre-data-inicio");
     const inputFim = document.getElementById("dre-data-fim");
     if (!inputInicio || !inputFim) return;
@@ -2484,26 +2616,39 @@ const app = {
 
   salvarNovoProduto: async function() {
     if (!this.verificarPlanoAtivoAntesDeCriar()) return;
-    const nome = document.getElementById("prod-nome").value.trim();
-    const categoria = document.getElementById("prod-categoria").value;
-    const quantidade = parseInt(document.getElementById("prod-quantidade").value) || 0;
+    const nomeEl = document.getElementById("prod-nome");
+    const nome = nomeEl ? nomeEl.value.trim() : "";
+    const categoria = document.getElementById("prod-categoria")?.value || "Brincos";
+    const quantidade = parseInt(document.getElementById("prod-quantidade")?.value) || 0;
     
     if (!nome) {
       this.toast("Por favor, preencha o nome do produto.", "warning");
+      if (nomeEl) {
+        nomeEl.focus();
+        nomeEl.style.borderColor = "#ff4d4d";
+        setTimeout(() => { nomeEl.style.borderColor = ""; }, 3000);
+      }
       return;
     }
 
-    const codigoInput = document.getElementById("prod-codigo").value.trim();
+    const codigoInput = document.getElementById("prod-codigo")?.value.trim();
     const codigo = codigoInput ? codigoInput : "REF-" + Math.floor(1000 + Math.random() * 9000);
     
-    const custoBruto = parseFloat(document.getElementById("prod-bruto").value) || 0;
-    const custoBanho = parseFloat(document.getElementById("prod-banho").value) || 0;
-    const custoLiquido = parseFloat(document.getElementById("prod-liquido").value) || 0;
-    const markup = parseFloat(document.getElementById("prod-markup").value) || 1.0;
-    const fotoUrl = document.getElementById("prod-foto-url").value.trim() || null;
-    const quantidadeDefeito = parseInt(document.getElementById("prod-defeito").value) || 0;
+    const custoBruto = parseFloat(document.getElementById("prod-bruto")?.value) || 0;
+    const custoBanho = parseFloat(document.getElementById("prod-banho")?.value) || 0;
+    const custoLiquido = parseFloat(document.getElementById("prod-liquido")?.value) || 0;
+    const markup = parseFloat(document.getElementById("prod-markup")?.value) || 1.0;
+    const fotoUrl = document.getElementById("prod-foto-url")?.value.trim() || null;
+    const quantidadeDefeito = parseInt(document.getElementById("prod-defeito")?.value) || 0;
 
-    const editId = document.getElementById("btn-salvar-produto").getAttribute("data-edit-id");
+    const chkManual = document.getElementById("prod-usar-preco-manual");
+    const valManualInput = document.getElementById("prod-preco-manual");
+    let precoVendaManual = null;
+    if (chkManual && chkManual.checked && valManualInput && parseFloat(valManualInput.value) > 0) {
+      precoVendaManual = parseFloat(valManualInput.value);
+    }
+
+    const editId = document.getElementById("btn-salvar-produto")?.getAttribute("data-edit-id");
 
     try {
       let produtoSalvo;
@@ -2518,7 +2663,8 @@ const app = {
         custoLiquido,
         markup,
         fotoUrl,
-        quantidadeDefeito
+        quantidadeDefeito,
+        precoVenda: precoVendaManual
       };
 
       if (editId) {
@@ -2544,31 +2690,36 @@ const app = {
             ...bodyData
           };
         }
-        this.state.produtos.push(produtoSalvo);
+        if (produtoSalvo && typeof produtoSalvo === 'object' && !Array.isArray(produtoSalvo)) {
+          this.state.produtos.push(produtoSalvo);
+        }
       }
 
       // Atualiza valores dinâmicos locais
-      this.state.produtos.forEach(p => {
-        const custoTotal = (p.custoBruto || 0) + (p.custoBanho || 0) + (p.custoLiquido || 0);
-        const precoVendaCalculado = custoTotal * (p.markup || 3.0);
-        p._valoresDinamicos = {
-          "Código": p.codigo,
-          "Nome do Produto": p.nome,
-          "Categoria": p.categoria,
-          "Estoque Central": p.quantidade,
-          "Custo Bruto": p.custoBruto,
-          "Custo Banho": p.custoBanho,
-          "Custo Oper.": p.custoLiquido,
-          "Markup": p.markup,
-          "Preço Venda": p.precoVenda || precoVendaCalculado
-        };
-      });
+      if (Array.isArray(this.state.produtos)) {
+        this.state.produtos.forEach(p => {
+          if (!p || typeof p !== 'object') return;
+          const custoTotal = (p.custoBruto || 0) + (p.custoBanho || 0) + (p.custoLiquido || 0);
+          const precoVendaCalculado = p.precoVenda || (custoTotal * (p.markup || 3.0));
+          p._valoresDinamicos = {
+            "Código": p.codigo,
+            "Nome do Produto": p.nome,
+            "Categoria": p.categoria,
+            "Estoque Central": p.quantidade,
+            "Custo Bruto": p.custoBruto,
+            "Custo Banho": p.custoBanho,
+            "Custo Oper.": p.custoLiquido,
+            "Markup": p.markup,
+            "Preço Venda": precoVendaCalculado
+          };
+        });
+      }
 
       this.salvarDadosNoLocalStorage();
       this.renderizarEstoque();
       this.renderizarDashboard();
       
-      document.getElementById("modal-produto").classList.remove("active");
+      this.fecharModalProduto();
       
       // Navega para aba de estoque para o usuário ver o produto que acabou de cadastrar/editar
       this.navegarParaAba("estoque");
@@ -2836,6 +2987,23 @@ const app = {
   adicionarFaixaLinha: function(valorMin = 0, valorMax = 0, percentual = 0) {
     const container = document.getElementById("rev-faixas-container");
     if (!container) return;
+
+    // Se os valores não foram fornecidos (ou são zero), sugere automaticamente com base na última faixa
+    if (valorMin === 0 && valorMax === 0 && percentual === 0) {
+      const rows = container.querySelectorAll(".rev-faixa-row");
+      if (rows.length > 0) {
+        const lastRow = rows[rows.length - 1];
+        const lastMax = parseFloat(lastRow.querySelector(".faixa-max")?.value) || 0;
+        const lastPct = parseFloat(lastRow.querySelector(".faixa-pct")?.value) || 0;
+        valorMin = lastMax;
+        valorMax = lastMax + 2000;
+        percentual = Math.min(100, lastPct + 5);
+      } else {
+        valorMin = 0;
+        valorMax = 2000;
+        percentual = 30;
+      }
+    }
 
     // Remove o aviso de "vazio" se existir
     const vazio = document.getElementById("rev-faixas-vazio");
@@ -3138,38 +3306,54 @@ const app = {
 
   salvarNovaRevendedora: async function() {
     if (!this.verificarPlanoAtivoAntesDeCriar()) return;
-    const nome = document.getElementById("rev-nome").value.trim();
-    const whatsapp = document.getElementById("rev-whatsapp").value.trim();
-    const comissao = parseInt(document.getElementById("rev-comissao").value) || 30;
+    const nomeEl = document.getElementById("rev-nome");
+    const whatsEl = document.getElementById("rev-whatsapp");
+    const nome = nomeEl ? nomeEl.value.trim() : "";
+    const whatsapp = whatsEl ? whatsEl.value.trim() : "";
+    const comissao = parseInt(document.getElementById("rev-comissao")?.value) || 30;
     const faixasComissao = this.obterFaixasComissaoDaUI();
-    const editId = document.getElementById("btn-salvar-revendedora").getAttribute("data-edit-id");
+    const editId = document.getElementById("btn-salvar-revendedora")?.getAttribute("data-edit-id");
 
     if (!nome || !whatsapp) {
       this.toast("Por favor, preencha o nome e o WhatsApp da revendedora.", "warning");
+      if (!nome && nomeEl) {
+        nomeEl.focus();
+        nomeEl.style.borderColor = "#ff4d4d";
+        setTimeout(() => { nomeEl.style.borderColor = ""; }, 3000);
+      } else if (!whatsapp && whatsEl) {
+        whatsEl.focus();
+        whatsEl.style.borderColor = "#ff4d4d";
+        setTimeout(() => { whatsEl.style.borderColor = ""; }, 3000);
+      }
       return;
     }
 
-    const senhaInput = document.getElementById("rev-senha").value.trim();
+    let senhaInput = document.getElementById("rev-senha") ? document.getElementById("rev-senha").value.trim() : "";
     if (!editId && !senhaInput) {
-      this.toast("Por favor, defina uma senha de acesso para a revendedora.", "warning");
-      return;
+      senhaInput = "Conecta@123";
     }
 
     const regexSenha = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%&*(),.?":{}|<>]).{8,}$/;
     if (senhaInput && !regexSenha.test(senhaInput)) {
-      this.toast("A senha deve conter pelo menos 8 caracteres, incluindo pelo menos uma letra maiúscula, uma letra minúscula, um número e um caractere especial (!@#$%&*(),.?\":{}|<>).", "warning");
+      this.toast("A senha deve conter pelo menos 8 caracteres, incluindo letra maiúscula, minúscula, número e caractere especial.", "warning");
+      const senhaEl = document.getElementById("rev-senha");
+      if (senhaEl) {
+        senhaEl.focus();
+        senhaEl.style.borderColor = "#ff4d4d";
+        setTimeout(() => { senhaEl.style.borderColor = ""; }, 3000);
+      }
       return;
     }
 
     // Novos campos adicionados
-    const tipoComissao = document.getElementById("rev-tipo-comissao").value;
-    const metaUnicaValor = parseFloat(document.getElementById("rev-meta-valor").value) || 0;
-    const metaUnicaTipoBonus = document.getElementById("rev-meta-bonus-tipo").value;
-    const metaUnicaBonus = parseFloat(document.getElementById("rev-meta-bonus").value) || 0;
-    const baseCalculo = document.getElementById("rev-base-calculo").value;
-    const regraPerda = document.getElementById("rev-regra-perda").value;
-    const limiteIsencaoPerda = parseInt(document.getElementById("rev-limite-isencao").value) || 0;
-    const periodoAcumulo = document.getElementById("rev-periodo-acumulo").value;
+    const tipoComissao = document.getElementById("rev-tipo-comissao")?.value || "FIXA";
+    const metaUnicaValor = parseFloat(document.getElementById("rev-meta-valor")?.value) || 0;
+    const metaUnicaTipoBonus = document.getElementById("rev-meta-bonus-tipo")?.value || "PERCENTUAL";
+    const metaUnicaBonus = parseFloat(document.getElementById("rev-meta-bonus")?.value) || 0;
+    const baseCalculo = document.getElementById("rev-base-calculo")?.value || "BRUTO";
+    const regraPerda = document.getElementById("rev-regra-perda")?.value || "VALOR_VENDA";
+    const limiteIsencaoPerda = parseInt(document.getElementById("rev-limite-isencao")?.value) || 0;
+    const periodoAcumulo = document.getElementById("rev-periodo-acumulo")?.value || "MANUAL";
 
     try {
       if (editId) {
@@ -3278,7 +3462,7 @@ const app = {
       this.renderizarRevendedoras();
       this.renderizarDashboard();
       
-      document.getElementById("modal-revendedora").classList.remove("active");
+      this.fecharModalRevendedora();
       
       if (editId) {
         this.toast("Cadastro de revendedora atualizado com sucesso!", "success");
@@ -5018,6 +5202,14 @@ const app = {
   },
 
   mudarSubAbaRevendedora: function(aba) {
+    if (aba === "termos") {
+      const temAcesso = this.validarAcessoRecurso('termos-maleta');
+      if (!temAcesso) return;
+    } else if (aba === "documentos") {
+      const temAcesso = this.validarAcessoRecurso('cofre-virtual');
+      if (!temAcesso) return;
+    }
+
     // Esconde todas as sub-abas da revendedora
     document.getElementById("sub-aba-rev-maleta").style.display = "none";
     document.getElementById("sub-aba-rev-historico").style.display = "none";
@@ -5121,15 +5313,23 @@ const app = {
       const vendasConsolidadas = [];
       
       vendasDiretas.forEach(v => {
+        const qtd = Number(v.quantidade) || 1;
+        const totalVenda = Number(v.preco) || 0;
+        const desc = Number(v.desconto) || 0;
+        const precoBrutoUnit = qtd > 0 ? (totalVenda + desc) / qtd : totalVenda;
+
         vendasConsolidadas.push({
           id: v.id,
           data: v.data,
           tipo: 'direta',
           nomeProduto: v.nome,
           codigoProduto: v.codigo,
-          quantidade: 1,
-          precoVenda: v.preco,
-          total: v.preco,
+          quantidade: qtd,
+          precoVenda: precoBrutoUnit,
+          total: totalVenda,
+          desconto: desc,
+          motivoDesconto: v.motivoDesconto || '',
+          formaPagamento: v.formaPagamento || 'Pix',
           comissao: 0,
           vendedor: 'Conecta Joias (Direta)',
           contato: v.whatsappCliente || '—',
@@ -6054,379 +6254,7 @@ const app = {
     }
   },
 
-  subAbaNFAtiva: "pendentes",
-  mudarAbaNF: function(aba) {
-    this.subAbaNFAtiva = aba;
-    document.getElementById("btn-nf-pendentes").classList.remove("active");
-    document.getElementById("btn-nf-emitidas").classList.remove("active");
-    document.getElementById("painel-nf-pendentes").style.display = "none";
-    document.getElementById("painel-nf-emitidas").style.display = "none";
 
-    if (aba === "pendentes") {
-      document.getElementById("btn-nf-pendentes").classList.add("active");
-      document.getElementById("painel-nf-pendentes").style.display = "block";
-    } else {
-      document.getElementById("btn-nf-emitidas").classList.add("active");
-      document.getElementById("painel-nf-emitidas").style.display = "block";
-    }
-    this.carregarNotasFiscais();
-  },
-
-  carregarNotasFiscais: async function() {
-    const tbodyPendentes = document.getElementById("tbody-nf-pendentes");
-    const tbodyEmitidas = document.getElementById("tbody-nf-emitidas");
-
-    try {
-      // Faturamentos fictícios baseados em acertos passados e vendas concluídas
-      let acertosCompletos = [];
-      const revendedoras = Array.isArray(this.state.revendedoras) ? this.state.revendedoras : [];
-
-      revendedoras.forEach(r => {
-        if (r.historico && Array.isArray(r.historico)) {
-          r.historico.forEach((h, idx) => {
-            acertosCompletos.push({
-              id: `acerto-${r.id}-${idx}`,
-              data: h.data,
-              tipo: "Acerto de Contas",
-              destinatario: r.nome,
-              cpf: r.documentoCpf || "000.000.000-00",
-              valorTotal: h.faturamentoBruto,
-              consignado: h.totalConsignada,
-              vendido: h.totalVendida,
-              comissao: h.comissaoPaga,
-              itensDesc: `${h.totalVendida} peças acertadas`
-            });
-          });
-        }
-      });
-
-      // Guardar as notas já emitidas no localStorage para persistência
-      let nfs = JSON.parse(localStorage.getItem("conectajoias_nfe_emitidas") || "[]");
-
-      // Notas pendentes: acertos que não estão na lista de nfs
-      let pendentes = acertosCompletos.filter(ac => !nfs.some(nf => nf.idOrigem === ac.id));
-
-      // Renderiza Pendentes
-      if (tbodyPendentes) {
-        if (pendentes.length === 0) {
-          tbodyPendentes.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 1.5rem;">Nenhum faturamento aguardando emissão.</td></tr>`;
-        } else {
-          tbodyPendentes.innerHTML = pendentes.map(p => `
-            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-              <td style="padding: 12px;">${new Date(p.data).toLocaleDateString('pt-BR')}</td>
-              <td style="padding: 12px; font-weight: bold; color: var(--gold-light);">${p.tipo}</td>
-              <td style="padding: 12px;">${p.destinatario}</td>
-              <td style="padding: 12px; font-weight: bold;">R$ ${p.valorTotal.toFixed(2).replace(".", ",")}</td>
-              <td style="padding: 12px; color: var(--warning);"><i class="fa-solid fa-triangle-exclamation"></i> Não Emitida</td>
-              <td style="padding: 12px;">
-                <button class="btn-gold" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="app.emitirNotaFiscal('${p.id}')">
-                  <i class="fa-solid fa-file-invoice"></i> Emitir NF-e
-                </button>
-              </td>
-            </tr>
-          `).join("");
-        }
-      }
-
-      // Renderiza Emitidas
-      if (tbodyEmitidas) {
-        if (nfs.length === 0) {
-          tbodyEmitidas.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 1.5rem;">Nenhuma nota fiscal emitida ainda.</td></tr>`;
-        } else {
-          tbodyEmitidas.innerHTML = nfs.map(n => `
-            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-              <td style="padding: 12px;">${new Date(n.dataEmissao).toLocaleDateString('pt-BR')}</td>
-              <td style="padding: 12px; font-family: monospace; font-size: 0.8rem; color: var(--gold-primary);">${n.chave}</td>
-              <td style="padding: 12px;">${n.destinatario}</td>
-              <td style="padding: 12px; font-weight: bold;">R$ ${n.valorTotal.toFixed(2).replace(".", ",")}</td>
-              <td style="padding: 12px; color: #81c784;">Modelo 55 (NF-e)</td>
-              <td style="padding: 12px; display: flex; gap: 0.5rem;">
-                <button class="btn-outline-gold" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="app.visualizarDANFE('${n.id}')">
-                  <i class="fa-solid fa-eye"></i> Ver DANFE
-                </button>
-              </td>
-            </tr>
-          `).join("");
-        }
-      }
-    } catch (err) {
-      console.error("Erro ao carregar notas fiscais:", err);
-      if (tbodyPendentes) {
-        tbodyPendentes.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 1.5rem;">Erro ao carregar faturamentos pendentes.</td></tr>`;
-      }
-      if (tbodyEmitidas) {
-        tbodyEmitidas.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 1.5rem;">Erro ao carregar notas emitidas.</td></tr>`;
-      }
-      this.toast("Erro ao processar faturamento para Notas Fiscais: " + err.message, "error");
-    }
-  },
-
-  emitirNotaFiscal: async function(faturamentoId) {
-    let acertosCompletos = [];
-    this.state.revendedoras.forEach(r => {
-      if (r.historico && Array.isArray(r.historico)) {
-        r.historico.forEach((h, idx) => {
-          acertosCompletos.push({
-            id: `acerto-${r.id}-${idx}`,
-            data: h.data,
-            tipo: "Acerto de Contas",
-            destinatario: r.nome,
-            cpf: r.documentoCpf || "000.000.000-00",
-            valorTotal: h.faturamentoBruto,
-            consignado: h.totalConsignada,
-            vendido: h.totalVendida,
-            comissao: h.comissaoPaga,
-            itensDesc: `${h.totalVendida} peças acertadas`
-          });
-        });
-      }
-    });
-
-    const fat = acertosCompletos.find(f => f.id === faturamentoId);
-    if (!fat) return;
-
-    // Simulação visual de emissão na SEFAZ
-    const backdrop = document.createElement("div");
-    backdrop.className = "modal-backdrop active";
-    backdrop.style.zIndex = 10000;
-    backdrop.innerHTML = `
-      <div class="modal-card" style="max-width: 450px; text-align: center; padding: 2rem; background: var(--bg-card); border: var(--border-gold); border-radius: var(--radius-lg);">
-        <i class="fa-solid fa-server fa-spin" style="font-size: 3rem; color: var(--gold-primary); margin-bottom: 1.5rem;"></i>
-        <h3 style="font-family: var(--font-title); color: var(--gold-light); margin-bottom: 0.5rem;">Processando Transmissão</h3>
-        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1rem;">Conectando com o servidor da SEFAZ autorizadora...</p>
-        <div style="width: 100%; height: 6px; background: #222; border-radius: 3px; overflow: hidden; margin-top: 1rem;">
-          <div id="sefaz-progress" style="width: 0%; height: 100%; background: var(--gold-gradient); border-radius: 3px; transition: width 0.3s ease;"></div>
-        </div>
-        <span id="sefaz-status" style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 0.5rem;">Assinando documento digitalmente...</span>
-      </div>
-    `;
-    document.body.appendChild(backdrop);
-
-    const progress = backdrop.querySelector("#sefaz-progress");
-    const status = backdrop.querySelector("#sefaz-status");
-
-    setTimeout(() => { progress.style.width = "30%"; status.innerText = "Validando dados fiscais do destinatário..."; }, 600);
-    setTimeout(() => { progress.style.width = "65%"; status.innerText = "Transmitindo XML de lote para a SEFAZ São Paulo..."; }, 1200);
-    setTimeout(() => { progress.style.width = "90%"; status.innerText = "Aguardando autorização de uso..."; }, 1800);
-    
-    setTimeout(async () => {
-      progress.style.width = "100%"; 
-      status.innerText = "Autorização de Uso concedida!"; 
-
-      let nfs = JSON.parse(localStorage.getItem("conectajoias_nfe_emitidas") || "[]");
-      const numNota = Math.floor(100000 + Math.random() * 900000);
-      const chaveAcesso = "352606" + "12345678000199" + "55" + "001" + numNota.toString().padStart(9, "0") + "1" + Math.floor(100000000 + Math.random() * 900000000).toString();
-
-      const novaNota = {
-        id: `nf-${Date.now()}`,
-        idOrigem: fat.id,
-        dataEmissao: new Date().toISOString(),
-        chave: chaveAcesso,
-        destinatario: fat.destinatario,
-        cpf: fat.cpf,
-        valorTotal: fat.valorTotal,
-        numNota,
-        itensDesc: fat.itensDesc
-      };
-
-      nfs.push(novaNota);
-      localStorage.setItem("conectajoias_nfe_emitidas", JSON.stringify(nfs));
-
-      backdrop.remove();
-      this.toast(`Nota Fiscal Nº ${numNota} autorizada e emitida com sucesso!`, "success");
-      this.carregarNotasFiscais();
-    }, 2500);
-  },
-
-  visualizarDANFE: function(notaId) {
-    let nfs = JSON.parse(localStorage.getItem("conectajoias_nfe_emitidas") || "[]");
-    const nf = nfs.find(n => n.id === notaId);
-    if (!nf) return;
-
-    document.getElementById("danfe-chave").innerText = nf.chave.replace(/(.{4})/g, '$1 ');
-    document.getElementById("danfe-dest-nome").innerText = nf.destinatario.toUpperCase();
-    document.getElementById("danfe-dest-cpf").innerText = nf.cpf;
-    document.getElementById("danfe-data-emissao").innerText = new Date(nf.dataEmissao).toLocaleDateString('pt-BR');
-    document.getElementById("danfe-valor-total").innerText = `R$ ${nf.valorTotal.toFixed(2).replace(".", ",")}`;
-
-    const tbody = document.getElementById("danfe-itens-tbody");
-    tbody.innerHTML = `
-      <tr>
-        <td style="padding: 5px 0;">001</td>
-        <td style="padding: 5px 0;">COMISSAO / ACERTO DE CONSIGNACAO DE SEMIJOIAS - ${nf.itensDesc.toUpperCase()}</td>
-        <td style="padding: 5px 0; text-align: center;">1</td>
-        <td style="padding: 5px 0;">R$ ${nf.valorTotal.toFixed(2).replace(".", ",")}</td>
-        <td style="padding: 5px 0; text-align: right;">R$ ${nf.valorTotal.toFixed(2).replace(".", ",")}</td>
-      </tr>
-    `;
-
-    const modal = document.getElementById("modal-danfe");
-    modal.style.display = "flex";
-    modal.classList.add("active");
-
-    document.getElementById("btn-close-modal-danfe").onclick = () => {
-      modal.style.display = "none";
-      modal.classList.remove("active");
-    };
-  },
-
-  carregarCentralWhatsApp: async function() {
-    const tbody = document.getElementById("tbody-whatsapp-fila");
-    if (!tbody) return;
-
-    try {
-      let fila = [];
-      if (this.state.token && !this.state.token.startsWith("mock_")) {
-        fila = await this.requisitarAPI("/whatsapp/fila");
-      } else {
-        fila = JSON.parse(localStorage.getItem("conectajoias_whatsapp_mock") || "[]");
-      }
-
-      if (fila.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 1.5rem;">Nenhuma notificação na fila do WhatsApp.</td></tr>`;
-      } else {
-        tbody.innerHTML = fila.map(m => {
-          const statusCor = m.status === "PENDENTE" ? "var(--warning)" : "#81c784";
-          const statusTxt = m.status === "PENDENTE" ? "Pendente" : "Enviado";
-          
-          let acaoBtn = "";
-          if (m.status === "PENDENTE") {
-            acaoBtn = `
-              <div style="display: flex; gap: 0.4rem; align-items: center;">
-                <button class="btn-gold" style="padding: 0.35rem 0.7rem; font-size: 0.8rem; background: linear-gradient(135deg, #2e7d32, #43a047); border-color: #43a047; color: white; display: inline-flex; align-items: center; gap: 4px;" onclick="app.dispararMensagemFila('${m.id}', '${m.numero}', '${encodeURIComponent(m.mensagem)}')">
-                  <i class="fa-brands fa-whatsapp"></i> Disparar
-                </button>
-                <button class="btn-outline-gold" style="padding: 0.35rem; font-size: 0.8rem; min-width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;" title="Editar Mensagem" onclick="app.abrirEditarWhats('${m.id}')">
-                  <i class="fa-solid fa-pen"></i>
-                </button>
-              </div>
-            `;
-          } else {
-            acaoBtn = `
-              <div style="display: flex; gap: 0.4rem; align-items: center;">
-                <span style="font-size: 0.8rem; color: var(--text-muted); display: inline-flex; align-items: center; gap: 3px; margin-right: 4px;"><i class="fa-solid fa-circle-check" style="color: #81c784;"></i> Disparado</span>
-                <button class="btn-outline-gold" style="padding: 0.35rem 0.6rem; font-size: 0.78rem; display: inline-flex; align-items: center; gap: 3px;" onclick="app.abrirEditarWhats('${m.id}')">
-                  <i class="fa-solid fa-pen-to-square"></i> Editar / Reenviar
-                </button>
-              </div>
-            `;
-          }
-
-          return `
-            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-              <td style="padding: 12px; font-size: 0.8rem; color: var(--text-secondary);">${new Date(m.createdAt).toLocaleString('pt-BR')}</td>
-              <td style="padding: 12px; font-weight: bold;">${m.numero}</td>
-              <td style="padding: 12px; color: var(--gold-light); font-size: 0.85rem;">${m.tipo}</td>
-              <td style="padding: 12px; max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${m.mensagem}">${m.mensagem}</td>
-              <td style="padding: 12px; color: ${statusCor}; font-weight: 500;">${statusTxt}</td>
-              <td style="padding: 12px;">${acaoBtn}</td>
-            </tr>
-          `;
-        }).join("");
-      }
-    } catch (error) {
-      console.error(error);
-      this.toast("Erro ao carregar fila do WhatsApp: " + error.message, "error");
-    }
-  },
-
-  dispararMensagemFila: async function(id, numero, msgEnc) {
-    const msg = decodeURIComponent(msgEnc);
-    const phoneClean = numero.replace(/\D/g, "");
-    const waUrl = `https://api.whatsapp.com/send?phone=55${phoneClean}&text=${encodeURIComponent(msg)}`;
-    window.open(waUrl, "_blank");
-
-    try {
-      if (this.state.token && !this.state.token.startsWith("mock_")) {
-        await this.requisitarAPI(`/whatsapp/enviar/${id}`, "POST");
-      } else {
-        let mockFila = JSON.parse(localStorage.getItem("conectajoias_whatsapp_mock") || "[]");
-        const foundIdx = mockFila.findIndex(m => m.id === id);
-        if (foundIdx !== -1) {
-          mockFila[foundIdx].status = "ENVIADO";
-          localStorage.setItem("conectajoias_whatsapp_mock", JSON.stringify(mockFila));
-        }
-      }
-      this.toast("Mensagem marcada como disparada!", "success");
-      this.carregarCentralWhatsApp();
-    } catch (e) {
-      this.toast("Erro ao marcar envio no servidor: " + e.message, "error");
-    }
-  },
-
-  abrirEditarWhats: async function(id) {
-    let item = null;
-    if (this.state.token && !this.state.token.startsWith("mock_")) {
-      try {
-        const fila = await this.requisitarAPI("/whatsapp/fila");
-        item = fila.find(m => m.id === id);
-      } catch (e) {
-        console.error("Erro ao obter mensagem da API:", e);
-      }
-    }
-    
-    if (!item) {
-      const mockFila = JSON.parse(localStorage.getItem("conectajoias_whatsapp_mock") || "[]");
-      item = mockFila.find(m => m.id === id);
-    }
-
-    if (!item) {
-      this.toast("Mensagem não encontrada.", "error");
-      return;
-    }
-
-    document.getElementById("edit-whats-id").value = item.id;
-    document.getElementById("edit-whats-numero").value = item.numero || "";
-    document.getElementById("edit-whats-mensagem").value = item.mensagem || "";
-    
-    // Aplicar máscara
-    const numInput = document.getElementById("edit-whats-numero");
-    if (numInput) this.aplicarMascaraWhatsApp(numInput);
-
-    document.getElementById("modal-editar-whats").classList.add("active");
-  },
-
-  fecharEditarWhats: function() {
-    document.getElementById("modal-editar-whats").classList.remove("active");
-  },
-
-  salvarEditarWhats: async function() {
-    const id = document.getElementById("edit-whats-id").value;
-    const numero = document.getElementById("edit-whats-numero").value.trim();
-    const mensagem = document.getElementById("edit-whats-mensagem").value.trim();
-
-    if (!numero || !mensagem) {
-      this.toast("Por favor, preencha o número e a mensagem.", "warning");
-      return;
-    }
-
-    try {
-      if (this.state.token && !this.state.token.startsWith("mock_")) {
-        await this.requisitarAPI(`/whatsapp/fila/${id}`, "PUT", { numero, mensagem });
-      } else {
-        let mockFila = JSON.parse(localStorage.getItem("conectajoias_whatsapp_mock") || "[]");
-        const foundIdx = mockFila.findIndex(m => m.id === id);
-        if (foundIdx !== -1) {
-          mockFila[foundIdx].numero = numero;
-          mockFila[foundIdx].mensagem = mensagem;
-          localStorage.setItem("conectajoias_whatsapp_mock", JSON.stringify(mockFila));
-        }
-      }
-
-      this.toast("Mensagem salva na fila!", "success");
-      this.fecharEditarWhats();
-      this.carregarCentralWhatsApp();
-      
-      // Auto-dispara a mensagem recém-salva após fechar o modal
-      setTimeout(() => {
-        this.dispararMensagemFila(id, numero, encodeURIComponent(mensagem));
-      }, 500);
-
-    } catch (e) {
-      console.error(e);
-      this.toast("Erro ao salvar mensagem: " + e.message, "error");
-    }
-  },
 
   carregarTreinamentosAdmin: async function() {
     const tbody = document.getElementById("tbody-admin-treinamentos");
@@ -6782,7 +6610,11 @@ const app = {
   abrirOnboardingWizard: function() {
     this.wizardStep = 1;
     this.atualizarPassoWizard();
-    document.getElementById("modal-onboarding-wizard").style.display = "flex";
+    const modal = document.getElementById("modal-onboarding-wizard");
+    if (modal) {
+      modal.style.display = "flex";
+      modal.classList.add("active");
+    }
   },
 
   atualizarPassoWizard: function() {
@@ -6901,7 +6733,11 @@ const app = {
         if (response.ok) {
           const configSalva = await response.json();
           this.aplicarConfiguracoes(configSalva);
-          document.getElementById("modal-onboarding-wizard").style.display = "none";
+          const wzModal = document.getElementById("modal-onboarding-wizard");
+          if (wzModal) {
+            wzModal.style.display = "none";
+            wzModal.classList.remove("active");
+          }
           this.toast("Sua loja foi personalizada com sucesso! ✨ Recomendamos recarregar para aplicar o tema.", "success");
         } else {
           const err = await response.json();
@@ -7034,16 +6870,219 @@ const app = {
         }
       });
     } catch (e) {
-     verificarPlanoAtivoAntesDeCriar: function(acaoCallback) {
-    const statusPlano = (this.state.loja && this.state.loja.statusPlano) || localStorage.getItem("conectajoias_status_plano") || "PENDENTE";
-    const isSuperAdmin = this.state.usuarioLogado && this.state.usuarioLogado.role === "SuperAdmin";
+      console.warn("Erro ao aplicar ordem dos widgets:", e);
+    }
+  },
+
+  // Validação central de recursos do plano SaaS
+  validarAcessoRecurso: function(recurso, exibirModal = true) {
+    if (!this.state.usuarioLogado) return true;
     
-    if (isSuperAdmin) {
-      if (typeof acaoCallback === "function") acaoCallback();
-      return true;
+    // SuperAdmin tem acesso irrestrito
+    if (this.state.usuarioLogado.role === 'SuperAdmin') return true;
+    
+    const plano = (this.state.usuarioLogado.planoLoja || 'BASICO').toUpperCase();
+    
+    const regras = {
+      'importar-excel': ['BRONZE', 'GOLD', 'PLATINUM'],
+      'links-pagamento': ['BRONZE', 'GOLD', 'PLATINUM'],
+      'dre': ['GOLD', 'PLATINUM'],
+      'termos-maleta': ['GOLD', 'PLATINUM'],
+      'cofre-virtual': ['GOLD', 'PLATINUM']
+    };
+    
+    const planosPermitidos = regras[recurso];
+    if (planosPermitidos && !planosPermitidos.includes(plano)) {
+      if (!exibirModal) return false;
+
+      let planoRequerido = planosPermitidos[0];
+      
+      const descricoes = {
+        'importar-excel': {
+          nome: 'Importação em Massa via Excel',
+          desc: 'A importação de joias e consultoras via planilha Excel está disponível a partir do plano <strong>Bronze</strong>. Faça o upgrade agora para economizar horas de digitação manual!',
+          plano: 'BRONZE'
+        },
+        'links-pagamento': {
+          nome: 'Links de Pagamento',
+          desc: 'Gere links de pagamento integrados (PIX, boleto ou cartão) e envie para suas clientes. O status compensa automaticamente no caixa. Disponível a partir do plano <strong>Bronze</strong>.',
+          plano: 'BRONZE'
+        },
+        'dre': {
+          nome: 'Demonstrativo do Resultado do Exercício (DRE)',
+          desc: 'Monitore a saúde financeira do seu negócio (faturamento, custos, comissões e lucro líquido). Disponível nos planos <strong>Gold</strong> e <strong>Platinum</strong>.',
+          plano: 'GOLD'
+        },
+        'termos-maleta': {
+          nome: 'Termos de Maleta Digitais',
+          desc: 'Gere termos de consignação e envie para assinatura digital direta das suas consultoras. Disponível nos planos <strong>Gold</strong> e <strong>Platinum</strong>.',
+          plano: 'GOLD'
+        },
+        'cofre-virtual': {
+          nome: 'Cofre Virtual de Documentos',
+          desc: 'Armazene e organize com total segurança os documentos digitalizados (RG, residência) de suas consultoras. Disponível nos planos <strong>Gold</strong> e <strong>Platinum</strong>.',
+          plano: 'GOLD'
+        }
+      };
+
+      const info = descricoes[recurso] || {
+        nome: recurso,
+        desc: `Este recurso está disponível a partir do plano ${planoRequerido}.`,
+        plano: planoRequerido
+      };
+
+      this.exibirAvisoUpgradePlano(info.nome, info.desc, info.plano);
+      return false;
+    }
+    
+    return true;
+  },
+
+  exibirAvisoUpgradePlano: function(titulo, mensagem, planoRequerido = 'GOLD') {
+    // Remove modal anterior se já existir
+    const existente = document.getElementById("modal-aviso-upgrade");
+    if (existente) existente.remove();
+
+    const backdrop = document.createElement("div");
+    backdrop.className = "modal-backdrop active";
+    backdrop.id = "modal-aviso-upgrade";
+    backdrop.style.display = "flex";
+    backdrop.style.zIndex = "10000";
+
+    backdrop.innerHTML = `
+      <div class="modal-card" style="width: 450px; max-width: 95%; text-align: center; padding: 2.2rem; background: var(--bg-card); border: 1px solid rgba(212,175,55,0.25); border-radius: var(--radius-md); box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+        <div style="margin-bottom: 1.5rem;">
+          <i class="fa-solid fa-crown" style="font-size: 3.8rem; color: var(--gold-primary); filter: drop-shadow(0 0 12px rgba(212,175,55,0.45));"></i>
+        </div>
+        <h3 style="font-family: var(--font-title); color: var(--gold-light); font-size: 1.5rem; margin-bottom: 0.8rem; letter-spacing: 0.5px;">
+          Upgrade de Plano Requerido
+        </h3>
+        <h4 style="color: var(--text-primary); font-size: 1.1rem; margin-bottom: 1.2rem; font-weight: 600;">
+          Recurso: ${titulo}
+        </h4>
+        <p style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6; margin-bottom: 2rem;">
+          ${mensagem}
+        </p>
+        <div style="display: flex; gap: 1rem; justify-content: center;">
+          <button class="btn btn-outline" onclick="document.getElementById('modal-aviso-upgrade').remove()" style="padding: 0.6rem 1.4rem; font-size: 0.85rem; border-color: rgba(255,255,255,0.15); color: var(--text-secondary); border-radius: var(--radius-sm); cursor: pointer; background: transparent;">
+            Voltar
+          </button>
+          <button class="btn btn-gold" onclick="document.getElementById('modal-aviso-upgrade').remove(); app.navegarParaAba('meu-plano-saas');" style="padding: 0.6rem 1.6rem; font-size: 0.85rem; border-radius: var(--radius-sm); cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem;">
+            Ver Planos <i class="fa-solid fa-arrow-right"></i>
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(backdrop);
+  },
+
+  atualizarCadeadosUI: function() {
+    if (!this.state.usuarioLogado) return;
+    
+    const plano = (this.state.usuarioLogado.planoLoja || 'BASICO').toUpperCase();
+    const isSuperAdmin = this.state.usuarioLogado.role === 'SuperAdmin';
+    
+    // 1. Sidebar Tabs
+    const abas = {
+      'planilhas': 'importar-excel',
+      'notas-fiscais': 'links-pagamento'
+    };
+    
+    for (const [tabId, recurso] of Object.entries(abas)) {
+      const el = document.querySelector(`.nav-item[data-target="${tabId}"]`);
+      if (el) {
+        const temAcesso = isSuperAdmin || this.validarAcessoRecurso(recurso, false);
+        if (!temAcesso) {
+          el.classList.add("locked");
+        } else {
+          el.classList.remove("locked");
+        }
+      }
+    }
+    
+    // 2. Botões específicos na interface (Importar Excel no Estoque, etc.)
+    const btnImportarExcel = document.getElementById("btn-open-import-modal"); // se houver
+    if (btnImportarExcel) {
+      const temAcessoExcel = isSuperAdmin || this.validarAcessoRecurso('importar-excel', false);
+      if (!temAcessoExcel) {
+        btnImportarExcel.classList.add("btn-locked");
+      } else {
+        btnImportarExcel.classList.remove("btn-locked");
+      }
     }
 
-    if (statusPlano === "ATIVO" && !this.state.excedeuCota) {
+    // 3. Sub-abas de Consultora (Termos de Maleta e Cofre Virtual)
+    const btnSubtabTermos = document.getElementById("btn-subtab-termos");
+    if (btnSubtabTermos) {
+      const temAcessoTermos = isSuperAdmin || this.validarAcessoRecurso('termos-maleta', false);
+      if (!temAcessoTermos) {
+        btnSubtabTermos.innerHTML = '<i class="fa-solid fa-file-contract"></i> Termos Maleta 🔒';
+      } else {
+        btnSubtabTermos.innerHTML = '<i class="fa-solid fa-file-contract"></i> Termos Maleta';
+      }
+    }
+    
+    const btnSubtabDocumentos = document.getElementById("btn-subtab-documentos");
+    if (btnSubtabDocumentos) {
+      const temAcessoDocs = isSuperAdmin || this.validarAcessoRecurso('cofre-virtual', false);
+      if (!temAcessoDocs) {
+        btnSubtabDocumentos.innerHTML = '<i class="fa-solid fa-vault"></i> Cofre Virtual 🔒';
+      } else {
+        btnSubtabDocumentos.innerHTML = '<i class="fa-solid fa-vault"></i> Cofre Virtual';
+      }
+    }
+
+    // 4. Limites de Consultoras / Produtos (Desabilita botões ou adiciona aviso)
+    // Obter limites
+    let limiteConsultoras = 5;
+    if (plano === 'BASICO') limiteConsultoras = 2;
+    else if (plano === 'BRONZE') limiteConsultoras = 5;
+    else if (plano === 'GOLD') limiteConsultoras = 25;
+    else if (plano === 'PLATINUM') limiteConsultoras = 99999;
+
+    const totalConsultoras = this.state.revendedoras.length;
+    const btnCadastrarConsultora = document.getElementById("btn-open-modal-revendedora");
+    if (btnCadastrarConsultora) {
+      if (!isSuperAdmin && totalConsultoras >= limiteConsultoras) {
+        btnCadastrarConsultora.classList.add("btn-locked");
+        btnCadastrarConsultora.title = `Limite do plano atingido (${totalConsultoras}/${limiteConsultoras} revendedoras). Faça upgrade para cadastrar mais.`;
+      } else {
+        btnCadastrarConsultora.classList.remove("btn-locked");
+        btnCadastrarConsultora.removeAttribute("title");
+      }
+    }
+
+    let limiteEstoque = 300;
+    if (plano === 'BASICO') limiteEstoque = 50;
+    else if (plano === 'BRONZE') limiteEstoque = 300;
+    else if (plano === 'GOLD') limiteEstoque = 1500;
+    else if (plano === 'PLATINUM') limiteEstoque = 999999;
+
+    // Calcular estoque atual
+    let totalEstoqueAtual = 0;
+    this.state.produtos.forEach(p => {
+      totalEstoqueAtual += (p.quantidade || 0);
+    });
+
+    const btnCadastrarProduto = document.getElementById("btn-open-modal-produto");
+    if (btnCadastrarProduto) {
+      if (!isSuperAdmin && totalEstoqueAtual >= limiteEstoque) {
+        btnCadastrarProduto.classList.add("btn-locked");
+        btnCadastrarProduto.title = `Limite de estoque do plano atingido (${totalEstoqueAtual}/${limiteEstoque} peças). Faça upgrade para cadastrar mais.`;
+      } else {
+        btnCadastrarProduto.classList.remove("btn-locked");
+        btnCadastrarProduto.removeAttribute("title");
+      }
+    }
+  },
+
+  verificarPlanoAtivoAntesDeCriar: function(acaoCallback) {
+    const statusPlano = ((this.state.loja && this.state.loja.statusPlano) || localStorage.getItem("conectajoias_status_plano") || "ATIVO").toUpperCase();
+    const isSuperAdmin = this.state.usuarioLogado && ["SUPERADMIN", "SUPER_ADMIN", "MANAGER", "ADMIN_LOJA", "ADMIN"].includes((this.state.usuarioLogado.role || "").toUpperCase());
+    const isMock = !this.state.token || this.state.token.startsWith("mock_");
+
+    if (isSuperAdmin || isMock || ["ATIVO", "TRIAL", "PENDENTE", "DEMO", "TESTE", "DEGUSTACAO"].includes(statusPlano)) {
       if (typeof acaoCallback === "function") acaoCallback();
       return true;
     }
@@ -7051,6 +7090,7 @@ const app = {
     const modal = document.getElementById("modal-bloqueio-plano");
     if (modal) {
       modal.style.display = "flex";
+      modal.classList.add("active");
     } else {
       alert("Para realizar esta ação, é necessário assinar um dos nossos planos ativos.");
       const isPagesDir = window.location.pathname.includes("/pages/");
@@ -7066,6 +7106,10 @@ const app = {
         if (res) {
           this.state.statusPlano = res.statusPlano || 'PENDENTE';
           this.state.plano = res.plano || 'BASICO';
+          if (this.state.usuarioLogado) {
+            this.state.usuarioLogado.planoLoja = res.plano || 'BASICO';
+            localStorage.setItem("conectajoias_usuario", JSON.stringify(this.state.usuarioLogado));
+          }
           this.state.excedeuCota = !!res.excedeuCota;
           this.state.downgradePendente = res.downgradePendente || null;
           localStorage.setItem("conectajoias_status_plano", this.state.statusPlano);
@@ -7113,22 +7157,8 @@ const app = {
             const pct = res.uso.limiteEstoque >= 9999 ? 10 : Math.min(100, Math.round((res.uso.totalEstoque / res.uso.limiteEstoque) * 100));
             estoqueBar.style.width = `${pct}%`;
           }
-        }
-      }
-    } catch (e) {
-      console.error("Erro ao carregar dados do plano SaaS:", e);
-    }
-  },>= 999 ? 10 : Math.min(100, Math.round((res.uso.totalConsultoras / res.uso.limiteConsultoras) * 100));
-            consultorasBar.style.width = `${pct}%`;
-          }
 
-          const estoqueTxt = document.getElementById("saas-uso-estoque-txt");
-          const estoqueBar = document.getElementById("saas-bar-estoque");
-          if (estoqueTxt && res.uso) estoqueTxt.innerText = `${res.uso.totalEstoque} / ${res.uso.limiteEstoque >= 9999 ? 'Ilimitado' : res.uso.limiteEstoque}`;
-          if (estoqueBar && res.uso) {
-            const pct = res.uso.limiteEstoque >= 9999 ? 10 : Math.min(100, Math.round((res.uso.totalEstoque / res.uso.limiteEstoque) * 100));
-            estoqueBar.style.width = `${pct}%`;
-          }
+          this.atualizarCadeadosUI();
         }
       }
     } catch (e) {

@@ -160,6 +160,9 @@
           <li class="nav-item" data-target="saas-logs">
             <button id="btn-tab-saas-logs"><i class="fa-solid fa-shield-halved"></i>Logs & Auditoria</button>
           </li>
+          <li class="nav-item" data-target="saas-reportes">
+            <button id="btn-tab-saas-reportes"><i class="fa-solid fa-bug"></i>Bug Reports & Chamados</button>
+          </li>
           <li class="nav-item" data-target="saas-configuracoes">
             <button id="btn-tab-saas-configuracoes"><i class="fa-solid fa-gears"></i>Configurações</button>
           </li>
@@ -526,6 +529,47 @@
               </ul>
               <button class="btn-outline-gold" style="width: 100%; justify-content: center; height: 38px; font-size: 0.8rem;">Alterar Regras</button>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           ABA: BUG REPORTS & CHAMADOS DE ERROS
+           ========================================== -->
+      <section id="saas-reportes" class="app-section" style="display: none;">
+        <div class="section-header">
+          <div class="section-title">
+            <h1><i class="fa-solid fa-bug" style="color: #ffb74d;"></i> Central de Bug Reports & Suporte</h1>
+            <p>Gerencie todos os erros, problemas e sugestões enviados pelos usuários do sistema.</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn-gold" onclick="saasApp.carregarReportesErros()"><i class="fa-solid fa-rotate"></i> Atualizar Lista</button>
+          </div>
+        </div>
+
+        <div class="dashboard-panel" style="width: 100%;">
+          <div class="panel-header">
+            <h2><i class="fa-solid fa-list-check"></i> Chamados de Erros Registrados</h2>
+          </div>
+          <div style="overflow-x: auto; margin-top: 1rem;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Loja / Solicitante</th>
+                  <th>Categoria</th>
+                  <th>Título / Problema</th>
+                  <th>Prioridade</th>
+                  <th>Status</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-saas-reportes">
+                <tr>
+                  <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">Carregando chamados...</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </section>

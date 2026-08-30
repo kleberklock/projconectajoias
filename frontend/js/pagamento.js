@@ -9,9 +9,17 @@ function getApiBaseUrl() {
   const savedUrl = localStorage.getItem("conectajoias_api_url");
   if (savedUrl) return savedUrl;
 
-  const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-  return isLocal ? "http://localhost:5000/api" : `${window.location.origin}/api`;
+  const port = window.location.port;
+  const hostname = window.location.hostname;
+  const isDevPort = ["5500", "8080", "3000", "5501", "5000"].includes(port);
+  const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1" || /^192\.168\./.test(hostname) || /^10\./.test(hostname);
+  if (isDevPort || isLocalHost) {
+    return `${window.location.protocol}//${hostname}:5000/api`;
+  }
+  return `${window.location.origin}/api`;
 }
+
+const API_BASE_URL = getApiBaseUrl();
 
 const checkout = {
   linkId: null,

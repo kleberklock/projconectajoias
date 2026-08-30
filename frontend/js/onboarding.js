@@ -2,9 +2,18 @@
  * Conecta Joias - Cadastro & Onboarding Script
  */
 
-const API_BASE_URL = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" 
-  ? "http://localhost:5000/api" 
-  : `${window.location.origin}/api`;
+const API_BASE_URL = (function() {
+  const saved = localStorage.getItem("conectajoias_api_url");
+  if (saved) return saved;
+  const port = window.location.port;
+  const hostname = window.location.hostname;
+  const isDevPort = ["5500", "8080", "3000", "5501", "5000"].includes(port);
+  const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1" || /^192\.168\./.test(hostname) || /^10\./.test(hostname);
+  if (isDevPort || isLocalHost) {
+    return `${window.location.protocol}//${hostname}:5000/api`;
+  }
+  return `${window.location.origin}/api`;
+})();
 
 const onboarding = {
   currentStep: 1,
@@ -24,6 +33,7 @@ const onboarding = {
       });
       if (response.ok) {
         const config = await response.json();
+        this.config = config;
         this.aplicarConfiguracaoLoja(config);
       }
     } catch (e) {
@@ -166,12 +176,49 @@ const onboarding = {
     }
 
     if (step === 4) {
+      const rgFrenteFile = document.getElementById("rgFrenteFile").files[0];
+      const rgVersoFile = document.getElementById("rgVersoFile").files[0];
+      const cpfFile = document.getElementById("cpfFile").files[0];
       const enderecoFile = document.getElementById("enderecoFile").files[0];
-      if (!enderecoFile) {
-        this.toast("Por favor, anexe o comprovante de residência atual.", "warning");
-        return false;
+      const termoFile = document.getElementById("termoFile").files[0];
+
+      const isFreeTier = this.config && (this.config.plano === 'BASICO' || this.config.plano === 'BRONZE');
+
+      if (!isFreeTier) {
+        if (!rgFrenteFile) {
+          this.toast("Por favor, anexe a foto da Frente do seu RG/CNH.", "warning");
+          return false;
+        }
+        if (!rgVersoFile) {
+          this.toast("Por favor, anexe a foto do Verso do seu RG/CNH.", "warning");
+          return false;
+        }
+        if (!enderecoFile) {
+          this.toast("Por favor, anexe o comprovante de residência atual.", "warning");
+          return false;
+        }
+        if (!termoFile) {
+          this.toast("Por favor, anexe o Termo de Responsabilidade assinado.", "warning");
+          return false;
+        }
       }
-      
+
+      const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+      const arquivos = [
+        { name: "RG Frente", file: rgFrenteFile },
+        { name: "RG Verso", file: rgVersoFile },
+        { name: "CPF", file: cpfFile },
+        { name: "Comprovante de Residência", file: enderecoFile },
+        { name: "Termo de Responsabilidade", file: termoFile }
+      ];
+
+      for (const item of arquivos) {
+        if (item.file && item.file.size > MAX_SIZE) {
+          this.toast(`O arquivo do ${item.name} é muito grande (${(item.file.size / 1024 / 1024).toFixed(2)} MB). O limite máximo permitido é 5 MB.`, "error");
+          return false;
+        }
+      }
+
       const aceiteLgpd = document.getElementById("aceite-termos-lgpd");
       if (aceiteLgpd && !aceiteLgpd.checked) {
         this.toast("Você precisa aceitar os Termos de Uso e a Política de Privacidade (LGPD) para prosseguir.", "warning");
@@ -286,6 +333,16 @@ function atualizarStatusArquivo(input, statusId) {
   const file = input.files[0];
 
   if (file) {
+    const MAX_SIZE = 5 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      onboarding.toast(`O arquivo selecionado é muito grande (${(file.size / 1024 / 1024).toFixed(2)} MB). O limite máximo permitido é 5 MB.`, "error");
+      input.value = ""; // Limpa a seleção
+      statusEl.style.display = "none";
+      box.style.borderColor = "var(--error)";
+      box.style.background = "rgba(244, 67, 54, 0.02)";
+      return;
+    }
+
     statusEl.querySelector(".file-name").innerText = `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
     statusEl.style.display = "flex";
     box.style.borderColor = "#81c784";

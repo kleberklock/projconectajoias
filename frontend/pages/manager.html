@@ -112,7 +112,7 @@
             </div>
             <div id="notif-lista" style="max-height: 400px; overflow-y: auto;">
               <div style="text-align: center; padding: 2.5rem 1rem; color: var(--text-muted);">
-                <i class="fa-solid fa-check-circle" style="font-size: 1.8rem; margin-bottom: 0.6rem; opacity: 0.3; display: block;"></i>
+                <i class="fa-solid fa-circle-check" style="font-size: 1.8rem; margin-bottom: 0.6rem; opacity: 0.3; display: block;"></i>
                 <span style="font-size: 0.85rem;">Nenhuma notificação pendente</span>
               </div>
             </div>
@@ -139,25 +139,25 @@
           <li class="nav-item active" data-target="minha-maleta" id="menu-minha-maleta">
             <button id="btn-tab-minha-maleta"><i class="fa-solid fa-briefcase"></i>Minha Maleta</button>
           </li>
-          <li class="nav-item" data-target="estoque-central">
+          <li class="nav-item" data-target="estoque-central" id="menu-estoque-central">
             <button id="btn-tab-estoque-central"><i class="fa-solid fa-store"></i>Estoque Central</button>
           </li>
-          <li class="nav-item" data-target="clientes">
+          <li class="nav-item" data-target="clientes" id="menu-clientes">
             <button id="btn-tab-clientes"><i class="fa-solid fa-address-book"></i>Meus Clientes</button>
           </li>
           <li class="nav-item" data-target="vendas-geral" id="menu-vendas-geral">
             <button id="btn-tab-vendas-geral"><i class="fa-solid fa-receipt"></i>Minhas Vendas</button>
           </li>
-          <li class="nav-item" data-target="links-pagamento">
+          <li class="nav-item" data-target="links-pagamento" id="menu-links-pagamento">
             <button id="btn-tab-links-pagamento"><i class="fa-solid fa-link"></i>Links de Pagamento</button>
           </li>
-          <li class="nav-item" data-target="termos-maleta">
+          <li class="nav-item" data-target="termos-maleta" id="menu-termos-maleta">
             <button id="btn-tab-termos-maleta"><i class="fa-solid fa-file-contract"></i>Termos de Maleta</button>
           </li>
-          <li class="nav-item" data-target="cofre-virtual">
-            <button id="btn-tab-cofre-virtual"><i class="fa-solid fa-vault"></i>Cofre Virtual</button>
+          <li class="nav-item" data-target="cofre-virtual" id="menu-cofre-virtual">
+            <button id="btn-tab-cofre-virtual"><i class="fa-solid fa-shield-halved"></i>Cofre Virtual</button>
           </li>
-          <li class="nav-item" data-target="treinamento-demand">
+          <li class="nav-item" data-target="treinamento-demand" id="menu-treinamentos">
             <button id="btn-tab-treinamentos"><i class="fa-solid fa-graduation-cap"></i>Treinamentos</button>
           </li>
           <li class="nav-item" data-target="meu-plano-saas" id="menu-meu-plano-saas">
@@ -197,10 +197,8 @@
         <a id="btn-assinar-termo-pendente" href="#" class="btn-gold" style="padding: 0.5rem 1rem; font-size: 0.82rem; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;"><i class="fa-solid fa-signature"></i> Assinar Termo Agora</a>
       </div>
 
-
-
-
-           ABA: DASHBOARD (INATIVA PARA REVENDEDORA)
+      <!-- ==========================================
+           ABA: DASHBOARD
            ========================================== -->
       <section id="dashboard" class="app-section">
         <div class="section-header">
@@ -208,7 +206,8 @@
             <h1 id="main-h1">Conecta Joias</h1>
             <p>Seja bem-vinda ao seu centro de gestão e luxo comercial.</p>
           </div>
-          <div class="header-actions">
+          <div class="header-actions" style="display: flex; gap: 0.8rem; align-items: center;">
+            <button class="btn-outline" id="btn-modal-reportar-erro" onclick="document.getElementById('modal-reportar-erro').style.display='flex'" style="color: #ffb74d; border-color: rgba(255, 183, 77, 0.3); font-size: 0.85rem;"><i class="fa-solid fa-bug"></i> Reportar Erro</button>
             <button class="btn-gold" id="btn-quick-sale"><i class="fa-brands fa-whatsapp"></i> Venda Rápida WhatsApp</button>
           </div>
         </div>
@@ -223,7 +222,7 @@
             </div>
           </div>
           <div class="metric-card" id="metric-stock-value">
-            <div class="metric-icon"><i class="fa-solid fa-vault"></i></div>
+            <div class="metric-icon"><i class="fa-solid fa-shield-halved"></i></div>
             <div class="metric-info">
               <h3>Capital em Peças</h3>
               <div class="metric-value" id="val-capital-pecas">R$ 0,00</div>
@@ -243,7 +242,8 @@
               <div class="metric-value" id="val-retorno-estimado">R$ 0,00</div>
             </div>
           </div>
-        </div>
+        <!-- Widget de Aniversariantes do Mês / Dia -->
+        <div id="widget-aniversariantes-container" style="display: none;"></div>
 
         <div class="dashboard-grid">
           <!-- Alertas e Estoque Crítico -->
@@ -321,7 +321,7 @@
         </div>
 
         <!-- Relatório DRE Simplificado -->
-        <div class="dashboard-panel" style="margin-top: 2rem; width: 100%;">
+        <div class="dashboard-panel" id="dashboard-dre-panel" style="margin-top: 2rem; width: 100%;">
           <div class="panel-header">
             <h2><i class="fa-solid fa-calculator"></i> Demonstrativo do Resultado do Exercício (DRE)</h2>
             <div class="dre-filter-container" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
@@ -436,7 +436,7 @@
             <p>Cadastre suas joias brutas, aplique banhos e calcule o markup exato do seu faturamento.</p>
           </div>
           <div class="header-actions">
-            <button class="btn-gold" id="btn-open-modal-produto"><i class="fa-solid fa-plus"></i> Cadastrar Semijoia</button>
+            <button class="btn-gold" id="btn-open-modal-produto" onclick="app.abrirModalProduto()"><i class="fa-solid fa-plus"></i> Cadastrar Joias</button>
           </div>
         </div>
 
@@ -819,7 +819,7 @@
             <p>Monitore suas maletas de semijoias distribuídas e feche acertos de vendas e devoluções com clareza.</p>
           </div>
           <div class="header-actions">
-            <button class="btn-gold" id="btn-open-modal-revendedora"><i class="fa-solid fa-user-plus"></i> Nova Revendedora</button>
+            <button class="btn-gold" id="btn-open-modal-revendedora" onclick="app.abrirModalRevendedora()"><i class="fa-solid fa-user-plus"></i> Nova Revendedora</button>
           </div>
         </div>
 
@@ -852,8 +852,8 @@
                 </p>
               </div>
               <div style="display: flex; gap: 0.5rem;">
-                <button class="btn-gold" id="btn-open-modal-consignar"><i class="fa-solid fa-briefcase"></i> Consignar Peças</button>
-                <button class="btn-outline-gold" id="btn-open-modal-acerto"><i class="fa-solid fa-calculator"></i> Realizar Acerto</button>
+                <button class="btn-gold" id="btn-open-modal-consignar" onclick="app.abrirModalConsignar()"><i class="fa-solid fa-briefcase"></i> Consignar Peças</button>
+                <button class="btn-outline-gold" id="btn-open-modal-acerto" onclick="app.abrirModalAcerto()"><i class="fa-solid fa-calculator"></i> Realizar Acerto</button>
               </div>
             </div>
 
@@ -936,6 +936,7 @@
               <button class="mkt-tab-btn active" id="btn-subtab-maleta" onclick="app.mudarSubAbaRevendedora('maleta')"><i class="fa-solid fa-briefcase"></i> Maleta Atual</button>
               <button class="mkt-tab-btn" id="btn-subtab-vendas-rev" onclick="app.mudarSubAbaRevendedora('vendas')"><i class="fa-solid fa-receipt"></i> Histórico de Vendas</button>
               <button class="mkt-tab-btn" id="btn-subtab-historico" onclick="app.mudarSubAbaRevendedora('historico')"><i class="fa-solid fa-clock-rotate-left"></i> Histórico de Acertos</button>
+              <button class="mkt-tab-btn" id="btn-subtab-cofre" onclick="app.mudarSubAbaRevendedora('cofre')"><i class="fa-solid fa-shield-halved"></i> Cofre Virtual & Termos</button>
             </div>
 
             <!-- Conteúdo Sub-Aba: Maleta Atual -->
@@ -1005,7 +1006,22 @@
                       <td colspan="6" style="text-align: center; color: var(--text-secondary);">Nenhum acerto registrado para esta revendedora.</td>
                     </tr>
                   </tbody>
-                </table>
+              </div>
+            </div>
+
+            <!-- Conteúdo Sub-Aba: Cofre Virtual & Termos -->
+            <div id="sub-aba-rev-cofre" class="sub-aba-rev" style="display: none;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 10px;">
+                <h4 style="font-family: var(--font-title); font-size: 1.15rem; color: var(--gold-light); margin: 0;">Cofre Virtual & Documentos</h4>
+                <button type="button" class="btn-outline-gold" id="btn-solicitar-novo-rg" onclick="app.abrirModalSolicitarNovoRG()" style="padding: 6px 12px; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 6px; background: rgba(244, 67, 54, 0.12); border: 1px solid rgba(244, 67, 54, 0.3); color: #ef5350; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#ef5350'; this.style.color='#fff';" onmouseout="this.style.background='rgba(244, 67, 54, 0.12)'; this.style.color='#ef5350';">
+                  <i class="fa-solid fa-triangle-exclamation"></i> Solicitar Novo RG
+                </button>
+              </div>
+
+              <!-- Grid de Documentos -->
+              <div class="metrics-grid" id="detalhe-documentos-grid" style="grid-template-columns: repeat(2, 1fr); gap: 1.5rem; margin-bottom: 1.5rem;">
+                <!-- Renderizado via JS -->
+                <p style="color: var(--text-muted); font-style: italic;">Carregando documentos...</p>
               </div>
             </div>
             
@@ -1212,7 +1228,7 @@
             <p>Registre as suas clientes, acompanhe datas de aniversário e mantenha o histórico de compras para uma relação mais pessoal e eficaz.</p>
           </div>
           <div class="header-actions">
-            <button class="btn-gold" id="btn-open-modal-cliente"><i class="fa-solid fa-user-plus"></i> Nova Cliente</button>
+            <button class="btn-gold" id="btn-open-modal-cliente" onclick="app.abrirModalCliente()"><i class="fa-solid fa-user-plus"></i> Nova Cliente</button>
           </div>
         </div>
 
@@ -1839,7 +1855,7 @@
                 <span style="font-size: 0.7rem; background: rgba(205, 127, 50, 0.15); color: #cd7f32; padding: 2px 8px; border-radius: 12px; font-weight: bold;">Inicial</span>
               </div>
               <div style="font-size: 1.8rem; font-weight: bold; color: var(--text-primary); margin-bottom: 1rem;">
-                R$ 147<span style="font-size: 0.85rem; color: var(--text-secondary);">/mês</span>
+                R$ 69,90<span style="font-size: 0.85rem; color: var(--text-secondary);">/mês</span>
               </div>
               <ul style="list-style: none; padding: 0; font-size: 0.85rem; color: var(--text-secondary); line-height: 2;">
                 <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Até <strong>5 Consultoras</strong></li>
@@ -1861,7 +1877,7 @@
                 <h3 style="color: var(--gold-primary); font-size: 1.3rem; font-family: var(--font-title);">Plano Gold</h3>
               </div>
               <div style="font-size: 1.8rem; font-weight: bold; color: var(--gold-primary); margin-bottom: 1rem;">
-                R$ 297<span style="font-size: 0.85rem; color: var(--text-secondary);">/mês</span>
+                R$ 99,90<span style="font-size: 0.85rem; color: var(--text-secondary);">/mês</span>
               </div>
               <ul style="list-style: none; padding: 0; font-size: 0.85rem; color: var(--text-secondary); line-height: 2;">
                 <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Até <strong>25 Consultoras</strong></li>
@@ -1884,7 +1900,7 @@
                 <span style="font-size: 0.7rem; background: rgba(255, 255, 255, 0.15); color: #e5e4e2; padding: 2px 8px; border-radius: 12px; font-weight: bold;">Enterprise</span>
               </div>
               <div style="font-size: 1.8rem; font-weight: bold; color: var(--text-primary); margin-bottom: 1rem;">
-                R$ 497<span style="font-size: 0.85rem; color: var(--text-secondary);">/mês</span>
+                R$ 249,90<span style="font-size: 0.85rem; color: var(--text-secondary);">/mês</span>
               </div>
               <ul style="list-style: none; padding: 0; font-size: 0.85rem; color: var(--text-secondary); line-height: 2;">
                 <li><i class="fa-solid fa-star" style="color: var(--gold-primary); margin-right: 6px;"></i> Consultoras <strong>ILIMITADAS</strong></li>
@@ -1918,14 +1934,14 @@
               </div>
               <div style="text-align: right;">
                 <span style="font-size: 0.8rem; color: var(--text-secondary);">Valor Mensal:</span>
-                <div id="modal-saas-plano-valor" style="font-size: 1.4rem; font-weight: bold; color: var(--text-primary);">R$ 297,00</div>
+                <div id="modal-saas-plano-valor" style="font-size: 1.4rem; font-weight: bold; color: var(--text-primary);">R$ 99,90</div>
               </div>
             </div>
           </div>
 
           <!-- Checkout Pro Mercado Pago Direct -->
           <div style="margin-bottom: 1rem;">
-            <button type="button" class="btn-gold" style="width: 100%; padding: 0.8rem; background: linear-gradient(135deg, #009ee3 0%, #007eb5 100%); color: #fff; border: none; font-weight: 700; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem;" onclick="assinarPlano(app.planoSaasSelecionado === 'BRONZE' ? 'Plano Bronze' : (app.planoSaasSelecionado === 'PLATINUM' ? 'Plano Platinum' : 'Plano Gold'), app.planoSaasSelecionado === 'BRONZE' ? 147 : (app.planoSaasSelecionado === 'PLATINUM' ? 497 : 297), event)">
+            <button type="button" class="btn-gold" style="width: 100%; padding: 0.8rem; background: linear-gradient(135deg, #009ee3 0%, #007eb5 100%); color: #fff; border: none; font-weight: 700; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem;" onclick="assinarPlano(app.planoSaasSelecionado === 'BRONZE' ? 'Plano Bronze' : (app.planoSaasSelecionado === 'PLATINUM' ? 'Plano Platinum' : 'Plano Gold'), app.planoSaasSelecionado === 'BRONZE' ? 69.9 : (app.planoSaasSelecionado === 'PLATINUM' ? 249.9 : 99.9), event)">
               <i class="fa-solid fa-hand-holding-dollar"></i> Assinar via Mercado Pago (Checkout Pro)
             </button>
           </div>
@@ -2031,8 +2047,8 @@
   <div class="modal-backdrop" id="modal-produto">
     <div class="modal-card">
       <div class="modal-title-row">
-        <h3>Nova Semijoia</h3>
-        <button class="btn-close-modal" id="btn-close-modal-produto"><i class="fa-solid fa-xmark"></i></button>
+        <h3>Nova Joia</h3>
+        <button class="btn-close-modal" id="btn-close-modal-produto" onclick="app.fecharModalProduto()"><i class="fa-solid fa-xmark"></i></button>
       </div>
 
       <div class="form-grid">
@@ -2076,7 +2092,7 @@
             <label for="prod-bruto">Custo do Bruto (Unitário)</label>
             <div class="input-icon-wrapper">
               <span>R$</span>
-              <input type="number" id="prod-bruto" class="form-control" placeholder="0,00" step="0.01" value="0.00">
+              <input type="number" id="prod-bruto" class="form-control" placeholder="0,00" step="0.01" value="0.00" oninput="app.calcularPrecificacaoDinamicamente()">
             </div>
           </div>
 
@@ -2084,7 +2100,7 @@
             <label for="prod-banho">Custo do Banho (Unitário)</label>
             <div class="input-icon-wrapper">
               <span>R$</span>
-              <input type="number" id="prod-banho" class="form-control" placeholder="0,00" step="0.01" value="0.00">
+              <input type="number" id="prod-banho" class="form-control" placeholder="0,00" step="0.01" value="0.00" oninput="app.calcularPrecificacaoDinamicamente()">
             </div>
           </div>
 
@@ -2092,13 +2108,13 @@
             <label for="prod-liquido">Custo Líquido/Operacional (Unitário)</label>
             <div class="input-icon-wrapper">
               <span>R$</span>
-              <input type="number" id="prod-liquido" class="form-control" placeholder="0,00" step="0.01" value="0.00">
+              <input type="number" id="prod-liquido" class="form-control" placeholder="0,00" step="0.01" value="0.00" oninput="app.calcularPrecificacaoDinamicamente()">
             </div>
           </div>
 
           <div class="form-group">
             <label for="prod-markup">Markup Desejado</label>
-            <input type="number" id="prod-markup" class="form-control" step="0.1" value="3.0">
+            <input type="number" id="prod-markup" class="form-control" step="0.1" value="3.0" oninput="app.calcularPrecificacaoDinamicamente()">
           </div>
 
           <div class="form-group">
@@ -2175,8 +2191,8 @@
       </div>
 
       <div class="modal-footer">
-        <button class="btn-outline-gold" id="btn-cancelar-produto">Cancelar</button>
-        <button class="btn-gold" id="btn-salvar-produto"><i class="fa-solid fa-floppy-disk"></i> Salvar Produto</button>
+        <button class="btn-outline-gold" id="btn-cancelar-produto" onclick="app.fecharModalProduto()">Cancelar</button>
+        <button class="btn-gold" id="btn-salvar-produto" onclick="app.salvarNovoProduto()"><i class="fa-solid fa-floppy-disk"></i> Salvar Produto</button>
       </div>
     </div>
   </div>
@@ -2188,7 +2204,7 @@
     <div class="modal-card" style="width: 540px;">
       <div class="modal-title-row">
         <h3>Nova Revendedora</h3>
-        <button class="btn-close-modal" id="btn-close-modal-revendedora"><i class="fa-solid fa-xmark"></i></button>
+        <button class="btn-close-modal" id="btn-close-modal-revendedora" onclick="app.fecharModalRevendedora()"><i class="fa-solid fa-xmark"></i></button>
       </div>
 
       <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
@@ -2200,9 +2216,51 @@
           <label for="rev-whatsapp">WhatsApp / Celular *</label>
           <input type="text" id="rev-whatsapp" class="form-control" placeholder="Ex: (11) 99999-9999" required>
         </div>
-        <div class="form-group">
+        <div class="form-group" style="grid-column: 1/-1;">
+          <label for="rev-tipo-comissao">Modelo de Comissão</label>
+          <select id="rev-tipo-comissao" class="form-control" style="width: 100%;" onchange="app.ajustarCamposComissaoRev()">
+            <option value="FIXA" selected>Comissão Fixa (%)</option>
+            <option value="PROGRESSIVA">Comissão Progressiva (Por Faixas)</option>
+            <option value="META_UNICA">Meta Única (Bônus por Atingimento)</option>
+          </select>
+        </div>
+        <div class="form-group" id="group-rev-comissao-padrao" style="margin-bottom: 0;">
           <label for="rev-comissao">Comissão (%) *</label>
           <input type="number" id="rev-comissao" class="form-control" value="30" min="0" max="100">
+        </div>
+        <!-- Campos de Meta Única -->
+        <div id="group-rev-meta-unica" style="display: none; flex-direction: column; gap: 0.8rem; grid-column: 1/-1;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label for="rev-meta-valor">Meta de Vendas (R$ Venda Bruta) *</label>
+            <input type="number" id="rev-meta-valor" class="form-control" value="5000" min="0">
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label for="rev-meta-bonus-tipo">Tipo de Bônus da Meta</label>
+              <select id="rev-meta-bonus-tipo" class="form-control" onchange="app.ajustarLabelsMetaRev()">
+                <option value="PERCENTUAL" selected>Soma na Comissão (%)</option>
+                <option value="FIXO">Valor Fixo em Dinheiro (R$)</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label id="lbl-rev-meta-bonus" for="rev-meta-bonus">Bônus da Meta *</label>
+              <input type="number" id="rev-meta-bonus" class="form-control" value="5" min="0">
+            </div>
+          </div>
+        </div>
+        <!-- Seção de Faixas de Comissão -->
+        <div class="form-group" id="group-rev-faixas" style="margin-bottom: 0; display: none; grid-column: 1/-1;">
+          <label style="display: flex; justify-content: space-between; align-items: center; font-weight: 600; margin-bottom: 6px;">
+            Tabela de Faixas Progressivas
+            <button type="button" class="btn-gold" id="btn-add-faixa-ui" onclick="app.adicionarFaixaLinha()" style="padding: 4px 8px; font-size: 0.75rem; margin: 0; cursor: pointer;">
+              <i class="fa-solid fa-plus"></i> Adicionar Faixa
+            </button>
+          </label>
+          <div id="rev-faixas-container" style="max-height: 180px; overflow-y: auto; border: 1px solid rgba(212, 175, 55, 0.2); padding: 8px; border-radius: 6px; background: rgba(0,0,0,0.3);">
+            <div style="color: var(--text-muted); font-size: 0.85rem; text-align: center; padding: 10px;" id="rev-faixas-vazio">
+              Nenhuma faixa cadastrada. Usará a comissão padrão.
+            </div>
+          </div>
         </div>
         <div class="form-group" id="group-rev-senha" style="grid-column: 1/-1;">
           <label for="rev-senha">Senha de Acesso *</label>
@@ -2296,8 +2354,8 @@
       </div>
 
       <div class="modal-footer" style="margin-top:1rem;">
-        <button class="btn-outline-gold" id="btn-cancelar-revendedora">Cancelar</button>
-        <button class="btn-gold" id="btn-salvar-revendedora"><i class="fa-solid fa-floppy-disk"></i> Cadastrar</button>
+        <button class="btn-outline-gold" id="btn-cancelar-revendedora" onclick="app.fecharModalRevendedora()">Cancelar</button>
+        <button class="btn-gold" id="btn-salvar-revendedora" onclick="app.salvarNovaRevendedora()"><i class="fa-solid fa-floppy-disk"></i> Cadastrar</button>
       </div>
     </div>
   </div>
@@ -2313,7 +2371,7 @@
     <div class="modal-card" style="width: 900px; max-width: 95%;">
       <div class="modal-title-row">
         <h3>Consignar Semijoias</h3>
-        <button class="btn-close-modal" id="btn-close-modal-consignar"><i class="fa-solid fa-xmark"></i></button>
+        <button class="btn-close-modal" id="btn-close-modal-consignar" onclick="app.fecharModalConsignar()"><i class="fa-solid fa-xmark"></i></button>
       </div>
       
       <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.9rem;">
@@ -2382,8 +2440,8 @@
       </div>
 
       <div class="modal-footer">
-        <button class="btn-outline-gold" id="btn-cancelar-consignar">Cancelar</button>
-        <button class="btn-gold" id="btn-confirmar-consignar"><i class="fa-solid fa-briefcase"></i> Enviar para Maleta</button>
+        <button class="btn-outline-gold" id="btn-cancelar-consignar" onclick="app.fecharModalConsignar()">Cancelar</button>
+        <button class="btn-gold" id="btn-confirmar-consignar" onclick="app.processarConsignacao()"><i class="fa-solid fa-briefcase"></i> Enviar para Maleta</button>
       </div>
     </div>
   </div>
@@ -2395,7 +2453,7 @@
     <div class="modal-card" style="width: 950px; max-width: 95%;">
       <div class="modal-title-row">
         <h3>Fechamento de Acerto Consignado</h3>
-        <button class="btn-close-modal" id="btn-close-modal-acerto"><i class="fa-solid fa-xmark"></i></button>
+        <button class="btn-close-modal" id="btn-close-modal-acerto" onclick="app.fecharModalAcerto()"><i class="fa-solid fa-xmark"></i></button>
       </div>
 
       <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.9rem;">
@@ -2509,7 +2567,7 @@
             </div>
 
             <div style="display: flex; flex-direction: column; gap: 0.8rem; margin-top: 1.5rem;">
-              <button class="btn-gold" id="btn-finalizar-acerto-whats" style="font-size: 0.85rem; padding: 0.75rem; justify-content: center;">
+              <button class="btn-gold" id="btn-finalizar-acerto-whats" onclick="app.finalizarAcerto(true)" style="font-size: 0.85rem; padding: 0.75rem; justify-content: center;">
                 <i class="fa-brands fa-whatsapp"></i> WhatsApp e Fechar
               </button>
               <button class="btn-outline-gold" id="btn-finalizar-acerto-pdf" onclick="app.imprimirAcerto()" style="font-size: 0.85rem; padding: 0.75rem; justify-content: center;">
@@ -2521,8 +2579,8 @@
       </div>
 
       <div class="modal-footer">
-        <button class="btn-outline-gold" id="btn-cancelar-acerto">Cancelar Fechamento</button>
-        <button class="btn-gold" id="btn-salvar-acerto-apenas"><i class="fa-solid fa-check"></i> Apenas Concluir no Sistema</button>
+        <button class="btn-outline-gold" id="btn-cancelar-acerto" onclick="app.fecharModalAcerto()">Cancelar Fechamento</button>
+        <button class="btn-gold" id="btn-salvar-acerto-apenas" onclick="app.finalizarAcerto(false)"><i class="fa-solid fa-check"></i> Apenas Concluir no Sistema</button>
       </div>
     </div>
   </div>
@@ -2534,7 +2592,7 @@
     <div class="modal-card" style="width: 500px;">
       <div class="modal-title-row">
         <h3>Venda Rápida WhatsApp</h3>
-        <button class="btn-close-modal" id="btn-close-modal-venda-rapida"><i class="fa-solid fa-xmark"></i></button>
+        <button class="btn-close-modal" id="btn-close-modal-venda-rapida" onclick="app.fecharModalVendaRapida()"><i class="fa-solid fa-xmark"></i></button>
       </div>
 
       <div class="form-group">
@@ -2568,8 +2626,8 @@
       </div>
 
       <div class="modal-footer">
-        <button class="btn-outline-gold" id="btn-cancelar-venda-rapida">Cancelar</button>
-        <button class="btn-gold" id="btn-enviar-venda-rapida"><i class="fa-brands fa-whatsapp"></i> Gerar e Enviar</button>
+        <button class="btn-outline-gold" id="btn-cancelar-venda-rapida" onclick="app.fecharModalVendaRapida()">Cancelar</button>
+        <button class="btn-gold" id="btn-enviar-venda-rapida" onclick="app.processarVendaRapidaWhats()"><i class="fa-brands fa-whatsapp"></i> Gerar e Enviar</button>
       </div>
     </div>
   </div>
@@ -2581,7 +2639,7 @@
     <div class="modal-card modal-venda-rev-card">
       <div class="modal-title-row">
         <h3><i class="fa-solid fa-cash-register logo-venda-rev"></i> Registrar Venda</h3>
-        <button class="btn-close-modal" id="btn-close-modal-venda-rev"><i class="fa-solid fa-xmark"></i></button>
+        <button class="btn-close-modal" id="btn-close-modal-venda-rev" onclick="app.fecharModalVendaRev()"><i class="fa-solid fa-xmark"></i></button>
       </div>
 
       <div class="venda-rev-form-container">
@@ -2674,11 +2732,11 @@
       </div>
 
       <div class="modal-footer" style="display: flex; gap: 0.6rem; justify-content: flex-end; width: 100%;">
-        <button class="btn-outline-gold" id="btn-cancelar-venda-rev" style="flex: 1; min-width: 0; padding: 0.6rem 0.5rem; font-size: 0.85rem;">Cancelar</button>
+        <button class="btn-outline-gold" id="btn-cancelar-venda-rev" onclick="app.fecharModalVendaRev()" style="flex: 1; min-width: 0; padding: 0.6rem 0.5rem; font-size: 0.85rem;">Cancelar</button>
         <button class="btn-outline-gold" id="btn-add-carrinho-venda-rev" onclick="app.adicionarAoCarrinho()" style="flex: 1.2; min-width: 0; background: rgba(212,175,55,0.05); color: var(--gold-primary); display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0.6rem 0.5rem; font-size: 0.85rem; border-color: rgba(212,175,55,0.35);">
           <i class="fa-solid fa-cart-plus"></i> + Sacola
         </button>
-        <button class="btn-gold" id="btn-confirmar-venda-rev" style="flex: 1.5; min-width: 0; padding: 0.6rem 0.5rem; font-size: 0.85rem;">
+        <button class="btn-gold" id="btn-confirmar-venda-rev" onclick="app.processarVendaRevendedora()" style="flex: 1.5; min-width: 0; padding: 0.6rem 0.5rem; font-size: 0.85rem;">
           <i class="fa-solid fa-check"></i> Venda Direta
         </button>
       </div>
@@ -2692,7 +2750,7 @@
     <div class="modal-card" style="width: 480px;">
       <div class="modal-title-row">
         <h3 id="modal-cliente-titulo"><i class="fa-solid fa-address-book"></i> Nova Cliente</h3>
-        <button class="btn-close-modal" id="btn-close-modal-cliente"><i class="fa-solid fa-xmark"></i></button>
+        <button class="btn-close-modal" id="btn-close-modal-cliente" onclick="app.fecharModalCliente()"><i class="fa-solid fa-xmark"></i></button>
       </div>
 
       <div class="form-group">
@@ -2716,8 +2774,8 @@
       </div>
 
       <div class="modal-footer">
-        <button class="btn-outline-gold" id="btn-cancelar-cliente">Cancelar</button>
-        <button class="btn-gold" id="btn-salvar-cliente"><i class="fa-solid fa-floppy-disk"></i> Salvar Cliente</button>
+        <button class="btn-outline-gold" id="btn-cancelar-cliente" onclick="app.fecharModalCliente()">Cancelar</button>
+        <button class="btn-gold" id="btn-salvar-cliente" onclick="app.salvarCliente()"><i class="fa-solid fa-floppy-disk"></i> Salvar Cliente</button>
       </div>
     </div>
   </div>
@@ -2910,18 +2968,95 @@
       </p>
       
       <form id="form-upload-rg-obrigatorio" onsubmit="app.enviarRgObrigatorio(event)" style="display: flex; flex-direction: column; gap: 1.2rem;">
-        <div class="form-group" style="text-align: left;">
+        <div class="form-group" id="wrapper-rg-frente" style="text-align: left;">
           <label style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 600; display: block; margin-bottom: 0.4rem;">RG Frente (Foto nítida) *</label>
-          <input type="file" id="rg-frente-file" accept="image/*,application/pdf" required style="width: 100%; padding: 0.5rem; background: rgba(0,0,0,0.4); border: 1px solid rgba(212,175,55,0.2); border-radius: var(--radius-sm); color: #fff;">
+          <input type="file" id="rg-frente-file" accept="image/*,application/pdf" style="width: 100%; padding: 0.5rem; background: rgba(0,0,0,0.4); border: 1px solid rgba(212,175,55,0.2); border-radius: var(--radius-sm); color: #fff;">
         </div>
-        <div class="form-group" style="text-align: left;">
+        <div class="form-group" id="wrapper-rg-verso" style="text-align: left;">
           <label style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 600; display: block; margin-bottom: 0.4rem;">RG Verso (Foto nítida) *</label>
-          <input type="file" id="rg-verso-file" accept="image/*,application/pdf" required style="width: 100%; padding: 0.5rem; background: rgba(0,0,0,0.4); border: 1px solid rgba(212,175,55,0.2); border-radius: var(--radius-sm); color: #fff;">
+          <input type="file" id="rg-verso-file" accept="image/*,application/pdf" style="width: 100%; padding: 0.5rem; background: rgba(0,0,0,0.4); border: 1px solid rgba(212,175,55,0.2); border-radius: var(--radius-sm); color: #fff;">
+        </div>
+        <div class="form-group" id="wrapper-termo-resp" style="text-align: left; display: none;">
+          <label style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 600; display: block; margin-bottom: 0.4rem;">Termo de Responsabilidade Assinado *</label>
+          <div style="margin-bottom: 0.3rem;">
+            <a href="../assets/modelo_termo_responsabilidade.pdf" target="_blank" style="color: var(--gold-primary); text-decoration: underline; font-weight: 500; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-file-pdf"></i> Baixar Modelo do Termo</a>
+          </div>
+          <input type="file" id="termo-file" accept="image/*,application/pdf" style="width: 100%; padding: 0.5rem; background: rgba(0,0,0,0.4); border: 1px solid rgba(212,175,55,0.2); border-radius: var(--radius-sm); color: #fff;">
         </div>
         
         <button type="submit" id="btn-submit-rg-obrigatorio" class="btn-gold" style="width: 100%; justify-content: center; padding: 0.8rem; font-size: 0.95rem; margin-top: 0.5rem;">
           <i class="fa-solid fa-upload"></i> Salvar no Cofre Virtual e Entrar
         </button>
+      </form>
+    </div>
+  <!-- Modal Reportar Erro / Suporte -->
+  <div class="modal-backdrop" id="modal-reportar-erro" style="display: none; align-items: center; justify-content: center; z-index: 10000; background: rgba(0,0,0,0.85);">
+    <div class="modal-card" style="max-width: 500px; width: 92%; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.8rem; box-shadow: 0 20px 60px rgba(0,0,0,0.9);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; border-bottom: 1px solid rgba(212,175,55,0.15); padding-bottom: 0.8rem;">
+        <h3 style="font-family: var(--font-title); color: var(--gold-light); font-size: 1.2rem; margin: 0; display: flex; align-items: center; gap: 8px;">
+          <i class="fa-solid fa-bug" style="color: #ffb74d;"></i> Reportar Erro / Suporte
+        </h3>
+        <button type="button" onclick="document.getElementById('modal-reportar-erro').style.display='none'" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1.3rem;">&times;</button>
+      </div>
+
+      <form id="form-reportar-erro" onsubmit="app.enviarReporteErro(event)">
+        <div class="form-group" style="margin-bottom: 1rem; text-align: left;">
+          <label style="display: block; font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 0.4rem;">Categoria *</label>
+          <select id="reporte-categoria" class="form-control" style="width: 100%; background: #1a1a1a; border: 1px solid rgba(212,175,55,0.2); color: #fff; padding: 0.6rem; border-radius: 8px;">
+            <option value="BUG">🐛 Erro / Falha no Sistema (Bug)</option>
+            <option value="DUVIDA">❓ Dúvida de Uso</option>
+            <option value="SUGESTAO">💡 Sugestão de Melhoria</option>
+            <option value="OUTRO">📌 Outro Assunto</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1rem; text-align: left;">
+          <label style="display: block; font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 0.4rem;">Título do Problema *</label>
+          <input type="text" id="reporte-titulo" class="form-control" placeholder="Ex: Erro ao emitir recibo ou valor incorreto" required style="width: 100%; background: #1a1a1a; border: 1px solid rgba(212,175,55,0.2); color: #fff; padding: 0.6rem; border-radius: 8px;">
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1rem; text-align: left;">
+          <label style="display: block; font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 0.4rem;">Descrição Detalhada *</label>
+          <textarea id="reporte-descricao" class="form-control" rows="4" placeholder="Descreva passo a passo o que aconteceu..." required style="width: 100%; background: #1a1a1a; border: 1px solid rgba(212,175,55,0.2); color: #fff; padding: 0.6rem; border-radius: 8px; font-family: inherit;"></textarea>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1.5rem; text-align: left;">
+          <label style="display: block; font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 0.4rem;">Foto ou Print da Tela (Opcional)</label>
+          <input type="file" id="reporte-anexo" accept="image/*" class="form-control" style="width: 100%; background: #1a1a1a; border: 1px dashed rgba(212,175,55,0.3); color: var(--text-secondary); padding: 0.5rem; border-radius: 8px;">
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 0.8rem;">
+          <button type="button" class="btn-outline" onclick="document.getElementById('modal-reportar-erro').style.display='none'">Cancelar</button>
+          <button type="submit" class="btn-gold" id="btn-enviar-bug-report"><i class="fa-solid fa-paper-plane"></i> Enviar Reporte</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Solicitar Novo RG (Manager) -->
+  <div class="modal-backdrop" id="modal-solicitar-novo-rg" style="display: none; align-items: center; justify-content: center; z-index: 10000; background: rgba(0,0,0,0.85);">
+    <div class="modal-card" style="max-width: 500px; width: 92%; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.8rem; box-shadow: 0 20px 60px rgba(0,0,0,0.9);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; border-bottom: 1px solid rgba(212,175,55,0.15); padding-bottom: 0.8rem;">
+        <h3 style="font-family: var(--font-title); color: var(--gold-light); font-size: 1.2rem; margin: 0; display: flex; align-items: center; gap: 8px;">
+          <i class="fa-solid fa-triangle-exclamation" style="color: var(--gold-primary);"></i> Solicitar Novas Fotos do RG
+        </h3>
+        <button type="button" onclick="app.fecharModalSolicitarNovoRG()" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1.3rem;">&times;</button>
+      </div>
+
+      <form id="form-solicitar-novo-rg" onsubmit="app.confirmarSolicitacaoNovoRG(event)">
+        <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 1.2rem;">
+          Ao solicitar novas fotos, os arquivos atuais de RG Frente e RG Verso salvos no Cofre Virtual desta revendedora serão <strong>excluídos permanentemente</strong> do servidor. A revendedora será notificada e precisará enviar novas fotos nítidas na próxima vez que acessar a plataforma.
+        </p>
+
+        <div class="form-group" style="margin-bottom: 1.5rem; text-align: left;">
+          <label style="display: block; font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 0.4rem;">Por que você quer solicitar novas fotos? *</label>
+          <textarea id="solicitacao-rg-motivo" class="form-control" rows="3" placeholder="Ex: A foto da frente ficou borrada / Falta a foto do verso / Documento cortado..." required style="width: 100%; background: #1a1a1a; border: 1px solid rgba(212,175,55,0.2); color: #fff; padding: 0.6rem; border-radius: 8px; font-family: inherit;"></textarea>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 0.8rem;">
+          <button type="button" class="btn-outline" onclick="app.fecharModalSolicitarNovoRG()">Cancelar</button>
+          <button type="submit" class="btn-gold" id="btn-submit-solicitar-novo-rg"><i class="fa-solid fa-paper-plane"></i> Enviar Solicitação</button>
+        </div>
       </form>
     </div>
   </div>

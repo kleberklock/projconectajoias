@@ -7,7 +7,18 @@
 const app = {
   // 1. Estado da Aplicação
   state: {
-    apiUrl: "http://localhost:5000/api",
+    apiUrl: (function() {
+      const saved = localStorage.getItem("conectajoias_api_url");
+      if (saved) return saved;
+      const port = window.location.port;
+      const hostname = window.location.hostname;
+      const isDevPort = ["5500", "8080", "3000", "5501", "5000"].includes(port);
+      const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1" || /^192\.168\./.test(hostname) || /^10\./.test(hostname);
+      if (isDevPort || isLocalHost) {
+        return `${window.location.protocol}//${hostname}:5000/api`;
+      }
+      return `${window.location.origin}/api`;
+    })(),
     token: null,
     usuarioLogado: null,
     produtos: [],
@@ -560,9 +571,14 @@ const app = {
 
     const response = await fetch(`${this.state.apiUrl}${endpoint}`, config);
     
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
       this.fazerLogout();
       throw new Error("Sua sessão expirou. Por favor, realize login novamente.");
+    }
+
+    if (response.status === 403) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.error || `Acesso negado (Erro 403) ao recurso: ${endpoint}`);
     }
 
     const data = await response.json();
@@ -1232,6 +1248,131 @@ const app = {
     });
   },
 
+  abrirModalProduto: function() {
+    const modal = document.getElementById("modal-produto");
+    if (!modal) return;
+    this.limparFormProduto();
+    this.calcularPrecificacaoDinamicamente();
+    modal.style.display = "flex";
+    modal.classList.add("active");
+  },
+
+  abrirModalRevendedora: function() {
+    const modal = document.getElementById("modal-revendedora");
+    if (!modal) return;
+    this.limparFormRevendedora();
+    modal.style.display = "flex";
+    modal.classList.add("active");
+  },
+
+  abrirModalConsignar: function() {
+    const modal = document.getElementById("modal-consignar");
+    if (!modal) return;
+    const buscaInput = document.getElementById("consignar-busca");
+    const filtroCat = document.getElementById("consignar-filtro-categoria");
+    if (buscaInput) buscaInput.value = "";
+    if (filtroCat) filtroCat.value = "";
+    const totPecas = document.getElementById("consignar-total-pecas");
+    const valTotal = document.getElementById("consignar-valor-total");
+    if (totPecas) totPecas.innerText = "0 pçs";
+    if (valTotal) valTotal.innerText = "R$ 0,00";
+    if (typeof this.renderizarTabelaSelecaoConsignado === "function") {
+      this.renderizarTabelaSelecaoConsignado();
+    }
+    modal.style.display = "flex";
+    modal.classList.add("active");
+  },
+
+  abrirModalAcerto: function() {
+    const modal = document.getElementById("modal-acerto");
+    if (!modal) return;
+    const buscaInput = document.getElementById("acerto-busca");
+    if (buscaInput) buscaInput.value = "";
+    if (typeof this.renderizarTabelaPreencherAcerto === "function") {
+      this.renderizarTabelaPreencherAcerto();
+    }
+    modal.style.display = "flex";
+    modal.classList.add("active");
+  },
+
+  abrirModalCliente: function() {
+    const modal = document.getElementById("modal-cliente");
+    if (!modal) return;
+    if (typeof this.limparFormCliente === "function") {
+      this.limparFormCliente();
+    }
+    modal.style.display = "flex";
+    modal.classList.add("active");
+  },
+
+  fecharModalProduto: function() {
+    const modal = document.getElementById("modal-produto");
+    if (modal) {
+      modal.style.display = "none";
+      modal.classList.remove("active");
+    }
+  },
+
+  fecharModalRevendedora: function() {
+    const modal = document.getElementById("modal-revendedora");
+    if (modal) {
+      modal.style.display = "none";
+      modal.classList.remove("active");
+    }
+  },
+
+  fecharModalConsignar: function() {
+    const modal = document.getElementById("modal-consignar");
+    if (modal) {
+      modal.style.display = "none";
+      modal.classList.remove("active");
+    }
+  },
+
+  fecharModalAcerto: function() {
+    const modal = document.getElementById("modal-acerto");
+    if (modal) {
+      modal.style.display = "none";
+      modal.classList.remove("active");
+    }
+  },
+
+  fecharModalCliente: function() {
+    const modal = document.getElementById("modal-cliente");
+    if (modal) {
+      modal.style.display = "none";
+      modal.classList.remove("active");
+    }
+  },
+
+  fecharModalVendaRapida: function() {
+    const modal = document.getElementById("modal-venda-rapida");
+    if (modal) {
+      modal.style.display = "none";
+      modal.classList.remove("active");
+    }
+  },
+
+  abrirModalVendaRev: function() {
+    if (typeof this._abrirModalVendaRevInterno === "function") {
+      this._abrirModalVendaRevInterno();
+    } else {
+      const modal = document.getElementById("modal-venda-rev");
+      if (modal) {
+        modal.style.display = "flex";
+        modal.classList.add("active");
+      }
+    }
+  },
+
+  fecharModalVendaRev: function() {
+    const modal = document.getElementById("modal-venda-rev");
+    if (modal) {
+      modal.style.display = "none";
+      modal.classList.remove("active");
+    }
+  },
+
   configurarModal: function(modalId, triggerId, closeBtnId, cancelBtnId) {
     const modal = document.getElementById(modalId);
     const trigger = triggerId ? document.getElementById(triggerId) : null;
@@ -1239,34 +1380,22 @@ const app = {
     const cancelBtn = document.getElementById(cancelBtnId);
 
     const abrir = () => {
-      modal.classList.add("active");
-      if (modalId === "modal-produto") {
-        this.limparFormProduto();
-        this.calcularPrecificacaoDinamicamente();
-      }
-      if (modalId === "modal-revendedora") {
-        this.limparFormRevendedora();
-      }
-      if (modalId === "modal-consignar") {
-        const buscaInput = document.getElementById("consignar-busca");
-        const filtroCat = document.getElementById("consignar-filtro-categoria");
-        if (buscaInput) buscaInput.value = "";
-        if (filtroCat) filtroCat.value = "";
-        const totPecas = document.getElementById("consignar-total-pecas");
-        const valTotal = document.getElementById("consignar-valor-total");
-        if (totPecas) totPecas.innerText = "0 pçs";
-        if (valTotal) valTotal.innerText = "R$ 0,00";
-        this.renderizarTabelaSelecaoConsignado();
-      }
-      if (modalId === "modal-acerto") {
-        const buscaInput = document.getElementById("acerto-busca");
-        if (buscaInput) buscaInput.value = "";
-        this.renderizarTabelaPreencherAcerto();
+      if (modalId === "modal-produto") this.abrirModalProduto();
+      else if (modalId === "modal-revendedora") this.abrirModalRevendedora();
+      else if (modalId === "modal-consignar") this.abrirModalConsignar();
+      else if (modalId === "modal-acerto") this.abrirModalAcerto();
+      else if (modalId === "modal-cliente") this.abrirModalCliente();
+      else if (modal) {
+        modal.style.display = "flex";
+        modal.classList.add("active");
       }
     };
 
     const fechar = () => {
-      modal.classList.remove("active");
+      if (modal) {
+        modal.style.display = "none";
+        modal.classList.remove("active");
+      }
     };
 
     if (trigger) trigger.addEventListener("click", abrir);
@@ -3918,15 +4047,23 @@ const app = {
       const vendasConsolidadas = [];
       
       vendasDiretas.forEach(v => {
+        const qtd = Number(v.quantidade) || 1;
+        const totalVenda = Number(v.preco) || 0;
+        const desc = Number(v.desconto) || 0;
+        const precoBrutoUnit = qtd > 0 ? (totalVenda + desc) / qtd : totalVenda;
+
         vendasConsolidadas.push({
           id: v.id,
           data: v.data,
           tipo: 'direta',
           nomeProduto: v.nome,
           codigoProduto: v.codigo,
-          quantidade: 1,
-          precoVenda: v.preco,
-          total: v.preco,
+          quantidade: qtd,
+          precoVenda: precoBrutoUnit,
+          total: totalVenda,
+          desconto: desc,
+          motivoDesconto: v.motivoDesconto || '',
+          formaPagamento: v.formaPagamento || 'Pix',
           comissao: 0,
           vendedor: 'Conecta Joias (Direta)',
           contato: v.whatsappCliente || '—',

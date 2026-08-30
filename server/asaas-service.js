@@ -221,12 +221,12 @@ async function criarCobrancaPlanoSaaS(dados) {
   } = dados;
 
   const precosPlanos = {
-    BRONZE: 147.00,
-    GOLD: 297.00,
-    PLATINUM: 497.00
+    BRONZE: 69.90,
+    GOLD: 99.90,
+    PLATINUM: 249.90
   };
 
-  const valor = precosPlanos[(plano || 'BRONZE').toUpperCase()] || 147.00;
+  const valor = precosPlanos[(plano || 'BRONZE').toUpperCase()] || 69.90;
   const externalRef = `SAAS_PLANO_${lojaId}_${(plano || 'BRONZE').toUpperCase()}_${Date.now()}`;
 
   if (eModoSimulado) {

@@ -3,9 +3,18 @@
  */
 
 const loginApp = {
-  apiUrl: window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" 
-    ? "http://localhost:5000/api" 
-    : `${window.location.origin}/api`,
+  apiUrl: (function() {
+    const saved = localStorage.getItem("conectajoias_api_url");
+    if (saved) return saved;
+    const port = window.location.port;
+    const hostname = window.location.hostname;
+    const isDevPort = ["5500", "8080", "3000", "5501", "5000"].includes(port);
+    const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1" || /^192\.168\./.test(hostname) || /^10\./.test(hostname);
+    if (isDevPort || isLocalHost) {
+      return `${window.location.protocol}//${hostname}:5000/api`;
+    }
+    return `${window.location.origin}/api`;
+  })(),
   wizardStep: 1,
   wizardTotalSteps: 5,
   _cadastroData: null, // guarda token/usuario pós-signup para usar após o wizard
@@ -20,6 +29,7 @@ const loginApp = {
 
   init: async function() {
     await this.carregarConfiguracoesLoja();
+    this.registrarEventosRecuperacao();
 
     const params = new URLSearchParams(window.location.search);
     const planoParam = params.get("plano");
@@ -125,6 +135,122 @@ const loginApp = {
     aplicarTemaLoja(config);
   },
 
+  registrarEventosRecuperacao: function() {
+    const linkEsqueci = document.getElementById("link-esqueci-senha");
+    const linkVoltar = document.getElementById("link-voltar-login");
+    const loginCard = document.getElementById("login-card");
+    const recCard = document.getElementById("recuperar-senha-card");
+    const btnSolicitar = document.getElementById("btn-solicitar-codigo-recuperacao");
+    const btnConfirmar = document.getElementById("btn-confirmar-redefinicao-senha");
+    const errBox = document.getElementById("recuperar-error-msg");
+    const succBox = document.getElementById("recuperar-success-msg");
+
+    if (linkEsqueci && recCard && loginCard) {
+      linkEsqueci.addEventListener("click", (e) => {
+        e.preventDefault();
+        loginCard.style.display = "none";
+        recCard.style.display = "block";
+        if (errBox) errBox.style.display = "none";
+        if (succBox) succBox.style.display = "none";
+      });
+    }
+
+    if (linkVoltar && recCard && loginCard) {
+      linkVoltar.addEventListener("click", (e) => {
+        e.preventDefault();
+        recCard.style.display = "none";
+        loginCard.style.display = "block";
+      });
+    }
+
+    if (btnSolicitar) {
+      btnSolicitar.addEventListener("click", async () => {
+        const ident = document.getElementById("recuperar-identificador").value.trim();
+        if (!ident) {
+          errBox.innerText = "Por favor, informe seu e-mail, PIN ou WhatsApp.";
+          errBox.style.display = "block";
+          return;
+        }
+
+        btnSolicitar.disabled = true;
+        btnSolicitar.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Enviando...`;
+        errBox.style.display = "none";
+
+        try {
+          const resp = await fetch(`${this.apiUrl}/public/solicitar-recuperacao-senha`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ identificador: ident })
+          });
+          const data = await resp.json();
+
+          if (!resp.ok) {
+            throw new Error(data.error || "Erro ao solicitar redefinição de senha.");
+          }
+
+          this._usuarioIdRecuperacao = data.usuarioId;
+          succBox.innerText = data.message || "Código enviado com sucesso!";
+          if (data.codigoSimulado) {
+            succBox.innerText += ` (Código para teste: ${data.codigoSimulado})`;
+          }
+          succBox.style.display = "block";
+          document.getElementById("recuperar-form-step1").style.display = "none";
+          document.getElementById("recuperar-form-step2").style.display = "block";
+        } catch (err) {
+          errBox.innerText = err.message;
+          errBox.style.display = "block";
+        } finally {
+          btnSolicitar.disabled = false;
+          btnSolicitar.innerHTML = `<i class="fa-solid fa-paper-plane"></i> Enviar Código de Verificação`;
+        }
+      });
+    }
+
+    if (btnConfirmar) {
+      btnConfirmar.addEventListener("click", async () => {
+        const codigo = document.getElementById("recuperar-codigo").value.trim();
+        const novaSenha = document.getElementById("recuperar-nova-senha").value;
+
+        if (!codigo || !novaSenha) {
+          errBox.innerText = "Preencha o código de 6 dígitos e a nova senha.";
+          errBox.style.display = "block";
+          return;
+        }
+
+        btnConfirmar.disabled = true;
+        btnConfirmar.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Redefinindo...`;
+        errBox.style.display = "none";
+
+        try {
+          const resp = await fetch(`${this.apiUrl}/public/redefinir-senha`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              usuarioId: this._usuarioIdRecuperacao,
+              codigo,
+              novaSenha
+            })
+          });
+          const data = await resp.json();
+
+          if (!resp.ok) {
+            throw new Error(data.error || "Erro ao redefinir senha.");
+          }
+
+          alert(data.message || "Senha redefinida com sucesso!");
+          recCard.style.display = "none";
+          loginCard.style.display = "block";
+        } catch (err) {
+          errBox.innerText = err.message;
+          errBox.style.display = "block";
+        } finally {
+          btnConfirmar.disabled = false;
+          btnConfirmar.innerHTML = `<i class="fa-solid fa-lock-open"></i> Redefinir Senha`;
+        }
+      });
+    }
+  },
+
   registrarEventos: function() {
     const btnLogin = document.getElementById("btn-executar-login");
     if (btnLogin) btnLogin.addEventListener("click", () => this.fazerLogin());
@@ -175,6 +301,71 @@ const loginApp = {
       const el = document.getElementById(id);
       if (el) el.addEventListener("keypress", signupEnterHandler);
     });
+
+    // Recurso 2: Gerador dinâmico de Slug / URL da loja
+    const inputLoja = document.getElementById("signup-loja");
+    const containerSlug = document.getElementById("signup-slug-preview-container");
+    const spanSlugUrl = document.getElementById("signup-slug-url");
+    if (inputLoja && containerSlug && spanSlugUrl) {
+      inputLoja.addEventListener("input", (e) => {
+        const val = e.target.value.trim();
+        if (val.length > 0) {
+          const slug = val.toLowerCase()
+            .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-z0-9]/g, "");
+          spanSlugUrl.innerText = `https://${slug || 'sualoja'}.conectajoias.com.br`;
+          containerSlug.style.display = "block";
+        } else {
+          containerSlug.style.display = "none";
+        }
+      });
+    }
+
+    // Recurso 3: Mostrar/Ocultar Senha & Medidor de Força
+    const inputSenhaSignup = document.getElementById("signup-senha");
+    const btnToggleSenha = document.getElementById("btn-toggle-signup-senha");
+    const iconToggleSenha = document.getElementById("icon-toggle-signup-senha");
+    if (inputSenhaSignup && btnToggleSenha && iconToggleSenha) {
+      btnToggleSenha.addEventListener("click", () => {
+        const isPass = inputSenhaSignup.type === "password";
+        inputSenhaSignup.type = isPass ? "text" : "password";
+        iconToggleSenha.className = isPass ? "fa-solid fa-eye-slash" : "fa-solid fa-eye";
+      });
+    }
+
+    const boxMeter = document.getElementById("signup-password-meter-box");
+    const barMeter = document.getElementById("signup-password-meter-bar");
+    const textMeter = document.getElementById("signup-password-meter-text");
+    if (inputSenhaSignup && boxMeter && barMeter && textMeter) {
+      inputSenhaSignup.addEventListener("input", (e) => {
+        const pass = e.target.value;
+        if (!pass) {
+          boxMeter.style.display = "none";
+          return;
+        }
+        boxMeter.style.display = "block";
+        let score = 0;
+        if (pass.length >= 6) score += 25;
+        if (pass.length >= 8) score += 25;
+        if (/[0-9]/.test(pass)) score += 25;
+        if (/[A-Z]/.test(pass) || /[^a-zA-Z0-9]/.test(pass)) score += 25;
+
+        barMeter.style.width = `${score}%`;
+        if (score <= 25) {
+          barMeter.style.background = "#ef5350";
+          textMeter.innerText = "Força da Senha: Fraca 🔴";
+          textMeter.style.color = "#ef5350";
+        } else if (score <= 75) {
+          barMeter.style.background = "#ffb74d";
+          textMeter.innerText = "Força da Senha: Média 🟡";
+          textMeter.style.color = "#ffb74d";
+        } else {
+          barMeter.style.background = "#81c784";
+          textMeter.innerText = "Força da Senha: Forte 🟢";
+          textMeter.style.color = "#81c784";
+        }
+      });
+    }
   },
 
   registrarEventosWizard: function() {
@@ -247,9 +438,19 @@ const loginApp = {
     const btnPainel = document.getElementById("btn-ir-para-painel");
     if (btnPainel) {
       btnPainel.addEventListener("click", () => {
-        if (this._cadastroData) {
-          this.redirecionarPorPerfil(this._cadastroData.usuario.role);
+        let role = "Manager";
+        if (this._cadastroData && this._cadastroData.usuario && this._cadastroData.usuario.role) {
+          role = this._cadastroData.usuario.role;
+        } else {
+          const usuarioJson = localStorage.getItem("conectajoias_usuario");
+          if (usuarioJson) {
+            try {
+              const u = JSON.parse(usuarioJson);
+              if (u.role) role = u.role;
+            } catch (e) {}
+          }
         }
+        this.redirecionarPorPerfil(role);
       });
     }
   },
@@ -419,22 +620,130 @@ const loginApp = {
     }
   },
 
-  mostrarCredenciais: function() {
-    const dados = this._cadastroData;
+  dispararConfetesDourados: function() {
+    let canvas = document.getElementById("canvas-confetti-signup");
+    if (!canvas) {
+      canvas = document.createElement("canvas");
+      canvas.id = "canvas-confetti-signup";
+      canvas.style.position = "fixed";
+      canvas.style.top = "0";
+      canvas.style.left = "0";
+      canvas.style.width = "100vw";
+      canvas.style.height = "100vh";
+      canvas.style.pointerEvents = "none";
+      canvas.style.zIndex = "999999";
+      document.body.appendChild(canvas);
+    }
+    const ctx = canvas.getContext("2d");
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
 
-    document.getElementById("onboarding-wizard-card").style.display = "none";
+    const particles = [];
+    const colors = ["#d4af37", "#f3e5ab", "#aa7c11", "#ffffff", "#ffd700", "#ffecb3"];
+
+    for (let i = 0; i < 90; i++) {
+      particles.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height * 0.4 - 50,
+        r: Math.random() * 6 + 3,
+        d: Math.random() * 90,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        tilt: Math.floor(Math.random() * 10) - 10,
+        tiltAngleIncremental: Math.random() * 0.07 + 0.05,
+        tiltAngle: 0
+      });
+    }
+
+    let opacity = 1.0;
+    const startTime = Date.now();
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const elapsed = Date.now() - startTime;
+      if (elapsed > 3500) {
+        opacity -= 0.03;
+        if (opacity <= 0) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          canvas.remove();
+          return;
+        }
+      }
+
+      ctx.globalAlpha = opacity;
+      particles.forEach((p) => {
+        p.tiltAngle += p.tiltAngleIncremental;
+        p.y += (Math.cos(p.d) + 3 + p.r / 2) / 2;
+        p.x += Math.sin(p.d);
+        p.tilt = Math.sin(p.tiltAngle) * 15;
+
+        ctx.beginPath();
+        ctx.lineWidth = p.r;
+        ctx.strokeStyle = p.color;
+        ctx.moveTo(p.x + p.tilt + p.r / 2, p.y);
+        ctx.lineTo(p.x + p.tilt, p.y + p.tilt + p.r / 2);
+        ctx.stroke();
+      });
+
+      requestAnimationFrame(draw);
+    }
+
+    draw();
+  },
+
+  copiarPIN: function() {
+    const pinEl = document.getElementById("cred-pin");
+    const lbl = document.getElementById("lbl-copiar-pin");
+    if (pinEl && pinEl.innerText && pinEl.innerText !== "—") {
+      navigator.clipboard.writeText(pinEl.innerText.trim());
+      if (lbl) {
+        lbl.innerText = "Copiado!";
+        setTimeout(() => { lbl.innerText = "Copiar PIN"; }, 2500);
+      }
+    }
+  },
+
+  copiarLink: function() {
+    const linkEl = document.getElementById("cred-link");
+    const lbl = document.getElementById("lbl-copiar-link");
+    if (linkEl && linkEl.innerText && linkEl.innerText !== "—") {
+      navigator.clipboard.writeText(linkEl.innerText.trim());
+      if (lbl) {
+        lbl.innerText = "Copiado!";
+        setTimeout(() => { lbl.innerText = "Copiar"; }, 2500);
+      }
+    }
+  },
+
+  mostrarCredenciais: function() {
+    const usuarioJson = localStorage.getItem("conectajoias_usuario");
+    let usuarioLocal = null;
+    try { usuarioLocal = usuarioJson ? JSON.parse(usuarioJson) : null; } catch(e) {}
+
+    const dados = this._cadastroData || (usuarioLocal ? { usuario: usuarioLocal, pin: usuarioLocal.pin || "—" } : null);
+
+    const loginCard = document.getElementById("login-card");
+    if (loginCard) loginCard.style.display = "none";
+
+    const signupCard = document.getElementById("signup-card");
+    if (signupCard) signupCard.style.display = "none";
+
+    const wzCard = document.getElementById("onboarding-wizard-card");
+    if (wzCard) wzCard.style.display = "none";
 
     const credCard = document.getElementById("credentials-card");
     if (credCard) credCard.style.display = "block";
 
-    if (dados) {
+    if (dados && dados.usuario) {
       const emailEl = document.getElementById("cred-email");
       const pinEl   = document.getElementById("cred-pin");
       const linkEl  = document.getElementById("cred-link");
-      if (emailEl) emailEl.innerText = dados.usuario.email;
-      if (pinEl)   pinEl.innerText   = dados.pin || "—";
-      if (linkEl)  linkEl.innerText  = `${window.location.origin}${window.location.pathname}?loja=${dados.usuario.lojaId}`;
+      if (emailEl) emailEl.innerText = dados.usuario.email || "—";
+      if (pinEl)   pinEl.innerText   = dados.pin || dados.usuario.pin || "—";
+      if (linkEl)  linkEl.innerText  = `${window.location.origin}${window.location.pathname.replace("login.html", "superadmin.html")}`;
     }
+
+    // Disparar celebração visual de confetes dourados
+    this.dispararConfetesDourados();
   },
 
   carregarTemaPreLogin: async function(identificador) {
@@ -635,8 +944,11 @@ const loginApp = {
       localStorage.setItem("conectajoias_token", data.token);
       localStorage.setItem("conectajoias_usuario", JSON.stringify(data.usuario));
       localStorage.setItem("conectajoias_loja_id", data.usuario.lojaId);
+      localStorage.setItem("conectajoias_nome_empresa", nomeLoja);
+      this._cadastroData = data;
 
-      this.redirecionarPorPerfil(data.usuario.role);
+      // Direciona direto para exibição de credenciais sem passar pelo wizard de personalização
+      this.mostrarCredenciais();
 
     } catch (error) {
       console.error(error);
@@ -655,10 +967,7 @@ const loginApp = {
         localStorage.setItem("conectajoias_nome_empresa", nomeLoja);
         this._cadastroData = { token:"mock", pin: pinAleatorio, usuario: userMock };
 
-        const nomeComercialEl = document.getElementById("wz-nome-comercial");
-        if (nomeComercialEl) nomeComercialEl.value = nomeLoja;
-
-        this.iniciarWizard();
+        this.mostrarCredenciais();
         return;
       }
 
@@ -666,7 +975,7 @@ const loginApp = {
       errorBox.style.display = "block";
     } finally {
       btnSignup.disabled = false;
-      btnSignup.innerHTML = '<i class="fa-solid fa-user-plus"></i> Criar Conta e Personalizar';
+      btnSignup.innerHTML = '<i class="fa-solid fa-user-plus"></i> Criar Minha Conta';
     }
   },
 

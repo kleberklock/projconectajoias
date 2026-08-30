@@ -1,4 +1,12 @@
 {
+  "name": "projconectajoias",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "scripts/start.bat",
+    "dev": "scripts/start.bat",
+    "server": "cd server && npm run dev",
+    "frontend": "cd frontend && npx http-server -p 8080 -c-1"
+  },
   "dependencies": {
     "mercadopago": "^3.3.0"
   }

@@ -9,11 +9,12 @@
   <link rel="icon" type="image/png" href="../assets/favicon.png">
   <link rel="apple-touch-icon" href="../assets/favicon.png">
   
-  <!-- Fontes Premium e FontAwesome -->
+  <!-- Fontes Premium, FontAwesome e html2pdf -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
   <style>
     :root {
@@ -524,9 +525,12 @@
 
           <div class="footer-actions">
             <button class="btn btn-outline" onclick="window.close()"><i class="fa-solid fa-circle-xmark"></i> Fechar</button>
-            <button class="btn btn-gold" onclick="window.print()"><i class="fa-solid fa-print"></i> Imprimir / Salvar PDF</button>
+            <button class="btn btn-outline" style="color: #25D366; border-color: #25D366;" onclick="compartilharWhatsApp()"><i class="fa-brands fa-whatsapp"></i> Enviar WhatsApp</button>
+            <button class="btn btn-gold" onclick="baixarPDF()"><i class="fa-solid fa-file-pdf"></i> Baixar PDF</button>
           </div>
         `;
+
+        window.dadosAcertoAtual = acerto;
 
         // Popula a explicação detalhada de contas
         const elExplicacao = document.getElementById("recibo-explicacao-resumo-detalhado");
@@ -570,6 +574,37 @@
           </div>
         `;
       }
+    }
+
+    function baixarPDF() {
+      const el = document.getElementById("recibo-content");
+      const actions = document.querySelector(".footer-actions");
+      if (actions) actions.style.display = "none";
+      const opt = {
+        margin: [10, 10, 10, 10],
+        filename: `Recibo_Acerto_${Date.now()}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#121212' },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+      if (typeof html2pdf !== 'undefined') {
+        html2pdf().set(opt).from(el).save().then(() => {
+          if (actions) actions.style.display = "flex";
+        });
+      } else {
+        window.print();
+        if (actions) actions.style.display = "flex";
+      }
+    }
+
+    function compartilharWhatsApp() {
+      const a = window.dadosAcertoAtual;
+      if (!a) return;
+      const num = a.usuario && a.usuario.whatsapp ? a.usuario.whatsapp.replace(/\D/g, '') : '';
+      const ddi = (num.startsWith('55') || num.length < 10) ? num : '55' + num;
+      const link = window.location.href;
+      const msg = `Olá *${a.usuario ? a.usuario.nome : 'Consultora'}*! 💎\nSegue seu Recibo de Acerto de Contas:\n\n• Faturamento Bruto: R$ ${a.faturamentoBruto.toFixed(2).replace('.', ',')}\n• Comissão: R$ ${a.comissaoPaga.toFixed(2).replace('.', ',')}\n• Saldo Final: R$ ${Math.abs(a.saldoFinalAcerto).toFixed(2).replace('.', ',')}\n\n📄 Visualizar Recibo Completo / PDF:\n${link}`;
+      window.open(`https://wa.me/${ddi}?text=${encodeURIComponent(msg)}`, '_blank');
     }
 
     window.onload = carregarRecibo;

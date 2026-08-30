@@ -9,8 +9,10 @@
   <link rel="icon" type="image/png" href="../assets/favicon.png">
   <link rel="apple-touch-icon" href="../assets/favicon.png">
   
-  <!-- Estilos base do aplicativo -->
+  <!-- Estilos base do aplicativo & PWA -->
+  <link rel="manifest" href="../manifest.json">
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/pwa-install.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
   <style>
@@ -561,16 +563,30 @@
             Para garantir a segurança do processo de consignação da maleta, precisamos armazenar cópias digitais legíveis dos seus documentos.
           </p>
 
-          <!-- Upload RG -->
+          <!-- Upload RG Frente -->
           <div class="form-group">
-            <label>RG / Documento de Identificação Oficial (Frente e Verso)</label>
-            <div class="file-upload-box" onclick="document.getElementById('rgFile').click()">
+            <label>RG ou CNH Frente *</label>
+            <div class="file-upload-box" onclick="document.getElementById('rgFrenteFile').click()">
               <i class="fa-solid fa-id-card"></i>
               <span>Clique para tirar foto ou selecionar arquivo</span>
-              <small>Formatos aceitos: JPG, PNG, PDF (Max 10MB)</small>
+              <small>Formatos aceitos: JPG, PNG, PDF (Max 5MB)</small>
             </div>
-            <input type="file" id="rgFile" name="rgFile" class="file-upload-input" accept="image/*,.pdf" onchange="atualizarStatusArquivo(this, 'status-rg')">
-            <div id="status-rg" class="file-status">
+            <input type="file" id="rgFrenteFile" name="rgFrenteFile" class="file-upload-input" accept="image/*,.pdf" onchange="atualizarStatusArquivo(this, 'status-rg-frente')" required>
+            <div id="status-rg-frente" class="file-status">
+              <i class="fa-solid fa-circle-check"></i> <span class="file-name"></span>
+            </div>
+          </div>
+
+          <!-- Upload RG Verso -->
+          <div class="form-group">
+            <label>RG ou CNH Verso *</label>
+            <div class="file-upload-box" onclick="document.getElementById('rgVersoFile').click()">
+              <i class="fa-solid fa-id-card"></i>
+              <span>Clique para tirar foto ou selecionar arquivo</span>
+              <small>Formatos aceitos: JPG, PNG, PDF (Max 5MB)</small>
+            </div>
+            <input type="file" id="rgVersoFile" name="rgVersoFile" class="file-upload-input" accept="image/*,.pdf" onchange="atualizarStatusArquivo(this, 'status-rg-verso')" required>
+            <div id="status-rg-verso" class="file-status">
               <i class="fa-solid fa-circle-check"></i> <span class="file-name"></span>
             </div>
           </div>
@@ -581,7 +597,7 @@
             <div class="file-upload-box" onclick="document.getElementById('cpfFile').click()">
               <i class="fa-solid fa-file-invoice"></i>
               <span>Clique para tirar foto ou selecionar arquivo</span>
-              <small>Formatos aceitos: JPG, PNG, PDF (Max 10MB)</small>
+              <small>Formatos aceitos: JPG, PNG, PDF (Max 5MB)</small>
             </div>
             <input type="file" id="cpfFile" name="cpfFile" class="file-upload-input" accept="image/*,.pdf" onchange="atualizarStatusArquivo(this, 'status-cpf')">
             <div id="status-cpf" class="file-status">
@@ -595,10 +611,27 @@
             <div class="file-upload-box" onclick="document.getElementById('enderecoFile').click()">
               <i class="fa-solid fa-house-chimney-window"></i>
               <span>Clique para tirar foto ou selecionar arquivo</span>
-              <small>Formatos aceitos: JPG, PNG, PDF (Max 10MB)</small>
+              <small>Formatos aceitos: JPG, PNG, PDF (Max 5MB)</small>
             </div>
             <input type="file" id="enderecoFile" name="enderecoFile" class="file-upload-input" accept="image/*,.pdf" onchange="atualizarStatusArquivo(this, 'status-endereco')" required>
             <div id="status-endereco" class="file-status">
+              <i class="fa-solid fa-circle-check"></i> <span class="file-name"></span>
+            </div>
+          </div>
+
+          <!-- Upload Termo de Responsabilidade -->
+          <div class="form-group">
+            <label>Termo de Responsabilidade Assinado *</label>
+            <div style="margin-bottom: 0.3rem;">
+              <a href="../assets/modelo_termo_responsabilidade.pdf" target="_blank" style="color: var(--gold-primary); text-decoration: underline; font-weight: 500; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-file-pdf"></i> Baixar Modelo do Termo</a>
+            </div>
+            <div class="file-upload-box" onclick="document.getElementById('termoFile').click()">
+              <i class="fa-solid fa-file-signature"></i>
+              <span>Clique para anexar foto ou PDF do termo assinado</span>
+              <small>Formatos aceitos: JPG, PNG, PDF (Max 5MB)</small>
+            </div>
+            <input type="file" id="termoFile" name="termoFile" class="file-upload-input" accept="image/*,.pdf" onchange="atualizarStatusArquivo(this, 'status-termo')" required>
+            <div id="status-termo" class="file-status">
               <i class="fa-solid fa-circle-check"></i> <span class="file-name"></span>
             </div>
           </div>
@@ -660,5 +693,6 @@
   <div id="toast-container" style="position: fixed; bottom: 20px; right: 20px; z-index: 9999;"></div>
 
   <script src="../js/onboarding.js"></script>
+  <script src="../js/pwa-install.js"></script>
 </body>
 </html>

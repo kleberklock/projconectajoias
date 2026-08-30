@@ -18,7 +18,7 @@ set /p confirm="Digite 'SIM' e pressione Enter para confirmar a exclusao: "
 if /i "%confirm%"=="SIM" (
     echo.
     echo Inciando a limpeza...
-    cd ../server
+    cd /d "%~dp0..\server"
     node scripts/clear_database.js
 ) else (
     echo.

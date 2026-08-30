@@ -7,9 +7,18 @@
 const app = {
   // 1. Estado da Aplicação
   state: {
-    apiUrl: window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" 
-      ? "http://localhost:5000/api" 
-      : `${window.location.origin}/api`,
+    apiUrl: (function() {
+      const saved = localStorage.getItem("conectajoias_api_url");
+      if (saved) return saved;
+      const port = window.location.port;
+      const hostname = window.location.hostname;
+      const isDevPort = ["5500", "8080", "3000", "5501", "5000"].includes(port);
+      const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1" || /^192\.168\./.test(hostname) || /^10\./.test(hostname);
+      if (isDevPort || isLocalHost) {
+        return `${window.location.protocol}//${hostname}:5000/api`;
+      }
+      return `${window.location.origin}/api`;
+    })(),
     token: null,
     usuarioLogado: null,
     produtos: [],
@@ -29,6 +38,7 @@ const app = {
     bgPrimary: "#0a0a0a",
     bgCard: "#121212",
     revendedoraSelecionadaId: null,
+    subAbaRevendedoraAtiva: "maleta",
     usandoFicticio: false,
     colunasEstoque: ["Código", "Nome do Produto", "Categoria", "Estoque Central", "Custo Bruto", "Custo Banho", "Custo Oper.", "Markup", "Preço Venda"],
     vendasSessao: [], // Vendas registradas pela revendedora nesta sessão
@@ -511,9 +521,10 @@ const app = {
       if (btnCadastrarProduto) btnCadastrarProduto.style.display = "none";
       if (divHeaderActions) divHeaderActions.style.display = "none";
       if (menuMinhaMaleta) menuMinhaMaleta.style.display = "block";
-      if (this.state.abaAtiva === "meu-plano-saas") {
+      if (this.state.abaAtiva === "dashboard" || this.state.abaAtiva === "meu-plano-saas" || !this.state.abaAtiva) {
         this.state.abaAtiva = "minha-maleta";
       }
+      this.renderizarAbas();
     } else {
       if (menuPlanilhas) menuPlanilhas.style.display = "block";
       if (menuRevendedoras) menuRevendedoras.style.display = "block";
@@ -530,6 +541,7 @@ const app = {
       if (this.state.abaAtiva === "minha-maleta") {
         this.state.abaAtiva = "dashboard";
       }
+      this.renderizarAbas();
     }
   },
 
@@ -601,12 +613,22 @@ const app = {
     // Interceptador para o Modo de Demonstração (Mocks / Offline)
     if (this.state.token && this.state.token.startsWith("mock_")) {
       console.warn(`[requisitarAPI] Modo de Demonstração Interceptado no Consultor: ${metodo} ${endpoint}`);
+      const upperMetodo = metodo.toUpperCase();
       
       // Simulação das respostas de endpoints para o modo demo
       if (endpoint.startsWith("/produtos/defeitos")) {
         return this.state.produtosComDefeito || [];
       }
       if (endpoint.startsWith("/produtos")) {
+        if (upperMetodo === "POST") {
+          return { id: 'prod_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6), ...body };
+        }
+        if (upperMetodo === "PUT") {
+          return { ...body };
+        }
+        if (upperMetodo === "DELETE") {
+          return { success: true };
+        }
         return this.state.produtos || [];
       }
       if (endpoint.startsWith("/revendedoras/minha-maleta")) {
@@ -626,10 +648,20 @@ const app = {
           }
         };
       }
+      if (endpoint.startsWith("/revendedoras")) {
+        if (upperMetodo === "POST") return { id: 'rev_' + Date.now(), pin: "1234", ...body };
+        if (upperMetodo === "PUT") return { ...body };
+        if (upperMetodo === "DELETE") return { success: true };
+        return this.state.revendedoras || [];
+      }
       if (endpoint.startsWith("/vendas-revendedora")) {
+        if (upperMetodo === "POST") return { id: 'venda_' + Date.now(), ...body };
         return this.state.vendasSessao || [];
       }
       if (endpoint.startsWith("/clientes")) {
+        if (upperMetodo === "POST") return { id: 'cli_' + Date.now(), ...body };
+        if (upperMetodo === "PUT") return { ...body };
+        if (upperMetodo === "DELETE") return { success: true };
         return this.state.clientes || [];
       }
       if (endpoint.startsWith("/termos")) {
@@ -671,7 +703,27 @@ const app = {
     }
 
     if (response.status === 403) {
-      throw new Error(`Acesso negado (Erro 403) ao recurso: ${endpoint}`);
+      let errMsg = `Acesso negado (Erro 403) ao recurso: ${endpoint}`;
+      try {
+        const errData = await response.json();
+        if (errData && errData.error) {
+          errMsg = errData.error;
+        }
+      } catch (e) {}
+      
+      if (errMsg.toLowerCase().includes("limite") || errMsg.toLowerCase().includes("plano") || errMsg.toLowerCase().includes("excede")) {
+        let recursoNome = "Operação Não Permitida";
+        if (endpoint.includes("produtos")) recursoNome = "Cadastro de Produtos/Estoque";
+        else if (endpoint.includes("revendedoras") || endpoint.includes("auth/register")) recursoNome = "Cadastro de Consultoras";
+        else if (endpoint.includes("importar")) recursoNome = "Importação via Excel";
+        else if (endpoint.includes("pagamentos")) recursoNome = "Links de Pagamento";
+        else if (endpoint.includes("termos")) recursoNome = "Termos de Maleta";
+        else if (endpoint.includes("documentos")) recursoNome = "Cofre Virtual";
+
+        this.exibirAvisoUpgradePlano(recursoNome, errMsg);
+      }
+      
+      throw new Error(errMsg);
     }
 
     const data = await response.json();
@@ -2086,25 +2138,9 @@ const app = {
     });
     addListenerSafe("btn-confirmar-venda-rev", "click", () => this.confirmarVendaRevendedora());
 
-    // Salvar Produto
-    addListenerSafe("btn-salvar-produto", "click", () => this.salvarNovoProduto());
-
-    // Salvar Revendedora
-    addListenerSafe("btn-salvar-revendedora", "click", () => this.salvarNovaRevendedora());
-
-    // Consignar Peças (Confirmar envio)
-    addListenerSafe("btn-confirmar-consignar", "click", () => this.processarConsignacao());
-
-    // Excluir Revendedora
+    // Excluir e Editar Revendedora
     addListenerSafe("btn-excluir-revendedora", "click", () => this.excluirRevendedoraSelecionada());
-
-    // Editar Revendedora
     addListenerSafe("btn-editar-revendedora", "click", () => this.editarRevendedoraSelecionada());
-
-    // Fechamento de acertos
-    addListenerSafe("btn-salvar-acerto-apenas", "click", () => this.finalizarAcerto(false));
-    addListenerSafe("btn-finalizar-acerto-whats", "click", () => this.finalizarAcerto(true));
-    addListenerSafe("btn-finalizar-acerto-excel", "click", () => this.exportarExcelAcerto());
 
     // Excel
     addListenerSafe("btn-exportar-estoque", "click", () => ExcelHandler.exportarEstoque(this.state.produtos, this.state.colunasEstoque));
@@ -2177,6 +2213,175 @@ const app = {
     }
   },
 
+  abrirModalProduto: function() {
+    if (this.state.dadosSaaS && this.state.dadosSaaS.uso) {
+      const { totalEstoque, limiteEstoque } = this.state.dadosSaaS.uso;
+      if (totalEstoque >= limiteEstoque && limiteEstoque < 9999) {
+        this.exibirAvisoUpgradePlano(
+          "Cadastro de Peças no Estoque",
+          `Seu limite atual é de <strong>${limiteEstoque} peças</strong> e você já possui <strong>${totalEstoque} peças</strong> cadastradas no estoque central. Faça o upgrade de sua assinatura para cadastrar mais joias.`
+        );
+        return;
+      }
+    }
+
+    const modal = document.getElementById("modal-produto");
+    if (!modal) {
+      console.warn("Modal #modal-produto não encontrado.");
+      return;
+    }
+    this.limparFormProduto();
+    this.calcularPrecificacaoDinamicamente();
+    modal.style.display = "flex";
+    modal.classList.add("active");
+  },
+
+  abrirModalRevendedora: function() {
+    if (this.state.dadosSaaS && this.state.dadosSaaS.uso) {
+      const { totalConsultoras, limiteConsultoras } = this.state.dadosSaaS.uso;
+      if (totalConsultoras >= limiteConsultoras && limiteConsultoras < 999) {
+        this.exibirAvisoUpgradePlano(
+          "Cadastro de Consultoras",
+          `Seu limite atual é de <strong>${limiteConsultoras} consultoras</strong> e você já possui <strong>${totalConsultoras}</strong> cadastradas. Faça o upgrade de sua assinatura para liberar novos cadastros.`
+        );
+        return;
+      }
+    }
+
+    const modal = document.getElementById("modal-revendedora");
+    if (!modal) return;
+    this.limparFormRevendedora();
+    modal.style.display = "flex";
+    modal.classList.add("active");
+  },
+
+  abrirModalConsignar: function() {
+    const modal = document.getElementById("modal-consignar");
+    if (!modal) return;
+    const buscaInput = document.getElementById("consignar-busca");
+    const filtroCat = document.getElementById("consignar-filtro-categoria");
+    if (buscaInput) buscaInput.value = "";
+    if (filtroCat) filtroCat.value = "";
+    const totPecas = document.getElementById("consignar-total-pecas");
+    const valTotal = document.getElementById("consignar-valor-total");
+    if (totPecas) totPecas.innerText = "0 pçs";
+    if (valTotal) valTotal.innerText = "R$ 0,00";
+    if (typeof this.renderizarTabelaSelecaoConsignado === "function") {
+      this.renderizarTabelaSelecaoConsignado();
+    }
+    modal.style.display = "flex";
+    modal.classList.add("active");
+  },
+
+  abrirModalAcerto: function() {
+    const modal = document.getElementById("modal-acerto");
+    if (!modal) return;
+    const buscaInput = document.getElementById("acerto-busca");
+    if (buscaInput) buscaInput.value = "";
+    if (typeof this.renderizarTabelaPreencherAcerto === "function") {
+      this.renderizarTabelaPreencherAcerto();
+    }
+    modal.style.display = "flex";
+    modal.classList.add("active");
+  },
+
+  abrirModalCliente: function() {
+    const modal = document.getElementById("modal-cliente");
+    if (!modal) return;
+    if (typeof this.limparFormCliente === "function") {
+      this.limparFormCliente();
+    }
+    modal.style.display = "flex";
+    modal.classList.add("active");
+  },
+
+  fecharModalProduto: function() {
+    const modal = document.getElementById("modal-produto");
+    if (modal) {
+      modal.style.display = "none";
+      modal.classList.remove("active");
+    }
+  },
+
+  fecharModalRevendedora: function() {
+    const modal = document.getElementById("modal-revendedora");
+    if (modal) {
+      modal.style.display = "none";
+      modal.classList.remove("active");
+    }
+  },
+
+  fecharModalConsignar: function() {
+    const modal = document.getElementById("modal-consignar");
+    if (modal) {
+      modal.style.display = "none";
+      modal.classList.remove("active");
+    }
+  },
+
+  fecharModalAcerto: function() {
+    const modal = document.getElementById("modal-acerto");
+    if (modal) {
+      modal.style.display = "none";
+      modal.classList.remove("active");
+    }
+  },
+
+  fecharModalCliente: function() {
+    const modal = document.getElementById("modal-cliente");
+    if (modal) {
+      modal.style.display = "none";
+      modal.classList.remove("active");
+    }
+  },
+
+  fecharModalVendaRapida: function() {
+    const modal = document.getElementById("modal-venda-rapida");
+    if (modal) {
+      modal.style.display = "none";
+      modal.classList.remove("active");
+    }
+  },
+
+  abrirModalVendaRev: function() {
+    if (typeof this._abrirModalVendaRevInterno === "function") {
+      this._abrirModalVendaRevInterno();
+    } else {
+      const modal = document.getElementById("modal-venda-rev");
+      if (modal) {
+        modal.style.display = "flex";
+        modal.classList.add("active");
+      }
+    }
+  },
+
+  fecharModalVendaRev: function() {
+    const modal = document.getElementById("modal-venda-rev");
+    if (modal) {
+      modal.style.display = "none";
+      modal.classList.remove("active");
+    }
+  },
+
+  abrirModalVendaAdmin: function() {
+    const modal = document.getElementById("modal-venda-admin");
+    if (modal) {
+      if (typeof this.renderizarSelectsVendaAdmin === "function") {
+        this.renderizarSelectsVendaAdmin();
+      }
+      modal.style.display = "flex";
+      modal.classList.add("active");
+    }
+  },
+
+  fecharModalVendaAdmin: function() {
+    const modal = document.getElementById("modal-venda-admin");
+    if (modal) {
+      modal.style.display = "none";
+      modal.classList.remove("active");
+    }
+  },
+
   configurarModal: function(modalId, triggerId, closeBtnId, cancelBtnId) {
     const modal = document.getElementById(modalId);
     const trigger = triggerId ? document.getElementById(triggerId) : null;
@@ -2184,34 +2389,22 @@ const app = {
     const cancelBtn = document.getElementById(cancelBtnId);
 
     const abrir = () => {
-      modal.classList.add("active");
-      if (modalId === "modal-produto") {
-        this.limparFormProduto();
-        this.calcularPrecificacaoDinamicamente();
-      }
-      if (modalId === "modal-revendedora") {
-        this.limparFormRevendedora();
-      }
-      if (modalId === "modal-consignar") {
-        const buscaInput = document.getElementById("consignar-busca");
-        const filtroCat = document.getElementById("consignar-filtro-categoria");
-        if (buscaInput) buscaInput.value = "";
-        if (filtroCat) filtroCat.value = "";
-        const totPecas = document.getElementById("consignar-total-pecas");
-        const valTotal = document.getElementById("consignar-valor-total");
-        if (totPecas) totPecas.innerText = "0 pçs";
-        if (valTotal) valTotal.innerText = "R$ 0,00";
-        this.renderizarTabelaSelecaoConsignado();
-      }
-      if (modalId === "modal-acerto") {
-        const buscaInput = document.getElementById("acerto-busca");
-        if (buscaInput) buscaInput.value = "";
-        this.renderizarTabelaPreencherAcerto();
+      if (modalId === "modal-produto") this.abrirModalProduto();
+      else if (modalId === "modal-revendedora") this.abrirModalRevendedora();
+      else if (modalId === "modal-consignar") this.abrirModalConsignar();
+      else if (modalId === "modal-acerto") this.abrirModalAcerto();
+      else if (modalId === "modal-cliente") this.abrirModalCliente();
+      else if (modal) {
+        modal.style.display = "flex";
+        modal.classList.add("active");
       }
     };
 
     const fechar = () => {
-      modal.classList.remove("active");
+      if (modal) {
+        modal.style.display = "none";
+        modal.classList.remove("active");
+      }
     };
 
     if (trigger) trigger.addEventListener("click", abrir);
@@ -2236,8 +2429,125 @@ const app = {
     document.body.classList.remove('sidebar-open');
   },
 
+  // Validação central de recursos do plano SaaS
+  validarAcessoRecurso: function(recurso) {
+    if (!this.state.usuarioLogado) return true;
+    
+    // SuperAdmin tem acesso irrestrito
+    if (this.state.usuarioLogado.role === 'SuperAdmin') return true;
+    
+    const plano = (this.state.usuarioLogado.planoLoja || 'BASICO').toUpperCase();
+    
+    const regras = {
+      'importar-excel': ['BRONZE', 'GOLD', 'PLATINUM'],
+      'links-pagamento': ['BRONZE', 'GOLD', 'PLATINUM'],
+      'dre': ['GOLD', 'PLATINUM'],
+      'termos-maleta': ['GOLD', 'PLATINUM'],
+      'cofre-virtual': ['GOLD', 'PLATINUM']
+    };
+    
+    const planosPermitidos = regras[recurso];
+    if (planosPermitidos && !planosPermitidos.includes(plano)) {
+      let planoRequerido = planosPermitidos[0];
+      
+      const descricoes = {
+        'importar-excel': {
+          nome: 'Importação em Massa via Excel',
+          desc: 'A importação de joias e consultoras via planilha Excel está disponível a partir do plano <strong>Bronze</strong>. Faça o upgrade agora para economizar horas de digitação manual!',
+          plano: 'BRONZE'
+        },
+        'links-pagamento': {
+          nome: 'Links de Pagamento',
+          desc: 'Gere links de pagamento integrados (PIX, boleto ou cartão) e envie para suas clientes. O status compensa automaticamente no caixa. Disponível a partir do plano <strong>Bronze</strong>.',
+          plano: 'BRONZE'
+        },
+        'dre': {
+          nome: 'Demonstrativo do Resultado do Exercício (DRE)',
+          desc: 'Monitore a saúde financeira do seu negócio (faturamento, custos, comissões e lucro líquido). Disponível nos planos <strong>Gold</strong> e <strong>Platinum</strong>.',
+          plano: 'GOLD'
+        },
+        'termos-maleta': {
+          nome: 'Termos de Maleta Digitais',
+          desc: 'Gere termos de consignação e envie para assinatura digital direta das suas consultoras. Disponível nos planos <strong>Gold</strong> e <strong>Platinum</strong>.',
+          plano: 'GOLD'
+        },
+        'cofre-virtual': {
+          nome: 'Cofre Virtual de Documentos',
+          desc: 'Armazene e organize com total segurança os documentos digitalizados (RG, residência) de suas consultoras. Disponível nos planos <strong>Gold</strong> e <strong>Platinum</strong>.',
+          plano: 'GOLD'
+        }
+      };
+
+      const info = descricoes[recurso] || {
+        nome: recurso,
+        desc: `Este recurso está disponível a partir do plano ${planoRequerido}.`,
+        plano: planoRequerido
+      };
+
+      this.exibirAvisoUpgradePlano(info.nome, info.desc, info.plano);
+      return false;
+    }
+    
+    return true;
+  },
+
+  exibirAvisoUpgradePlano: function(titulo, mensagem, planoRequerido = 'GOLD') {
+    // Remove modal anterior se já existir
+    const existente = document.getElementById("modal-aviso-upgrade");
+    if (existente) existente.remove();
+
+    const backdrop = document.createElement("div");
+    backdrop.className = "modal-backdrop active";
+    backdrop.id = "modal-aviso-upgrade";
+    backdrop.style.display = "flex";
+    backdrop.style.zIndex = "10000";
+
+    backdrop.innerHTML = `
+      <div class="modal-card" style="width: 450px; max-width: 95%; text-align: center; padding: 2.2rem; background: var(--bg-card); border: 1px solid rgba(212,175,55,0.25); border-radius: var(--radius-md); box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+        <div style="margin-bottom: 1.5rem;">
+          <i class="fa-solid fa-crown" style="font-size: 3.8rem; color: var(--gold-primary); filter: drop-shadow(0 0 12px rgba(212,175,55,0.45));"></i>
+        </div>
+        <h3 style="font-family: var(--font-title); color: var(--gold-light); font-size: 1.5rem; margin-bottom: 0.8rem; letter-spacing: 0.5px;">
+          Upgrade de Plano Requerido
+        </h3>
+        <h4 style="color: var(--text-primary); font-size: 1.1rem; margin-bottom: 1.2rem; font-weight: 600;">
+          Recurso: ${titulo}
+        </h4>
+        <p style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6; margin-bottom: 2rem;">
+          ${mensagem}
+        </p>
+        <div style="display: flex; gap: 1rem; justify-content: center;">
+          <button class="btn btn-outline" onclick="document.getElementById('modal-aviso-upgrade').remove()" style="padding: 0.6rem 1.4rem; font-size: 0.85rem; border-color: rgba(255,255,255,0.15); color: var(--text-secondary); border-radius: var(--radius-sm); cursor: pointer; background: transparent;">
+            Voltar
+          </button>
+          <button class="btn btn-gold" onclick="document.getElementById('modal-aviso-upgrade').remove(); app.navegarParaAba('meu-plano-saas');" style="padding: 0.6rem 1.6rem; font-size: 0.85rem; border-radius: var(--radius-sm); cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem;">
+            Ver Planos <i class="fa-solid fa-arrow-right"></i>
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(backdrop);
+  },
+
   // Navegação SPA
   navegarParaAba: function(tabId) {
+    if (typeof window.endTour === "function") {
+      window.endTour();
+    }
+
+    // Trava de planos nas abas do menu
+    const abasMapeadas = {
+      'links-pagamento': 'links-pagamento',
+      'termos-maleta': 'termos-maleta',
+      'cofre-virtual': 'cofre-virtual'
+    };
+
+    if (abasMapeadas[tabId]) {
+      const temAcesso = this.validarAcessoRecurso(abasMapeadas[tabId]);
+      if (!temAcesso) return; // Cancela navegação
+    }
+
     this.state.abaAtiva = tabId;
     this.fecharSidebarMobile();
     this.renderizarAbas();
@@ -2445,6 +2755,31 @@ const app = {
   },
 
   carregarDRE: async function() {
+    const drePanel = document.getElementById("dashboard-dre-panel");
+    if (!drePanel) return;
+
+    const plano = (this.state.usuarioLogado && this.state.usuarioLogado.planoLoja || 'BASICO').toUpperCase();
+    const temDRE = plano === 'GOLD' || plano === 'PLATINUM' || (this.state.usuarioLogado && this.state.usuarioLogado.role === 'SuperAdmin');
+
+    if (!temDRE) {
+      drePanel.innerHTML = `
+        <div class="panel-header">
+          <h2><i class="fa-solid fa-calculator"></i> Demonstrativo do Resultado do Exercício (DRE)</h2>
+        </div>
+        <div style="padding: 3rem 1.5rem; text-align: center; background: rgba(0,0,0,0.15); border: 1px dashed rgba(212,175,55,0.25); border-radius: var(--radius-md); margin-top: 1.5rem;">
+          <i class="fa-solid fa-lock" style="font-size: 2.5rem; color: var(--gold-primary); opacity: 0.8; margin-bottom: 1rem; display: block;"></i>
+          <h3 style="font-family: var(--font-title); color: var(--gold-light); font-size: 1.35rem; margin-bottom: 0.5rem;">Demonstrativo DRE Avançado</h3>
+          <p style="color: var(--text-secondary); max-width: 480px; margin: 0 auto 1.5rem; font-size: 0.88rem; line-height: 1.5;">
+            Monitore a saúde financeira da sua marca em tempo real. Veja faturamento consolidado, comissões pagas, custos de mercadorias (CMV) e lucro líquido.
+          </p>
+          <button class="btn-gold" onclick="app.navegarParaAba('meu-plano-saas')" style="padding: 0.55rem 1.5rem; font-size: 0.82rem; margin: 0 auto; display: inline-flex;">
+            <i class="fa-solid fa-crown"></i> Liberar no Plano Gold
+          </button>
+        </div>
+      `;
+      return;
+    }
+
     const inputInicio = document.getElementById("dre-data-inicio");
     const inputFim = document.getElementById("dre-data-fim");
     if (!inputInicio || !inputFim) return;
@@ -3047,66 +3382,126 @@ const app = {
     }
   },
 
+  togglePrecoManual: function() {
+    const chk = document.getElementById("prod-usar-preco-manual");
+    const container = document.getElementById("prod-preco-manual-container");
+    if (chk && container) {
+      container.style.display = chk.checked ? "block" : "none";
+    }
+    this.calcularPrecificacaoDinamicamente();
+  },
+
+  atualizarPrecoManual: function() {
+    this.calcularPrecificacaoDinamicamente();
+  },
+
   // Precificação em tempo real no Modal
   calcularPrecificacaoDinamicamente: function() {
-    const custoBruto = Number(document.getElementById("prod-bruto").value || 0);
-    const custoBanho = Number(document.getElementById("prod-banho").value || 0);
-    const custoLiquido = Number(document.getElementById("prod-liquido").value || 0);
-    const markup = Number(document.getElementById("prod-markup").value || 1);
+    const custoBruto = Number(document.getElementById("prod-bruto")?.value || 0);
+    const custoBanho = Number(document.getElementById("prod-banho")?.value || 0);
+    const custoLiquido = Number(document.getElementById("prod-liquido")?.value || 0);
+    const markup = Number(document.getElementById("prod-markup")?.value || 1);
 
     const custoTotal = custoBruto + custoBanho + custoLiquido;
-    const precoVenda = custoTotal * markup;
+    let precoVenda = custoTotal * markup;
+
+    const chkManual = document.getElementById("prod-usar-preco-manual");
+    const valManualInput = document.getElementById("prod-preco-manual");
+    if (chkManual && chkManual.checked && valManualInput && parseFloat(valManualInput.value) > 0) {
+      precoVenda = parseFloat(valManualInput.value);
+    }
+
     const lucroLiquido = precoVenda - custoTotal;
 
     // Atualiza o Preview do Modal
-    document.getElementById("calc-bruto").innerText = `R$ ${custoBruto.toFixed(2).replace(".", ",")}`;
-    document.getElementById("calc-banho").innerText = `R$ ${custoBanho.toFixed(2).replace(".", ",")}`;
-    document.getElementById("calc-liquido").innerText = `R$ ${custoLiquido.toFixed(2).replace(".", ",")}`;
-    document.getElementById("calc-custo-total").innerText = `R$ ${custoTotal.toFixed(2).replace(".", ",")}`;
-    document.getElementById("calc-markup").innerText = `${markup.toFixed(1)}x`;
-    document.getElementById("calc-preco-venda").innerText = `R$ ${precoVenda.toFixed(2).replace(".", ",")}`;
-    document.getElementById("calc-lucro-liquido").innerText = `R$ ${lucroLiquido.toFixed(2).replace(".", ",")}`;
+    const calcBrutoEl = document.getElementById("calc-bruto");
+    if (calcBrutoEl) calcBrutoEl.innerText = `R$ ${custoBruto.toFixed(2).replace(".", ",")}`;
+    const calcBanhoEl = document.getElementById("calc-banho");
+    if (calcBanhoEl) calcBanhoEl.innerText = `R$ ${custoBanho.toFixed(2).replace(".", ",")}`;
+    const calcLiqEl = document.getElementById("calc-liquido");
+    if (calcLiqEl) calcLiqEl.innerText = `R$ ${custoLiquido.toFixed(2).replace(".", ",")}`;
+    const calcTotalEl = document.getElementById("calc-custo-total");
+    if (calcTotalEl) calcTotalEl.innerText = `R$ ${custoTotal.toFixed(2).replace(".", ",")}`;
+    const calcMarkupEl = document.getElementById("calc-markup");
+    if (calcMarkupEl) calcMarkupEl.innerText = `${markup.toFixed(1)}x`;
+    const calcPrecoEl = document.getElementById("calc-preco-venda");
+    if (calcPrecoEl) calcPrecoEl.innerText = `R$ ${precoVenda.toFixed(2).replace(".", ",")}`;
+    const calcLucroEl = document.getElementById("calc-lucro-liquido");
+    if (calcLucroEl) calcLucroEl.innerText = `R$ ${lucroLiquido.toFixed(2).replace(".", ",")}`;
   },
 
   limparFormProduto: function() {
-    document.getElementById("prod-nome").value = "";
-    document.getElementById("prod-codigo").value = "";
-    document.getElementById("prod-categoria").value = "Brincos";
-    document.getElementById("prod-quantidade").value = "5";
-    document.getElementById("prod-bruto").value = "0.00";
-    document.getElementById("prod-banho").value = "0.00";
-    document.getElementById("prod-liquido").value = "0.00";
-    document.getElementById("prod-markup").value = "3.0";
-    document.getElementById("prod-foto-url").value = "";
-    document.getElementById("prod-defeito").value = "0";
+    const nomeEl = document.getElementById("prod-nome");
+    if (nomeEl) nomeEl.value = "";
+    const codEl = document.getElementById("prod-codigo");
+    if (codEl) codEl.value = "";
+    const catEl = document.getElementById("prod-categoria");
+    if (catEl) catEl.value = "Brincos";
+    const qtdEl = document.getElementById("prod-quantidade");
+    if (qtdEl) qtdEl.value = "5";
+    const brutoEl = document.getElementById("prod-bruto");
+    if (brutoEl) brutoEl.value = "0.00";
+    const banhoEl = document.getElementById("prod-banho");
+    if (banhoEl) banhoEl.value = "0.00";
+    const liqEl = document.getElementById("prod-liquido");
+    if (liqEl) liqEl.value = "0.00";
+    const mkEl = document.getElementById("prod-markup");
+    if (mkEl) mkEl.value = "3.0";
+    const fotoEl = document.getElementById("prod-foto-url");
+    if (fotoEl) fotoEl.value = "";
+    const defEl = document.getElementById("prod-defeito");
+    if (defEl) defEl.value = "0";
+
+    const chkManual = document.getElementById("prod-usar-preco-manual");
+    if (chkManual) chkManual.checked = false;
+    const containerManual = document.getElementById("prod-preco-manual-container");
+    if (containerManual) containerManual.style.display = "none";
+    const manualInput = document.getElementById("prod-preco-manual");
+    if (manualInput) manualInput.value = "";
+
     this.atualizarPreviewFotoProduto();
     
     // Reseta id de edição
-    document.getElementById("btn-salvar-produto").removeAttribute("data-edit-id");
-    document.querySelector("#modal-produto h3").innerText = "Nova Semijoia";
+    const btnSalvar = document.getElementById("btn-salvar-produto");
+    if (btnSalvar) btnSalvar.removeAttribute("data-edit-id");
+    const modalTitle = document.querySelector("#modal-produto h3");
+    if (modalTitle) modalTitle.innerText = "Nova Joia";
   },
 
   salvarNovoProduto: async function() {
-    const nome = document.getElementById("prod-nome").value.trim();
-    const categoria = document.getElementById("prod-categoria").value;
-    const quantidade = parseInt(document.getElementById("prod-quantidade").value) || 0;
+    const nomeEl = document.getElementById("prod-nome");
+    const nome = nomeEl ? nomeEl.value.trim() : "";
+    const categoria = document.getElementById("prod-categoria")?.value || "Brincos";
+    const quantidade = parseInt(document.getElementById("prod-quantidade")?.value) || 0;
     
     if (!nome) {
       this.toast("Por favor, preencha o nome do produto.", "warning");
+      if (nomeEl) {
+        nomeEl.focus();
+        nomeEl.style.borderColor = "#ff4d4d";
+        setTimeout(() => { nomeEl.style.borderColor = ""; }, 3000);
+      }
       return;
     }
 
-    const codigoInput = document.getElementById("prod-codigo").value.trim();
+    const codigoInput = document.getElementById("prod-codigo")?.value.trim();
     const codigo = codigoInput ? codigoInput : "REF-" + Math.floor(1000 + Math.random() * 9000);
     
-    const custoBruto = parseFloat(document.getElementById("prod-bruto").value) || 0;
-    const custoBanho = parseFloat(document.getElementById("prod-banho").value) || 0;
-    const custoLiquido = parseFloat(document.getElementById("prod-liquido").value) || 0;
-    const markup = parseFloat(document.getElementById("prod-markup").value) || 1.0;
-    const fotoUrl = document.getElementById("prod-foto-url").value.trim() || null;
-    const quantidadeDefeito = parseInt(document.getElementById("prod-defeito").value) || 0;
+    const custoBruto = parseFloat(document.getElementById("prod-bruto")?.value) || 0;
+    const custoBanho = parseFloat(document.getElementById("prod-banho")?.value) || 0;
+    const custoLiquido = parseFloat(document.getElementById("prod-liquido")?.value) || 0;
+    const markup = parseFloat(document.getElementById("prod-markup")?.value) || 1.0;
+    const fotoUrl = document.getElementById("prod-foto-url")?.value.trim() || null;
+    const quantidadeDefeito = parseInt(document.getElementById("prod-defeito")?.value) || 0;
 
-    const editId = document.getElementById("btn-salvar-produto").getAttribute("data-edit-id");
+    const chkManual = document.getElementById("prod-usar-preco-manual");
+    const valManualInput = document.getElementById("prod-preco-manual");
+    let precoVendaManual = null;
+    if (chkManual && chkManual.checked && valManualInput && parseFloat(valManualInput.value) > 0) {
+      precoVendaManual = parseFloat(valManualInput.value);
+    }
+
+    const editId = document.getElementById("btn-salvar-produto")?.getAttribute("data-edit-id");
 
     try {
       let produtoSalvo;
@@ -3121,12 +3516,13 @@ const app = {
         custoLiquido,
         markup,
         fotoUrl,
-        quantidadeDefeito
+        quantidadeDefeito,
+        precoVenda: precoVendaManual
       };
 
       if (editId) {
         // Envia para a API se logado
-        if (this.state.token) {
+        if (this.state.token && !this.state.token.startsWith("mock_")) {
           produtoSalvo = await this.requisitarAPI(`/produtos/${editId}`, "PUT", bodyData);
         } else {
           produtoSalvo = { id: editId, ...bodyData };
@@ -3139,7 +3535,7 @@ const app = {
         }
       } else {
         // Novo Produto
-        if (this.state.token) {
+        if (this.state.token && !this.state.token.startsWith("mock_")) {
           produtoSalvo = await this.requisitarAPI("/produtos", "POST", bodyData);
         } else {
           produtoSalvo = {
@@ -3147,36 +3543,45 @@ const app = {
             ...bodyData
           };
         }
-        this.state.produtos.push(produtoSalvo);
+
+        // Garantir que produtoSalvo seja um objeto válido antes de dar push
+        if (produtoSalvo && typeof produtoSalvo === 'object' && !Array.isArray(produtoSalvo)) {
+          this.state.produtos.push(produtoSalvo);
+        } else {
+          console.warn("Resposta da API ao criar produto não foi um objeto único:", produtoSalvo);
+        }
       }
 
       // Atualiza valores dinâmicos locais
-      this.state.produtos.forEach(p => {
-        const custoTotal = (p.custoBruto || 0) + (p.custoBanho || 0) + (p.custoLiquido || 0);
-        const precoVendaCalculado = custoTotal * (p.markup || 3.0);
-        p._valoresDinamicos = {
-          "Código": p.codigo,
-          "Nome do Produto": p.nome,
-          "Categoria": p.categoria,
-          "Estoque Central": p.quantidade,
-          "Custo Bruto": p.custoBruto,
-          "Custo Banho": p.custoBanho,
-          "Custo Oper.": p.custoLiquido,
-          "Markup": p.markup,
-          "Preço Venda": p.precoVenda || precoVendaCalculado
-        };
-      });
+      if (Array.isArray(this.state.produtos)) {
+        this.state.produtos.forEach(p => {
+          if (!p || typeof p !== 'object') return;
+          const custoTotal = (p.custoBruto || 0) + (p.custoBanho || 0) + (p.custoLiquido || 0);
+          const precoVendaCalculado = p.precoVenda || (custoTotal * (p.markup || 3.0));
+          p._valoresDinamicos = {
+            "Código": p.codigo,
+            "Nome do Produto": p.nome,
+            "Categoria": p.categoria,
+            "Estoque Central": p.quantidade,
+            "Custo Bruto": p.custoBruto,
+            "Custo Banho": p.custoBanho,
+            "Custo Oper.": p.custoLiquido,
+            "Markup": p.markup,
+            "Preço Venda": precoVendaCalculado
+          };
+        });
+      }
 
       this.salvarDadosNoLocalStorage();
       this.renderizarEstoque();
       this.renderizarDashboard();
       
-      document.getElementById("modal-produto").classList.remove("active");
+      this.fecharModalProduto();
       
       // Navega para aba de estoque para o usuário ver o produto que acabou de cadastrar/editar
       this.navegarParaAba("estoque");
       
-      this.toast(editId ? "Produto atualizado com sucesso!" : "Produto cadastrado com sucesso!", "success");
+      this.toast(editId ? "Joia atualizada com sucesso!" : "Joia cadastrada com sucesso!", "success");
     } catch (error) {
       console.error(error);
       this.toast("Erro ao salvar produto no banco de dados: " + error.message, "error");
@@ -3196,10 +3601,21 @@ const app = {
       document.getElementById("prod-markup").value = (prod.markup || 3.0).toFixed(1);
       document.getElementById("prod-foto-url").value = prod.fotoUrl || "";
       document.getElementById("prod-defeito").value = prod.quantidadeDefeito || 0;
+
+      if (prod.precoVenda) {
+        const chkManual = document.getElementById("prod-usar-preco-manual");
+        if (chkManual) chkManual.checked = true;
+        const containerManual = document.getElementById("prod-preco-manual-container");
+        if (containerManual) containerManual.style.display = "block";
+        const manualInput = document.getElementById("prod-preco-manual");
+        if (manualInput) manualInput.value = prod.precoVenda.toFixed(2);
+      }
+
       this.atualizarPreviewFotoProduto();
 
       document.getElementById("btn-salvar-produto").setAttribute("data-edit-id", prodId);
-      document.querySelector("#modal-produto h3").innerText = "Editar Semijoia";
+      const modalTitle = document.querySelector("#modal-produto h3");
+      if (modalTitle) modalTitle.innerText = "Editar Joia";
       
       this.calcularPrecificacaoDinamicamente();
       document.getElementById("modal-produto").classList.add("active");
@@ -3207,7 +3623,7 @@ const app = {
   },
 
   excluirProduto: async function(prodId) {
-    if (await this.confirmar("Tem certeza que deseja excluir esta semijoia do seu estoque?")) {
+    if (await this.confirmar("Tem certeza que deseja excluir esta joia do seu estoque?")) {
       try {
         if (this.state.token) {
           await this.requisitarAPI(`/produtos/${prodId}`, "DELETE");
@@ -3574,6 +3990,9 @@ const app = {
           tableHistoricoBody.appendChild(tr);
         });
       }
+
+      // Sincroniza a sub-aba ativa nos detalhes da revendedora
+      this.mudarSubAbaRevendedora(this.state.subAbaRevendedoraAtiva || 'maleta');
     } else {
       document.getElementById("painel-detalhes-revendedora").style.display = "none";
       document.getElementById("placeholder-detalhes-revendedora").style.display = "flex";
@@ -3589,7 +4008,7 @@ const app = {
 
     if (this.state.token) {
       try {
-        const resp = await this.requisitarAPI(`/usuarios/${revId}/regenerar-pin`, "POST");
+        const resp = await this.requisitarAPI(`/revendedoras/${revId}/reset-pin`, "PUT");
         alert(`NOVO PIN E SENHA GERADOS COM SUCESSO!\n\nPIN: ${resp.pin}\nSenha: ${resp.senha}\n\nCopie e anote estes dados com segurança antes de fechar este aviso.`);
         await this.carregarDadosIniciais();
       } catch (err) {
@@ -3660,12 +4079,147 @@ const app = {
     }
   },
 
+  ajustarCamposComissaoRev: function() {
+    const tipoEl = document.getElementById("rev-tipo-comissao");
+    if (!tipoEl) return;
+    const tipo = tipoEl.value;
+    const groupComissaoPadrao = document.getElementById("group-rev-comissao-padrao");
+    const groupMetaUnica = document.getElementById("group-rev-meta-unica");
+    const groupFaixas = document.getElementById("group-rev-faixas");
+
+    if (tipo === "FIXA") {
+      if (groupComissaoPadrao) groupComissaoPadrao.style.display = "block";
+      if (groupMetaUnica) groupMetaUnica.style.display = "none";
+      if (groupFaixas) groupFaixas.style.display = "none";
+    } else if (tipo === "PROGRESSIVA") {
+      if (groupComissaoPadrao) groupComissaoPadrao.style.display = "none";
+      if (groupMetaUnica) groupMetaUnica.style.display = "none";
+      if (groupFaixas) groupFaixas.style.display = "block";
+    } else if (tipo === "META_UNICA") {
+      if (groupComissaoPadrao) groupComissaoPadrao.style.display = "block";
+      if (groupMetaUnica) groupMetaUnica.style.display = "flex";
+      if (groupFaixas) groupFaixas.style.display = "none";
+    }
+  },
+
+  ajustarLabelsMetaRev: function() {
+    const tipoBonusEl = document.getElementById("rev-meta-bonus-tipo");
+    if (!tipoBonusEl) return;
+    const tipoBonus = tipoBonusEl.value;
+    const labelBonus = document.getElementById("lbl-rev-meta-bonus");
+
+    if (labelBonus) {
+      if (tipoBonus === "PERCENTUAL") {
+        labelBonus.innerHTML = "Bônus da Meta (%) *";
+      } else {
+        labelBonus.innerHTML = "Bônus da Meta (R$) *";
+      }
+    }
+  },
+
+  adicionarFaixaLinha: function(valorMin = 0, valorMax = 0, percentual = 0) {
+    const container = document.getElementById("rev-faixas-container");
+    if (!container) return;
+
+    if (valorMin === 0 && valorMax === 0 && percentual === 0) {
+      const rows = container.querySelectorAll(".rev-faixa-row");
+      if (rows.length > 0) {
+        const lastRow = rows[rows.length - 1];
+        const lastMax = parseFloat(lastRow.querySelector(".faixa-max")?.value) || 0;
+        const lastPct = parseFloat(lastRow.querySelector(".faixa-pct")?.value) || 0;
+        valorMin = lastMax;
+        valorMax = lastMax + 2000;
+        percentual = Math.min(100, lastPct + 5);
+      } else {
+        valorMin = 0;
+        valorMax = 2000;
+        percentual = 30;
+      }
+    }
+
+    const vazio = document.getElementById("rev-faixas-vazio");
+    if (vazio) vazio.remove();
+
+    const row = document.createElement("div");
+    row.className = "rev-faixa-row";
+    row.style = "display: grid; grid-template-columns: 1fr auto 1fr auto 70px auto auto; gap: 6px; align-items: center; margin-bottom: 8px; background: rgba(255, 255, 255, 0.02); padding: 6px; border-radius: 4px; border: 1px solid rgba(212,175,55,0.2); transition: all 0.2s ease;";
+    row.innerHTML = `
+      <div style="position: relative; display: flex; align-items: center;">
+        <span style="position: absolute; left: 8px; color: #666; font-size: 0.8rem; font-weight: 600;">R$</span>
+        <input type="number" class="form-control faixa-min" placeholder="Mínimo" value="${valorMin}" style="width: 100%; padding: 4px 8px 4px 24px; font-size: 0.85rem; border-color: rgba(212,175,55,0.2);" min="0">
+      </div>
+      <span style="color: #666; font-size: 0.8rem;">a</span>
+      <div style="position: relative; display: flex; align-items: center;">
+        <span style="position: absolute; left: 8px; color: #666; font-size: 0.8rem; font-weight: 600;">R$</span>
+        <input type="number" class="form-control faixa-max" placeholder="Máximo" value="${valorMax}" style="width: 100%; padding: 4px 8px 4px 24px; font-size: 0.85rem; border-color: rgba(212,175,55,0.2);" min="0">
+      </div>
+      <span style="color: #666; font-size: 0.8rem;">=</span>
+      <input type="number" class="form-control faixa-pct" placeholder="%" value="${percentual}" style="width: 100%; padding: 4px 8px; font-size: 0.85rem; text-align: center; border-color: rgba(212,175,55,0.2);" min="0" max="100">
+      <span style="color: #666; font-size: 0.85rem; font-weight: 600;">%</span>
+      <button type="button" class="btn-delete-faixa" style="background: rgba(239, 83, 80, 0.1); color: #ff8a80; border: 1px solid rgba(239, 83, 80, 0.25); border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); margin: 0;" title="Remover faixa">
+        <i class="fa-solid fa-trash-can" style="font-size: 0.85rem;"></i>
+      </button>
+    `;
+
+    const deleteBtn = row.querySelector(".btn-delete-faixa");
+    deleteBtn.addEventListener("click", () => {
+      row.style.opacity = "0";
+      row.style.transform = "scale(0.9)";
+      setTimeout(() => {
+        row.remove();
+        if (container.querySelectorAll(".rev-faixa-row").length === 0) {
+          container.innerHTML = `
+            <div style="color: var(--text-muted); font-size: 0.9rem; text-align: center; padding: 10px;" id="rev-faixas-vazio">
+              Nenhuma faixa cadastrada. Usará a comissão padrão.
+            </div>
+          `;
+        }
+      }, 200);
+    });
+
+    row.style.opacity = "0";
+    row.style.transform = "translateY(5px)";
+    container.appendChild(row);
+    setTimeout(() => {
+      row.style.opacity = "1";
+      row.style.transform = "translateY(0)";
+    }, 50);
+  },
+
+  obterFaixasComissaoDaUI: function() {
+    const rows = document.querySelectorAll(".rev-faixa-row");
+    const faixas = [];
+    rows.forEach(row => {
+      const valorMin = parseFloat(row.querySelector(".faixa-min").value) || 0;
+      const valorMax = parseFloat(row.querySelector(".faixa-max").value) || 0;
+      const percentual = parseFloat(row.querySelector(".faixa-pct").value) || 0;
+      faixas.push({ valorMin, valorMax, percentual });
+    });
+    return faixas;
+  },
+
   limparFormRevendedora: function() {
     document.getElementById("rev-nome").value = "";
     document.getElementById("rev-whatsapp").value = "";
     document.getElementById("rev-comissao").value = "30";
     document.getElementById("rev-senha").value = "";
     document.getElementById("group-rev-senha").style.display = "block";
+
+    if (document.getElementById("rev-tipo-comissao")) document.getElementById("rev-tipo-comissao").value = "FIXA";
+    if (document.getElementById("rev-meta-valor")) document.getElementById("rev-meta-valor").value = "5000";
+    if (document.getElementById("rev-meta-bonus-tipo")) document.getElementById("rev-meta-bonus-tipo").value = "PERCENTUAL";
+    if (document.getElementById("rev-meta-bonus")) document.getElementById("rev-meta-bonus").value = "5";
+    this.ajustarCamposComissaoRev();
+    this.ajustarLabelsMetaRev();
+
+    const container = document.getElementById("rev-faixas-container");
+    if (container) {
+      container.innerHTML = `
+        <div style="color: var(--text-muted); font-size: 0.9rem; text-align: center; padding: 10px;" id="rev-faixas-vazio">
+          Nenhuma faixa cadastrada. Usará a comissão padrão.
+        </div>
+      `;
+    }
 
     // Reseta campos do ciclo
     document.getElementById("rev-ciclo-ativo").checked = false;
@@ -3698,6 +4252,29 @@ const app = {
       document.getElementById("rev-comissao").value = rev.comissao;
       document.getElementById("group-rev-senha").style.display = "none";
 
+      if (document.getElementById("rev-tipo-comissao")) document.getElementById("rev-tipo-comissao").value = rev.tipoComissao || "FIXA";
+      if (document.getElementById("rev-meta-valor")) document.getElementById("rev-meta-valor").value = rev.metaUnicaValor || 5000;
+      if (document.getElementById("rev-meta-bonus-tipo")) document.getElementById("rev-meta-bonus-tipo").value = rev.metaUnicaTipoBonus || "PERCENTUAL";
+      if (document.getElementById("rev-meta-bonus")) document.getElementById("rev-meta-bonus").value = rev.metaUnicaBonus || 5;
+      this.ajustarCamposComissaoRev();
+      this.ajustarLabelsMetaRev();
+
+      const container = document.getElementById("rev-faixas-container");
+      if (container) {
+        container.innerHTML = "";
+        if (rev.faixasComissao && rev.faixasComissao.length > 0) {
+          rev.faixasComissao.forEach(f => {
+            this.adicionarFaixaLinha(f.valorMin, f.valorMax, f.percentual);
+          });
+        } else {
+          container.innerHTML = `
+            <div style="color: var(--text-muted); font-size: 0.9rem; text-align: center; padding: 10px;" id="rev-faixas-vazio">
+              Nenhuma faixa cadastrada. Usará a comissão padrão.
+            </div>
+          `;
+        }
+      }
+
       // Carrega campos do ciclo
       const ciclo = rev.ciclo || { ativo: false, diaInicioConsignacao: 1, diaFimConsignacao: 30, diaInicioAcerto: 25, diaFimAcerto: 30 };
       document.getElementById("rev-ciclo-ativo").checked = !!ciclo.ativo;
@@ -3724,28 +4301,44 @@ const app = {
   },
 
   salvarNovaRevendedora: async function() {
-    const nome = document.getElementById("rev-nome").value.trim();
-    const whatsapp = document.getElementById("rev-whatsapp").value.trim();
-    const comissao = parseInt(document.getElementById("rev-comissao").value) || 30;
-    const editId = document.getElementById("btn-salvar-revendedora").getAttribute("data-edit-id");
+    const nomeEl = document.getElementById("rev-nome");
+    const whatsEl = document.getElementById("rev-whatsapp");
+    const nome = nomeEl ? nomeEl.value.trim() : "";
+    const whatsapp = whatsEl ? whatsEl.value.trim() : "";
+    const comissao = parseInt(document.getElementById("rev-comissao")?.value) || 30;
+    const editId = document.getElementById("btn-salvar-revendedora")?.getAttribute("data-edit-id");
 
     if (!nome || !whatsapp) {
       this.toast("Por favor, preencha o nome e o WhatsApp da revendedora.", "warning");
+      if (!nome && nomeEl) {
+        nomeEl.focus();
+        nomeEl.style.borderColor = "#ff4d4d";
+        setTimeout(() => { nomeEl.style.borderColor = ""; }, 3000);
+      } else if (!whatsapp && whatsEl) {
+        whatsEl.focus();
+        whatsEl.style.borderColor = "#ff4d4d";
+        setTimeout(() => { whatsEl.style.borderColor = ""; }, 3000);
+      }
       return;
     }
 
-    const senhaInput = document.getElementById("rev-senha").value.trim();
+    let senhaInput = document.getElementById("rev-senha") ? document.getElementById("rev-senha").value.trim() : "";
     if (!editId && !senhaInput) {
-      this.toast("Por favor, defina uma senha de acesso para a revendedora.", "warning");
-      return;
+      senhaInput = "Conecta@123";
     }
 
-    // Leitura dos campos de ciclo
-    const cicloAtivo = document.getElementById("rev-ciclo-ativo").checked;
-    const diaInicioConsignacao = parseInt(document.getElementById("rev-ciclo-inicio-consig").value) || 1;
-    const diaFimConsignacao = parseInt(document.getElementById("rev-ciclo-fim-consig").value) || 30;
-    const diaInicioAcerto = parseInt(document.getElementById("rev-ciclo-inicio-acerto").value) || 25;
-    const diaFimAcerto = parseInt(document.getElementById("rev-ciclo-fim-acerto").value) || 30;
+    // Leitura dos campos de comissão e ciclo
+    const tipoComissao = document.getElementById("rev-tipo-comissao")?.value || "FIXA";
+    const metaUnicaValor = parseFloat(document.getElementById("rev-meta-valor")?.value) || 0;
+    const metaUnicaTipoBonus = document.getElementById("rev-meta-bonus-tipo")?.value || "PERCENTUAL";
+    const metaUnicaBonus = parseFloat(document.getElementById("rev-meta-bonus")?.value) || 0;
+    const faixasComissao = tipoComissao === "PROGRESSIVA" ? this.obterFaixasComissaoDaUI() : [];
+
+    const cicloAtivo = document.getElementById("rev-ciclo-ativo")?.checked || false;
+    const diaInicioConsignacao = parseInt(document.getElementById("rev-ciclo-inicio-consig")?.value) || 1;
+    const diaFimConsignacao = parseInt(document.getElementById("rev-ciclo-fim-consig")?.value) || 30;
+    const diaInicioAcerto = parseInt(document.getElementById("rev-ciclo-inicio-acerto")?.value) || 25;
+    const diaFimAcerto = parseInt(document.getElementById("rev-ciclo-fim-acerto")?.value) || 30;
 
     const cicloObj = {
       ativo: cicloAtivo,
@@ -3759,7 +4352,17 @@ const app = {
       if (editId) {
         // Envia atualização para a API Azure se autenticado
         if (this.state.token && !this.state.token.startsWith('mock_')) {
-          await this.requisitarAPI(`/revendedoras/${editId}`, "PUT", { nome, whatsapp, comissao, ciclo: cicloObj });
+          await this.requisitarAPI(`/revendedoras/${editId}`, "PUT", { 
+            nome, 
+            whatsapp, 
+            comissao, 
+            tipoComissao,
+            metaUnicaValor,
+            metaUnicaBonus,
+            metaUnicaTipoBonus,
+            faixasComissao,
+            ciclo: cicloObj 
+          });
         }
         
         // Atualização no estado local
@@ -3768,6 +4371,11 @@ const app = {
           rev.nome = nome;
           rev.whatsapp = whatsapp;
           rev.comissao = comissao;
+          rev.tipoComissao = tipoComissao;
+          rev.metaUnicaValor = metaUnicaValor;
+          rev.metaUnicaBonus = metaUnicaBonus;
+          rev.metaUnicaTipoBonus = metaUnicaTipoBonus;
+          rev.faixasComissao = faixasComissao;
           rev.ciclo = cicloObj;
         }
       } else {
@@ -3783,6 +4391,11 @@ const app = {
             role: "revendedora",
             whatsapp,
             comissao,
+            tipoComissao,
+            metaUnicaValor,
+            metaUnicaBonus,
+            metaUnicaTipoBonus,
+            faixasComissao,
             ciclo: cicloObj
           });
           novaRev = {
@@ -3790,6 +4403,11 @@ const app = {
             nome,
             whatsapp,
             comissao,
+            tipoComissao: res.usuario.tipoComissao || tipoComissao,
+            metaUnicaValor: res.usuario.metaUnicaValor || metaUnicaValor,
+            metaUnicaBonus: res.usuario.metaUnicaBonus || metaUnicaBonus,
+            metaUnicaTipoBonus: res.usuario.metaUnicaTipoBonus || metaUnicaTipoBonus,
+            faixasComissao: res.usuario.faixasComissao || faixasComissao,
             pin: res.usuario.pin,
             consignado: [],
             historico: [],
@@ -3802,6 +4420,11 @@ const app = {
             nome: nome,
             whatsapp: whatsapp,
             comissao: comissao,
+            tipoComissao,
+            metaUnicaValor,
+            metaUnicaBonus,
+            metaUnicaTipoBonus,
+            faixasComissao,
             pin: Math.floor(1000 + Math.random() * 9000).toString(),
             consignado: [],
             historico: [],
@@ -3816,17 +4439,18 @@ const app = {
       this.renderizarRevendedoras();
       this.renderizarDashboard();
       
-      document.getElementById("modal-revendedora").classList.remove("active");
+      this.fecharModalRevendedora();
       
       if (editId) {
         this.toast("Cadastro de revendedora atualizado com sucesso!", "success");
       } else {
-        const pinCriado = this.state.revendedoras.find(r => r.id === this.state.revendedoraSelecionadaId).pin;
+        const revSalva = this.state.revendedoras.find(r => r.id === this.state.revendedoraSelecionadaId);
+        const pinCriado = revSalva ? revSalva.pin : "1234";
         alert(`Revendedora cadastrada com sucesso!\n\n🔑 PIN de Acesso: ${pinCriado}\n🔒 Senha: ${senhaInput}\n\nInforme esses dados para a revendedora acessar o aplicativo.`);
       }
     } catch (error) {
       console.error(error);
-      this.toast("Erro ao salvar dados da revendedora no banco de dados Azure: " + error.message, "error");
+      this.toast("Erro ao salvar dados da revendedora no banco de dados: " + error.message, "error");
     }
   },
 
@@ -4638,6 +5262,10 @@ ${dinheiroAReceberDaRev >= comissaoApagarParaRev
 
   // 12. LÓGICA DE INTEGRAÇÃO COM PLANILHAS EXCEL IMPORTAÇÃO
   processarImportacaoExcel: function(event) {
+    if (!this.validarAcessoRecurso('importar-excel')) {
+      event.target.value = "";
+      return;
+    }
     const file = event.target.files[0];
     if (file) {
       ExcelHandler.importarEstoque(file, (produtos) => this.mesclarEstoqueImportado(produtos));
@@ -5122,26 +5750,37 @@ ${dinheiroAReceberDaRev >= comissaoApagarParaRev
   },
 
   mudarSubAbaRevendedora: function(aba) {
+    this.state.subAbaRevendedoraAtiva = aba || 'maleta';
+
     // Esconde todas as sub-abas da revendedora
-    document.getElementById("sub-aba-rev-maleta").style.display = "none";
-    document.getElementById("sub-aba-rev-historico").style.display = "none";
-    document.getElementById("sub-aba-rev-vendas").style.display = "none";
+    const abas = ["maleta", "historico", "vendas", "cofre"];
+    abas.forEach(x => {
+      const el = document.getElementById(`sub-aba-rev-${x}`);
+      if (el) el.style.display = "none";
+    });
     
     // Remove classe active de todos os botões
-    document.getElementById("btn-subtab-maleta").classList.remove("active");
-    document.getElementById("btn-subtab-historico").classList.remove("active");
-    document.getElementById("btn-subtab-vendas-rev").classList.remove("active");
+    const botoes = {
+      maleta: "btn-subtab-maleta",
+      historico: "btn-subtab-historico",
+      vendas: "btn-subtab-vendas-rev",
+      cofre: "btn-subtab-cofre"
+    };
+    Object.values(botoes).forEach(btnId => {
+      const el = document.getElementById(btnId);
+      if (el) el.classList.remove("active");
+    });
     
-    if (aba === "maleta") {
-      document.getElementById("sub-aba-rev-maleta").style.display = "block";
-      document.getElementById("btn-subtab-maleta").classList.add("active");
-    } else if (aba === "vendas") {
-      document.getElementById("sub-aba-rev-vendas").style.display = "block";
-      document.getElementById("btn-subtab-vendas-rev").classList.add("active");
+    const activeBtn = document.getElementById(botoes[aba]);
+    if (activeBtn) activeBtn.classList.add("active");
+
+    const activeSubTab = document.getElementById(`sub-aba-rev-${aba}`);
+    if (activeSubTab) activeSubTab.style.display = "block";
+
+    if (aba === "vendas") {
       this.renderizarVendasIndividuaisRevendedora();
-    } else if (aba === "historico") {
-      document.getElementById("sub-aba-rev-historico").style.display = "block";
-      document.getElementById("btn-subtab-historico").classList.add("active");
+    } else if (aba === "cofre") {
+      this.carregarCofreRevendedora();
     }
   },
 
@@ -5190,15 +5829,23 @@ ${dinheiroAReceberDaRev >= comissaoApagarParaRev
       const vendasConsolidadas = [];
       
       vendasDiretas.forEach(v => {
+        const qtd = Number(v.quantidade) || 1;
+        const totalVenda = Number(v.preco) || 0;
+        const desc = Number(v.desconto) || 0;
+        const precoBrutoUnit = qtd > 0 ? (totalVenda + desc) / qtd : totalVenda;
+
         vendasConsolidadas.push({
           id: v.id,
           data: v.data,
           tipo: 'direta',
           nomeProduto: v.nome,
           codigoProduto: v.codigo,
-          quantidade: 1,
-          precoVenda: v.preco,
-          total: v.preco,
+          quantidade: qtd,
+          precoVenda: precoBrutoUnit,
+          total: totalVenda,
+          desconto: desc,
+          motivoDesconto: v.motivoDesconto || '',
+          formaPagamento: v.formaPagamento || 'Pix',
           comissao: 0,
           vendedor: 'Conecta Joias (Direta)',
           contato: v.whatsappCliente || '—',
@@ -5525,10 +6172,77 @@ ${dinheiroAReceberDaRev >= comissaoApagarParaRev
     try {
       const clientes = await this.requisitarAPI("/clientes");
       this.state.clientes = clientes || [];
+      this.carregarAniversariantes();
     } catch (err) {
       console.warn("Não foi possível carregar clientes:", err.message);
       this.state.clientes = [];
     }
+  },
+
+  carregarAniversariantes: async function() {
+    if (!this.state.token || this.state.token.startsWith("mock_")) return;
+    try {
+      const data = await this.requisitarAPI("/clientes/aniversariantes");
+      if (data && (data.hoje.length > 0 || data.mes.length > 0)) {
+        this.renderizarWidgetAniversariantes(data);
+      }
+    } catch (err) {
+      console.warn("Não foi possível carregar aniversariantes:", err.message);
+    }
+  },
+
+  renderizarWidgetAniversariantes: function(data) {
+    const container = document.getElementById("widget-aniversariantes-container");
+    if (!container) return;
+    
+    if (!data || (data.hoje.length === 0 && data.mes.length === 0)) {
+      container.style.display = "none";
+      return;
+    }
+
+    let itemsHTML = "";
+    if (data.hoje.length > 0) {
+      itemsHTML += `<div style="color: #81c784; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.4rem;"><i class="fa-solid fa-cake-candles"></i> Aniversariantes de HOJE:</div>`;
+      data.hoje.forEach(c => {
+        const num = c.whatsapp ? c.whatsapp.replace(/\D/g, '') : '';
+        const msg = encodeURIComponent(`Parabéns, ${c.nome}! 🎂✨ Desejamos um aniversário iluminado e cheio de brilho! Em celebração ao seu dia, preparamos um presente especial para você na nossa loja de semijoias. 💎💖`);
+        itemsHTML += `
+          <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(129, 199, 132, 0.1); border: 1px solid rgba(129, 199, 132, 0.3); padding: 0.5rem 0.8rem; border-radius: 8px; margin-bottom: 0.4rem;">
+            <div><strong>${c.nome}</strong> <span style="font-size: 0.75rem; color: var(--text-secondary);">(Atendida por: ${c.usuario ? c.usuario.nome : 'Loja'})</span></div>
+            <a href="https://wa.me/55${num}?text=${msg}" target="_blank" class="btn-sm" style="background: #25D366; color: #fff; text-decoration: none; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+              <i class="fa-brands fa-whatsapp"></i> Parabenizar
+            </a>
+          </div>
+        `;
+      });
+    }
+
+    if (data.mes.length > 0) {
+      itemsHTML += `<div style="color: var(--gold-primary); font-weight: 600; font-size: 0.85rem; margin-top: 0.6rem; margin-bottom: 0.4rem;"><i class="fa-solid fa-calendar-days"></i> Aniversariantes deste Mês (${data.mes.length}):</div>`;
+      data.mes.forEach(c => {
+        const num = c.whatsapp ? c.whatsapp.replace(/\D/g, '') : '';
+        const msg = encodeURIComponent(`Olá, ${c.nome}! 🎂✨ Passando para lembrar que este mês é o seu aniversário! Temos um carinho especial por você na nossa loja. 💎💖`);
+        itemsHTML += `
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.6rem; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.82rem;">
+            <span>${c.nome} - <small style="color: var(--text-secondary);">${c.dataNascimento}</small></span>
+            <a href="https://wa.me/55${num}?text=${msg}" target="_blank" style="color: #25D366; text-decoration: none; font-size: 0.8rem;">
+              <i class="fa-brands fa-whatsapp"></i> WhatsApp
+            </a>
+          </div>
+        `;
+      });
+    }
+
+    container.innerHTML = `
+      <div class="card" style="margin-bottom: 1.5rem; border: 1px solid rgba(212, 175, 55, 0.3); background: rgba(212, 175, 55, 0.03); border-radius: 12px; padding: 1.2rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
+          <h3 style="font-size: 1rem; color: var(--gold-light); display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-gift" style="color: var(--gold-primary);"></i> Central de Aniversariantes</h3>
+          <span style="font-size: 0.75rem; background: rgba(212, 175, 55, 0.15); color: var(--gold-primary); padding: 2px 8px; border-radius: 10px;">CRM</span>
+        </div>
+        ${itemsHTML}
+      </div>
+    `;
+    container.style.display = "block";
   },
 
   renderizarClientes: function() {
@@ -6733,71 +7447,382 @@ ${dinheiroAReceberDaRev >= comissaoApagarParaRev
   },
 
   // 13. SISTEMA DE SEGURANÇA E COFRE VIRTUAL DA CONSULTORA
-  checarRgObrigatorio: async function() {
-    if (this.state.token && this.state.token.startsWith("mock_")) {
+  carregarCofreRevendedora: async function() {
+    const grid = document.getElementById("detalhe-documentos-grid");
+    if (!grid) return;
+
+    const revId = this.state.revendedoraSelecionadaId;
+    if (!revId) {
+      grid.innerHTML = `<p style="color: var(--text-muted); font-style: italic;">Nenhuma revendedora selecionada.</p>`;
       return;
     }
 
+    grid.innerHTML = `<p style="color: var(--text-muted); font-style: italic;"><i class="fa-solid fa-spinner fa-spin"></i> Carregando documentos do cofre...</p>`;
+
     try {
-      const res = await this.requisitarAPI(`/usuarios/${this.state.usuarioLogado.id}/documentos`);
-      const docs = res && res.documentos ? res.documentos : [];
-      
-      const temFrente = docs.some(d => d.tipo === "RG_FRENTE");
-      const temVerso = docs.some(d => d.tipo === "RG_VERSO");
-      
-      const modal = document.getElementById("modal-upload-rg-obrigatorio");
-      if (modal) {
-        if (!temFrente || !temVerso) {
-          modal.style.display = "flex";
-        } else {
-          modal.style.display = "none";
+      let docs = [];
+      if (this.state.token && !this.state.token.startsWith("mock_")) {
+        const res = await this.requisitarAPI(`/usuarios/${revId}/documentos`);
+        docs = res && res.documentos ? res.documentos : [];
+      } else {
+        const key = `conectajoias_documentos_${revId}`;
+        docs = JSON.parse(localStorage.getItem(key) || "[]");
+      }
+
+      grid.innerHTML = "";
+
+      if (docs.length === 0) {
+        grid.innerHTML = `
+          <div style="grid-column: span 2; text-align: center; padding: 2rem; color: var(--text-secondary); background: rgba(255,255,255,0.01); border: 1px dashed rgba(212,175,55,0.15); border-radius: 8px;">
+            <i class="fa-solid fa-shield-halved" style="font-size: 2rem; color: var(--gold-primary); opacity: 0.3; margin-bottom: 0.5rem; display: block;"></i>
+            Nenhum documento anexado ao cofre virtual desta revendedora.
+          </div>
+        `;
+        return;
+      }
+
+      const nomesTipos = {
+        'RG': 'RG / Identidade (Frente e Verso)',
+        'RG_FRENTE': 'RG / CNH (Frente)',
+        'RG_VERSO': 'RG / CNH (Verso)',
+        'CPF': 'CPF',
+        'COMPROVANTE_RESIDENCIA': 'Comprovante de Residência',
+        'TERMO_RESPONSABILIDADE': 'Termo de Responsabilidade'
+      };
+
+      docs.forEach(doc => {
+        const card = document.createElement("div");
+        card.className = "metric-card";
+        card.style.flexDirection = "column";
+        card.style.gap = "0.8rem";
+        card.style.padding = "1rem";
+        card.style.borderColor = "rgba(255,255,255,0.05)";
+        card.style.background = "rgba(0,0,0,0.2)";
+
+        const tipoTexto = nomesTipos[doc.tipo] || doc.tipo;
+        const dataEnvio = new Date(doc.createdAt).toLocaleDateString('pt-BR');
+        
+        let pathUrl = doc.caminhoUrl;
+        if (pathUrl && !pathUrl.startsWith("http") && !pathUrl.startsWith("/")) {
+          pathUrl = "/" + pathUrl;
         }
+        const urlCompleta = (pathUrl && pathUrl.startsWith("/")) ? `${this.state.apiUrl.replace('/api', '')}${pathUrl}` : pathUrl;
+
+        const isPdf = doc.nomeArquivo && doc.nomeArquivo.toLowerCase().endsWith('.pdf');
+        
+        let visualizacaoHtml = "";
+        if (isPdf) {
+          visualizacaoHtml = `
+            <div style="display: flex; align-items: center; justify-content: center; height: 120px; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px dashed rgba(212,175,55,0.15);">
+              <i class="fa-solid fa-file-pdf" style="font-size: 3rem; color: #ef5350; cursor: pointer;" onclick="window.open('${urlCompleta}', '_blank')"></i>
+            </div>
+          `;
+        } else {
+          visualizacaoHtml = `
+            <div style="height: 120px; overflow: hidden; background: #000; border-radius: 8px; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(212,175,55,0.1);">
+              <img src="${urlCompleta}" style="max-width: 100%; max-height: 100%; object-fit: contain; cursor: pointer;" onclick="window.open('${urlCompleta}', '_blank')" title="Clique para abrir imagem original">
+            </div>
+          `;
+        }
+
+        card.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%;">
+            <div>
+              <h5 style="color: var(--gold-light); font-size: 0.85rem; margin: 0;">${tipoTexto}</h5>
+              <small style="color: var(--text-muted); font-size: 0.72rem;">Enviado em: ${dataEnvio}</small>
+            </div>
+            <a href="${urlCompleta}" target="_blank" class="btn-outline-gold" style="padding: 2px 8px; font-size: 0.7rem; display: inline-flex; align-items: center; gap: 4px;" title="Ver Arquivo">
+              <i class="fa-solid fa-external-link"></i> Abrir
+            </a>
+          </div>
+          ${visualizacaoHtml}
+          <div style="font-size: 0.72rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%;" title="${doc.nomeArquivo}">
+            📄 ${doc.nomeArquivo}
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    } catch (e) {
+      console.error("Erro ao listar documentos na manager:", e);
+      grid.innerHTML = `<p style="color: var(--error); font-style: italic;">Erro ao carregar documentos do cofre.</p>`;
+    }
+  },
+
+  abrirModalSolicitarNovoRG: function() {
+    const modal = document.getElementById("modal-solicitar-novo-rg");
+    if (modal) {
+      modal.style.display = "flex";
+      modal.classList.add("active");
+      const textarea = document.getElementById("solicitacao-rg-motivo");
+      if (textarea) textarea.value = "";
+    }
+  },
+
+  fecharModalSolicitarNovoRG: function() {
+    const modal = document.getElementById("modal-solicitar-novo-rg");
+    if (modal) {
+      modal.style.display = "none";
+      modal.classList.remove("active");
+    }
+  },
+
+  confirmarSolicitacaoNovoRG: async function(event) {
+    event.preventDefault();
+    const revId = this.state.revendedoraSelecionadaId;
+    if (!revId) return;
+
+    const btn = document.getElementById("btn-submit-solicitar-novo-rg");
+    const motivo = document.getElementById("solicitacao-rg-motivo").value.trim();
+
+    if (!motivo) {
+      this.toast("Por favor, digite o motivo da solicitação.", "warning");
+      return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando...';
+
+    try {
+      if (this.state.token && !this.state.token.startsWith("mock_")) {
+        const response = await fetch(`${this.state.apiUrl}/revendedoras/${revId}/solicitar-novo-rg`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${this.state.token}`
+          },
+          body: JSON.stringify({ motivo })
+        });
+
+        const res = await response.json();
+        if (!response.ok) {
+          throw new Error(res.error || "Erro ao solicitar novo RG.");
+        }
+      } else {
+        // Fallback local
+        const key = `conectajoias_documentos_${revId}`;
+        const docs = JSON.parse(localStorage.getItem(key) || "[]");
+        const filteredDocs = docs.filter(d => d.tipo !== 'RG' && d.tipo !== 'RG_FRENTE' && d.tipo !== 'RG_VERSO');
+        localStorage.setItem(key, JSON.stringify(filteredDocs));
+        this.toast("[DEMO] RG removido localmente.", "success");
+      }
+
+      this.toast("Nova solicitação de RG enviada com sucesso!", "success");
+      this.fecharModalSolicitarNovoRG();
+      this.carregarCofreRevendedora();
+    } catch (e) {
+      this.toast("Erro ao solicitar nova foto: " + e.message, "error");
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Enviar Solicitação';
+    }
+  },
+
+  checarRgObrigatorio: async function() {
+    if (!this.state.usuarioLogado) return;
+
+    // Se o plano da loja for BÁSICO ou BRONZE, os documentos não são obrigatórios para uso do app
+    const plano = (this.state.usuarioLogado.planoLoja || "BASICO").toUpperCase();
+    if (plano === "BASICO" || plano === "BRONZE") {
+      this.desbloquearDashboard();
+      return;
+    }
+
+    // Apenas aplica verificação de RG obrigatório para consultoras / revendedoras
+    const role = (this.state.usuarioLogado.role || "").toLowerCase();
+    const isReseller = role === "vendedora" || role === "consultant" || role === "revendedora";
+    if (!isReseller) {
+      this.desbloquearDashboard();
+      return;
+    }
+
+    let docs = [];
+    try {
+      if (this.state.token && !this.state.token.startsWith("mock_")) {
+        const res = await this.requisitarAPI(`/usuarios/${this.state.usuarioLogado.id}/documentos`);
+        docs = res && res.documentos ? res.documentos : [];
+      } else {
+        // Fallback local/demo
+        const key = `conectajoias_documentos_${this.state.usuarioLogado.id}`;
+        docs = JSON.parse(localStorage.getItem(key) || "[]");
       }
     } catch (e) {
-      console.error("Erro ao checar RG obrigatório:", e);
+      console.warn("Aviso ao verificar RG obrigatório:", e.message);
+      const key = `conectajoias_documentos_${this.state.usuarioLogado.id}`;
+      docs = JSON.parse(localStorage.getItem(key) || "[]");
+    }
+
+    const temFrente = docs.some(d => d.tipo === "RG_FRENTE" || d.tipo === "rgFrente");
+    const temVerso = docs.some(d => d.tipo === "RG_VERSO" || d.tipo === "rgVerso");
+    const temTermo = docs.some(d => d.tipo === "TERMO_RESPONSABILIDADE" || d.tipo === "termo" || d.tipo === "TERMO_CONSIGNACAO");
+    
+    const modal = document.getElementById("modal-upload-rg-obrigatorio");
+    if (!temFrente || !temVerso || !temTermo) {
+      if (modal) {
+        modal.style.display = "flex";
+        modal.classList.add("active");
+
+        const elFrente = document.getElementById("wrapper-rg-frente");
+        const elVerso = document.getElementById("wrapper-rg-verso");
+        const elTermo = document.getElementById("wrapper-termo-resp");
+        
+        if (elFrente) elFrente.style.display = temFrente ? "none" : "block";
+        if (elVerso) elVerso.style.display = temVerso ? "none" : "block";
+        if (elTermo) elTermo.style.display = temTermo ? "none" : "block";
+
+        const pDesc = modal.querySelector("p");
+        if (pDesc) {
+          let listaFaltantes = [];
+          if (!temFrente) listaFaltantes.push("frente do RG/CNH");
+          if (!temVerso) listaFaltantes.push("verso do RG/CNH");
+          if (!temTermo) listaFaltantes.push("termo de responsabilidade assinado");
+          
+          pDesc.innerHTML = `Olá! Para a sua segurança jurídica e validação da retirada do seu consignado, é obrigatório realizar o upload do(a) <strong>${listaFaltantes.join(", ")}</strong> antes de prosseguir no sistema.`;
+        }
+      }
+      this.bloquearDashboardPorFaltaDeDocumento();
+    } else {
+      if (modal) {
+        modal.style.display = "none";
+        modal.classList.remove("active");
+      }
+      this.desbloquearDashboard();
+    }
+  },
+
+  bloquearDashboardPorFaltaDeDocumento: function() {
+    const mainWrapper = document.querySelector(".app-layout") || document.querySelector(".main-content");
+    if (mainWrapper) {
+      mainWrapper.style.pointerEvents = "none";
+      mainWrapper.style.filter = "blur(3px)";
+      mainWrapper.style.userSelect = "none";
+    }
+  },
+
+  desbloquearDashboard: function() {
+    const mainWrapper = document.querySelector(".app-layout") || document.querySelector(".main-content");
+    if (mainWrapper) {
+      mainWrapper.style.pointerEvents = "";
+      mainWrapper.style.filter = "";
+      mainWrapper.style.userSelect = "";
     }
   },
 
   enviarRgObrigatorio: async function(event) {
     event.preventDefault();
     const btn = document.getElementById("btn-submit-rg-obrigatorio");
+    
     const inputFrente = document.getElementById("rg-frente-file");
     const inputVerso = document.getElementById("rg-verso-file");
+    const inputTermo = document.getElementById("termo-file");
 
-    if (!inputFrente || !inputVerso || !inputFrente.files[0] || !inputVerso.files[0]) {
-      this.toast("Por favor, selecione ambos os arquivos (frente e verso).", "warning");
+    const wrapperFrente = document.getElementById("wrapper-rg-frente");
+    const wrapperVerso = document.getElementById("wrapper-rg-verso");
+    const wrapperTermo = document.getElementById("wrapper-termo-resp");
+
+    const formData = new FormData();
+    const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+
+    // Validar e anexar RG Frente se estiver visível
+    if (wrapperFrente && wrapperFrente.style.display !== "none") {
+      if (!inputFrente || !inputFrente.files[0]) {
+        this.toast("Por favor, selecione a foto da Frente do seu RG.", "warning");
+        return;
+      }
+      if (inputFrente.files[0].size > MAX_SIZE) {
+        this.toast("O arquivo da Frente do RG excede o limite de 5MB.", "error");
+        return;
+      }
+      formData.append("rgFrente", inputFrente.files[0]);
+    }
+
+    // Validar e anexar RG Verso se estiver visível
+    if (wrapperVerso && wrapperVerso.style.display !== "none") {
+      if (!inputVerso || !inputVerso.files[0]) {
+        this.toast("Por favor, selecione a foto do Verso do seu RG.", "warning");
+        return;
+      }
+      if (inputVerso.files[0].size > MAX_SIZE) {
+        this.toast("O arquivo do Verso do RG excede o limite de 5MB.", "error");
+        return;
+      }
+      formData.append("rgVerso", inputVerso.files[0]);
+    }
+
+    // Validar e anexar Termo se estiver visível
+    if (wrapperTermo && wrapperTermo.style.display !== "none") {
+      if (!inputTermo || !inputTermo.files[0]) {
+        this.toast("Por favor, selecione o Termo de Responsabilidade assinado.", "warning");
+        return;
+      }
+      if (inputTermo.files[0].size > MAX_SIZE) {
+        this.toast("O arquivo do Termo excede o limite de 5MB.", "error");
+        return;
+      }
+      formData.append("documento", inputTermo.files[0]);
+    }
+
+    let temArquivo = false;
+    for (var key of formData.keys()) {
+      temArquivo = true;
+    }
+    if (!temArquivo) {
+      this.toast("Nenhum novo documento anexado para enviar.", "warning");
       return;
     }
 
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando documentos...';
 
-    const formData = new FormData();
-    formData.append("rgFrente", inputFrente.files[0]);
-    formData.append("rgVerso", inputVerso.files[0]);
-
     try {
-      const response = await fetch(`${this.state.apiUrl}/usuarios/documentos/upload`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${this.state.token}`
-        },
-        body: formData
-      });
+      if (this.state.token && !this.state.token.startsWith("mock_")) {
+        const response = await fetch(`${this.state.apiUrl}/usuarios/documentos/upload?tipo=TERMO_RESPONSABILIDADE`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${this.state.token}`
+          },
+          body: formData
+        });
 
-      const res = await response.json();
-      if (!response.ok) {
-        throw new Error(res.error || "Erro no upload.");
+        const res = await response.json();
+        if (!response.ok) {
+          throw new Error(res.error || "Erro no upload.");
+        }
+      } else {
+        // Fallback local para testes e modo offline
+        const userId = this.state.usuarioLogado ? this.state.usuarioLogado.id : "default";
+        const key = `conectajoias_documentos_${userId}`;
+        const docs = JSON.parse(localStorage.getItem(key) || "[]");
+
+        if (inputFrente && inputFrente.files[0]) {
+          docs.push({ id: "doc_frente_" + Date.now(), tipo: "RG_FRENTE", nomeArquivo: inputFrente.files[0].name, createdAt: new Date().toISOString(), caminhoUrl: "/uploads/documentos/ficticio_frente.png" });
+        }
+        if (inputVerso && inputVerso.files[0]) {
+          docs.push({ id: "doc_verso_" + Date.now(), tipo: "RG_VERSO", nomeArquivo: inputVerso.files[0].name, createdAt: new Date().toISOString(), caminhoUrl: "/uploads/documentos/ficticio_verso.png" });
+        }
+        if (inputTermo && inputTermo.files[0]) {
+          docs.push({ id: "doc_termo_" + Date.now(), tipo: "TERMO_RESPONSABILIDADE", nomeArquivo: inputTermo.files[0].name, createdAt: new Date().toISOString(), caminhoUrl: "/uploads/documentos/ficticio_termo.png" });
+        }
+
+        localStorage.setItem(key, JSON.stringify(docs));
       }
 
-      this.toast("Fotos do RG salvas com sucesso no cofre!", "success");
-      document.getElementById("modal-upload-rg-obrigatorio").style.display = "none";
+      this.toast("Documentos salvos com sucesso! Acesso liberado. ✨", "success");
       
+      const rgModal = document.getElementById("modal-upload-rg-obrigatorio");
+      if (rgModal) {
+        rgModal.style.display = "none";
+        rgModal.classList.remove("active");
+      }
+      
+      this.desbloquearDashboard();
+
       if (this.state.abaAtiva === "cofre-virtual") {
         this.carregarCofreVirtualProprio();
       }
     } catch (e) {
+      console.error("Erro ao enviar RG:", e);
       this.toast("Erro ao enviar documentos: " + e.message, "error");
+    } finally {
       btn.disabled = false;
       btn.innerHTML = '<i class="fa-solid fa-upload"></i> Salvar no Cofre Virtual e Entrar';
     }
@@ -6940,6 +7965,8 @@ ${dinheiroAReceberDaRev >= comissaoApagarParaRev
       const res = await this.requisitarAPI('/saas/meu-plano');
       if (!res) return;
 
+      this.state.dadosSaaS = res;
+
       const elNome = document.getElementById("saas-plano-nome");
       const elStatus = document.getElementById("saas-plano-badge-status");
       const elVenc = document.getElementById("saas-plano-vencimento");
@@ -6981,10 +8008,10 @@ ${dinheiroAReceberDaRev >= comissaoApagarParaRev
 
   abrirModalCheckoutPlano: function(plano) {
     this.planoSaasSelecionado = plano || 'GOLD';
-    const valores = { BRONZE: 'R$ 147,00', GOLD: 'R$ 297,00', PLATINUM: 'R$ 497,00' };
+    const valores = { BRONZE: 'R$ 69,90', GOLD: 'R$ 99,90', PLATINUM: 'R$ 249,90' };
 
     document.getElementById("modal-saas-plano-nome").innerText = `Plano ${this.planoSaasSelecionado}`;
-    document.getElementById("modal-saas-plano-valor").innerText = valores[this.planoSaasSelecionado] || 'R$ 297,00';
+    document.getElementById("modal-saas-plano-valor").innerText = valores[this.planoSaasSelecionado] || 'R$ 99,90';
     
     // Reseta estado das seções PIX / Boleto
     document.getElementById("sec-saas-pix-qr").style.display = "none";
@@ -6993,11 +8020,19 @@ ${dinheiroAReceberDaRev >= comissaoApagarParaRev
     document.getElementById("btn-gerar-saas-boleto").style.display = "block";
     
     this.selecionarFormaSaas('pix');
-    document.getElementById("modal-checkout-plano-saas").style.display = "flex";
+    const saasModal = document.getElementById("modal-checkout-plano-saas");
+    if (saasModal) {
+      saasModal.style.display = "flex";
+      saasModal.classList.add("active");
+    }
   },
 
   fecharModalCheckoutPlano: function() {
-    document.getElementById("modal-checkout-plano-saas").style.display = "none";
+    const saasModal = document.getElementById("modal-checkout-plano-saas");
+    if (saasModal) {
+      saasModal.style.display = "none";
+      saasModal.classList.remove("active");
+    }
     this.pararPollingPlanoSaaS();
   },
 
@@ -7129,6 +8164,63 @@ ${dinheiroAReceberDaRev >= comissaoApagarParaRev
     if (this.pollingTimerSaas) {
       clearInterval(this.pollingTimerSaas);
       this.pollingTimerSaas = null;
+    }
+  },
+
+  enviarReporteErro: async function(e) {
+    if (e) e.preventDefault();
+    const titulo = document.getElementById("reporte-titulo").value.trim();
+    const descricao = document.getElementById("reporte-descricao").value.trim();
+    const categoria = document.getElementById("reporte-categoria").value;
+    const anexoInput = document.getElementById("reporte-anexo");
+    const btn = document.getElementById("btn-enviar-bug-report");
+
+    if (!titulo || !descricao) {
+      this.toast("Por favor, preencha o título e a descrição do problema.", "warning");
+      return;
+    }
+
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Enviando...`;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append("titulo", titulo);
+      formData.append("descricao", descricao);
+      formData.append("categoria", categoria);
+      formData.append("urlOrigem", window.location.href);
+      
+      if (anexoInput && anexoInput.files && anexoInput.files[0]) {
+        formData.append("anexo", anexoInput.files[0]);
+      }
+
+      const lojaId = localStorage.getItem("conectajoias_loja_id") || "default-loja";
+      const response = await fetch(`${this.state.apiUrl}/reportes-erro`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${this.state.token}`,
+          "x-loja-id": lojaId
+        },
+        body: formData
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Erro ao registrar reporte.");
+      }
+
+      this.toast("Reporte de erro enviado com sucesso! A administração analisará o problema.", "success");
+      document.getElementById("modal-reportar-erro").style.display = "none";
+      document.getElementById("form-reportar-erro").reset();
+    } catch (err) {
+      this.toast("Erro ao enviar reporte: " + err.message, "danger");
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> Enviar Reporte`;
+      }
     }
   }
 

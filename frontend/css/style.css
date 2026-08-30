@@ -187,6 +187,35 @@ body {
   transform: scale(1.1);
 }
 
+/* Classes de Travamento por Plano (Cadeado) */
+.nav-item.locked button {
+  opacity: 0.55;
+  cursor: pointer;
+}
+.nav-item.locked button:hover {
+  transform: none;
+  background-color: rgba(255, 255, 255, 0.01) !important;
+  border-color: transparent !important;
+}
+.nav-item.locked button::after {
+  content: "\f023"; /* Ícone de cadeado do Font Awesome */
+  font-family: "Font Awesome 6 Free";
+  font-weight: 900;
+  margin-left: auto;
+  color: var(--gold-primary);
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
+.btn-locked {
+  position: relative;
+  opacity: 0.7;
+}
+.btn-locked::after {
+  content: " 🔒";
+  font-size: 0.85rem;
+}
+
 .sidebar-footer {
   margin-top: auto;
   font-size: 0.75rem;
@@ -207,15 +236,30 @@ body {
 /* Seções de Conteúdo */
 .app-section {
   display: none;
-  animation: fadeIn 0.5s ease;
 }
 
 .app-section.active {
   display: block;
+  animation: fadeIn 0.4s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+}
+
+/* Transições das Sub-abas de Revendedoras */
+.sub-aba-rev {
+  animation: fadeInSubTab 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+}
+
+/* Feedback Táctil de Clique nos Botões Premium */
+.btn-gold:active, .btn-outline-gold:active, .btn-danger:active, .btn-outline:active {
+  transform: translateY(0) scale(0.97);
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(15px); }
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInSubTab {
+  from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -1209,17 +1253,20 @@ body {
   background-color: rgba(0, 0, 0, 0.85);
   backdrop-filter: blur(8px);
   z-index: 200;
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   opacity: 0;
   visibility: hidden;
+  pointer-events: none;
   transition: all 0.3s ease;
 }
 
 .modal-backdrop.active {
-  opacity: 1;
-  visibility: visible;
+  display: flex !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
 }
 
 .modal-card {
