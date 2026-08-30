@@ -224,6 +224,29 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'frontend', 'pages', 'apresentacao.html'));
 });
 
+// Aliases para as páginas principais dentro da pasta pages ficarem acessíveis a partir do nível da raiz
+const paginas = [
+  'login.html',
+  'manager.html',
+  'superadmin.html',
+  'pagamento.html',
+  'sucesso.html',
+  'falha.html',
+  'recibo.html',
+  'saasadmin.html',
+  'onboarding.html',
+  'termo_assinatura.html',
+  'termos_uso.html',
+  'politica_privacidade.html',
+  'apresentacao.html'
+];
+
+paginas.forEach(pagina => {
+  app.get(`/${pagina}`, (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'frontend', 'pages', pagina));
+  });
+});
+
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
 
 // Configuração do Multer para Imagens em Memória
