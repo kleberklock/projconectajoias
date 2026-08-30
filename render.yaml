@@ -3,9 +3,8 @@ services:
     name: projconectajoias
     runtime: node
     plan: free
-    rootDir: server
-    buildCommand: npm install && npx prisma generate
-    startCommand: npm start
+    buildCommand: cd server && npm install && npx prisma generate
+    startCommand: cd server && npm start
     envVars:
       - key: DATABASE_URL
         sync: false
