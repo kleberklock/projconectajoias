@@ -475,7 +475,7 @@ const app = {
             brandTextSpan.style.display = "block";
           }
         } else {
-          logoBrand.src = "assets/logo.png";
+          logoBrand.src = "/assets/logo.png";
           logoBrand.alt = "Conecta Joias";
           logoBrand.style.display = "block";
           if (brandTextSpan) brandTextSpan.style.display = "none";
