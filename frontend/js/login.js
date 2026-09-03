@@ -302,24 +302,6 @@ const loginApp = {
       if (el) el.addEventListener("keypress", signupEnterHandler);
     });
 
-    // Recurso 2: Gerador dinâmico de Slug / URL da loja
-    const inputLoja = document.getElementById("signup-loja");
-    const containerSlug = document.getElementById("signup-slug-preview-container");
-    const spanSlugUrl = document.getElementById("signup-slug-url");
-    if (inputLoja && containerSlug && spanSlugUrl) {
-      inputLoja.addEventListener("input", (e) => {
-        const val = e.target.value.trim();
-        if (val.length > 0) {
-          const slug = val.toLowerCase()
-            .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-            .replace(/[^a-z0-9]/g, "");
-          spanSlugUrl.innerText = `https://${slug || 'sualoja'}.conectajoias.com.br`;
-          containerSlug.style.display = "block";
-        } else {
-          containerSlug.style.display = "none";
-        }
-      });
-    }
 
     // Recurso 3: Mostrar/Ocultar Senha & Medidor de Força
     const inputSenhaSignup = document.getElementById("signup-senha");

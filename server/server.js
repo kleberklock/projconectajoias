@@ -4214,6 +4214,8 @@ app.post('/api/criar-pagamento', async (req, res) => {
     // Public URL / Ngrok para recebimento de webhooks do servidor do Mercado Pago
     const publicUrl = process.env.PUBLIC_URL || 'http://localhost:5000';
 
+    const isSandbox = (process.env.MP_ACCESS_TOKEN || '').startsWith('TEST-');
+
     // 1. Tenta criar link de assinatura recorrente mensal via Mercado Pago (Preapproval)
     try {
       if (typeof Preapproval !== 'undefined') {
@@ -4233,10 +4235,12 @@ app.post('/api/criar-pagamento', async (req, res) => {
           }
         });
 
-        if (response && (response.init_point || response.sandbox_init_point)) {
-          const linkSub = response.init_point || response.sandbox_init_point;
-          console.log(`✅ [Mercado Pago Assinatura] Link recorrente gerado: ${linkSub}`);
-          return res.status(200).json({ linkDePagamento: linkSub });
+        if (response) {
+          const linkSub = isSandbox ? response.sandbox_init_point : response.init_point;
+          if (linkSub) {
+            console.log(`✅ [Mercado Pago Assinatura] Link recorrente gerado (${isSandbox ? 'Sandbox' : 'Production'}): ${linkSub}`);
+            return res.status(200).json({ linkDePagamento: linkSub });
+          }
         }
       }
     } catch (subErr) {
@@ -4265,7 +4269,9 @@ app.post('/api/criar-pagamento', async (req, res) => {
       }
     });
 
-    return res.status(200).json({ linkDePagamento: response.init_point });
+    const linkPref = isSandbox ? response.sandbox_init_point : response.init_point;
+    console.log(`✅ [Mercado Pago Preferência] Link de pagamento gerado (${isSandbox ? 'Sandbox' : 'Production'}): ${linkPref}`);
+    return res.status(200).json({ linkDePagamento: linkPref });
   } catch (error) {
     console.error('Erro ao criar pagamento/assinatura no Mercado Pago:', error);
     return res.status(500).json({ error: 'Erro ao processar criação de pagamento no Mercado Pago' });

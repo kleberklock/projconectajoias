@@ -18,6 +18,9 @@
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="css/pwa-install.css">
   
+  <!-- FontAwesome Ícones -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
   <style>
     /* ─────────────────────────────────────────────────────────────────────────
        SISTEMA DE DESIGN E ESTILOS GLOBAIS PREMIUM
@@ -2642,9 +2645,6 @@
         <a href="pages/login.html?cadastro=true" class="btn btn-gold">
           <i class="fa-solid fa-wand-magic-sparkles"></i> Cadastrar Minha Marca
         </a>
-        <button class="btn btn-outline" id="open-video-demo-btn" onclick="openVideoModal()">
-          <i class="fa-solid fa-circle-play" style="color: var(--gold-primary)"></i> Ver Demonstração (1 min)
-        </button>
         <a href="#simulador" class="btn btn-outline">
           Simular Ganhos <i class="fa-solid fa-chart-line"></i>
         </a>
@@ -3147,7 +3147,7 @@
       <!-- Card 3 -->
       <div class="feature-card reveal delay-2">
         <div class="feature-icon-wrapper">
-          <i class="fa-solid fa-chart-line-up"></i>
+          <i class="fa-solid fa-arrow-trend-up"></i>
         </div>
         <h3>Termômetro de Comissão</h3>
         <p>Acompanhamento diário dos ganhos acumulados. Ver o saldo de comissão crescer motiva as revendedoras a buscarem novas vendas constantemente.</p>
@@ -3534,7 +3534,7 @@
     <div class="cta-box reveal">
       <h2>Chegou a Hora de Modernizar</h2>
       <p>Cadastre sua marca de joias ou semijoias hoje mesmo e tenha controle absoluto sobre suas consultoras e faturamento.</p>
-      <a href="login.html?cadastro=true" class="btn btn-gold">
+      <a href="pages/login.html?cadastro=true" class="btn btn-gold">
         <i class="fa-solid fa-right-to-bracket"></i> Começar Agora Grátis
       </a>
     </div>
@@ -3972,29 +3972,6 @@
     }
   </script>
 
-  <!-- Modal de Vídeo Demonstração -->
-  <div class="video-modal-backdrop" id="video-demo-modal" onclick="closeVideoModal(event)">
-    <div class="video-modal-container">
-      <button class="video-modal-close" onclick="closeVideoModal(event)">&times;</button>
-      <div class="video-modal-header">
-        <h3 style="font-family:'Cormorant Garamond', serif; font-size:1.8rem; color:#fff;">
-          <i class="fa-solid fa-gem" style="color:var(--gold-primary)"></i> Conecta Joias em Ação
-        </h3>
-        <p style="color:var(--text-muted); font-size:0.9rem;">Veja como funciona a gestão de consignados em 1 minuto</p>
-      </div>
-      <div class="video-preview-screen">
-        <div class="video-badge-live"><i class="fa-solid fa-circle"></i> DEMO INTERATIVA</div>
-        <div class="video-center-play" onclick="startSimulatedVideoPlay(this)">
-          <div class="play-pulse-circle"></div>
-          <i class="fa-solid fa-play"></i>
-        </div>
-        <div class="video-sim-overlay">
-          <h4 style="color:#fff; font-size:0.95rem; margin-bottom:0.3rem;">Interface da Distribuidora & App da Vendedora</h4>
-          <p style="color:var(--text-muted); font-size:0.75rem;">Controle de maleta, envio de peças e acerto com 1 clique</p>
-        </div>
-      </div>
-    </div>
-  </div>
 
   <!-- Botão Flutuante do WhatsApp -->
   <a href="https://wa.me/5500000000000?text=Olá,%20gostaria%20de%20ver%20uma%20demonstração%20do%20Conecta%20Joias" target="_blank" class="whatsapp-float-btn" aria-label="Atendimento via WhatsApp">

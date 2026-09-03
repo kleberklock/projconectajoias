@@ -192,6 +192,15 @@ const app = {
         this.state.token = token;
         this.state.usuarioLogado = usuario;
         this.exibirInterfacePosLogin();
+        
+        // Renderizar imediatamente usando os dados locais em cache para evitar atrasos e tela preta
+        this.renderizarMinhaMaleta();
+        this.renderizarClientes();
+        const el = document.getElementById("maleta-boas-vindas");
+        if (el && this.state.usuarioLogado && this.state.usuarioLogado.nome) {
+          el.innerText = `Olá, ${this.state.usuarioLogado.nome.split(' ')[0]}! 💎`;
+        }
+        
         this.carregarDadosIniciais();
 
         // Configuração de sincronização de vendas offline resiliente
@@ -404,6 +413,39 @@ const app = {
     this.state.corSecundaria = config.corSecundaria;
     this.state.bgPrimary = config.bgPrimary;
     this.state.bgCard = config.bgCard;
+
+    // Sincronizar o plano do backend com o localStorage e o estado
+    if (config.plano) {
+      const planoUpper = config.plano.toUpperCase();
+      this.state.plano = planoUpper;
+      
+      if (this.state.usuarioLogado) {
+        this.state.usuarioLogado.planoLoja = planoUpper;
+        localStorage.setItem("conectajoias_usuario", JSON.stringify(this.state.usuarioLogado));
+      }
+
+      const usuarioGenerico = localStorage.getItem("usuario");
+      if (usuarioGenerico) {
+        try {
+          const userGen = JSON.parse(usuarioGenerico);
+          userGen.planoLoja = planoUpper;
+          localStorage.setItem("usuario", JSON.stringify(userGen));
+        } catch (e) {
+          console.warn("Erro ao atualizar plano no usuario generico:", e);
+        }
+      }
+
+      const lojaRaw = localStorage.getItem("conectajoias_loja");
+      if (lojaRaw) {
+        try {
+          const loja = JSON.parse(lojaRaw);
+          loja.plano = planoUpper;
+          localStorage.setItem("conectajoias_loja", JSON.stringify(loja));
+        } catch (e) {
+          console.warn("Erro ao atualizar plano na loja local:", e);
+        }
+      }
+    }
     
     // Salvar localmente no localStorage
     localStorage.setItem("conectajoias_nome_empresa", config.nomeEmpresa);
@@ -546,62 +588,65 @@ const app = {
   },
 
   carregarDadosIniciais: async function() {
-    this.registrarEventosUI();
-    this.inicializarFeedPadrao();
+    try {
+      this.registrarEventosUI();
+      this.inicializarFeedPadrao();
 
-    // Aplica o perfil e exibe a aba correta imediatamente (Frame 1) sem piscar a tela
-    this.aplicarRestricoesPerfil();
-    this.renderizarAbas();
+      // Aplica o perfil e exibe a aba correta imediatamente (Frame 1) sem piscar a tela
+      this.aplicarRestricoesPerfil();
+      this.renderizarAbas();
 
-    const isManager = ['Manager', 'SuperAdmin', 'ADMIN_LOJA', 'SUPER_ADMIN', 'admin'].includes(this.state.usuarioLogado ? this.state.usuarioLogado.role : '');
-    
-    if (isManager) {
-      // Perfil Administrador/Manager: Exibe Frame 1 e carrega dados protegidos em paralelo
-      this.renderizarDashboard();
-
-      await Promise.allSettled([
-        this.carregarConfiguracaoAPI(),
-        this.carregarProdutosDaAPI(),
-        this.carregarRevendedorasDaAPI(),
-        this.carregarClientesDaAPI(),
-        this.carregarVendasConsolidadas()
-      ]);
-
-      this.renderizarEstoque();
-      this.renderizarRevendedoras();
-      this.renderizarDashboard();
-      this.renderizarClientes();
-    } else {
-      // Perfil Revendedora: Carregamento hiper-otimizado em PARALELO (Promise.all)
-      await Promise.all([
-        this.carregarConfiguracaoAPI(),
-        this.carregarProdutosDaAPI(),
-        this.carregarMaletaPropriaDaAPI(),
-        this.carregarVendasRevendedora(),
-        this.carregarClientesDaAPI(),
-        this.requisitarAPI("/vendas-revendedora?apenasPendentes=true").then(vendas => {
-          this.state.vendasPendentes = vendas;
-        }).catch(err => {
-          console.warn("Falha ao carregar vendas pendentes:", err.message);
-          this.state.vendasPendentes = [];
-        })
-      ]);
-
-      this.renderizarMinhaMaleta();
-      this.renderizarClientes();
+      const isManager = ['Manager', 'SuperAdmin', 'ADMIN_LOJA', 'SUPER_ADMIN', 'admin'].includes(this.state.usuarioLogado ? this.state.usuarioLogado.role : '');
       
-      const el = document.getElementById("maleta-boas-vindas");
-      if (el && this.state.usuarioLogado && this.state.usuarioLogado.nome) {
-        el.innerText = `Olá, ${this.state.usuarioLogado.nome.split(' ')[0]}! 💎`;
+      if (isManager) {
+        // Perfil Administrador/Manager: Exibe Frame 1 e carrega dados protegidos em paralelo
+        this.renderizarDashboard();
+
+        await Promise.allSettled([
+          this.carregarConfiguracaoAPI(),
+          this.carregarProdutosDaAPI(),
+          this.carregarRevendedorasDaAPI(),
+          this.carregarClientesDaAPI(),
+          this.carregarVendasConsolidadas()
+        ]);
+
+        this.renderizarEstoque();
+        this.renderizarRevendedoras();
+        this.renderizarDashboard();
+        this.renderizarClientes();
+      } else {
+        // Perfil Revendedora: Carregamento hiper-otimizado em PARALELO (Promise.all)
+        await Promise.all([
+          this.carregarConfiguracaoAPI(),
+          this.carregarProdutosDaAPI(),
+          this.carregarMaletaPropriaDaAPI(),
+          this.carregarVendasRevendedora(),
+          this.carregarClientesDaAPI(),
+          this.requisitarAPI("/vendas-revendedora?apenasPendentes=true").then(vendas => {
+            this.state.vendasPendentes = vendas;
+          }).catch(err => {
+            console.warn("Falha ao carregar vendas pendentes:", err.message);
+            this.state.vendasPendentes = [];
+          })
+        ]);
+
+        this.renderizarMinhaMaleta();
+        this.renderizarClientes();
+        
+        const el = document.getElementById("maleta-boas-vindas");
+        if (el && this.state.usuarioLogado && this.state.usuarioLogado.nome) {
+          el.innerText = `Olá, ${this.state.usuarioLogado.nome.split(' ')[0]}! 💎`;
+        }
+        this.carregarPreferenciaPagamento();
+        this.checarTermosPendentes();
+        this.checarRgObrigatorio();
       }
-      this.carregarPreferenciaPagamento();
-      this.checarTermosPendentes();
-      this.checarRgObrigatorio();
+      
+      // Inicializa o sistema de notificações
+      this.inicializarSinoNotificacoes();
+    } catch (e) {
+      console.error("Erro na inicialização dos dados:", e);
     }
-    
-    // Inicializa o sistema de notificações
-    this.inicializarSinoNotificacoes();
-    
     console.log("Conecta Joias inicializado com sucesso!");
   },
 
@@ -785,6 +830,10 @@ const app = {
   carregarMaletaPropriaDaAPI: async function() {
     try {
       const res = await this.requisitarAPI("/revendedoras/minha-maleta");
+      
+      // Salva no LocalStorage para carregamento instantâneo offline na inicialização
+      localStorage.setItem("conectajoias_minha_maleta", JSON.stringify(res));
+
       const maleta = res && res.consignado ? res.consignado : (Array.isArray(res) ? res : []);
       const faixas = res && res.faixasComissao ? res.faixasComissao : [];
       const config = res && res.config ? res.config : {};
@@ -830,6 +879,9 @@ const app = {
     try {
       const vendas = await this.requisitarAPI("/vendas-revendedora");
       this.state.vendasSessao = vendas;
+      
+      // Salva no LocalStorage para carregamento instantâneo offline na inicialização
+      localStorage.setItem("conectajoias_vendas_sessao", JSON.stringify(vendas));
     } catch (error) {
       console.warn("Falha ao carregar vendas:", error.message);
       this.state.vendasSessao = [];
@@ -1973,6 +2025,7 @@ const app = {
     try {
       const produtosSalvos = localStorage.getItem("conectajoias_produtos");
       const revendedorasSalvas = localStorage.getItem("conectajoias_revendedoras");
+      const clientesSalvos = localStorage.getItem("conectajoias_clientes");
       const feedSalvo = localStorage.getItem("conectajoias_feed");
       const ficticioSalvo = localStorage.getItem("conectajoias_usando_ficticio");
       const colunasSalvas = localStorage.getItem("conectajoias_colunas");
@@ -1997,6 +2050,8 @@ const app = {
       if (apiUrlSalva) {
         this.state.apiUrl = apiUrlSalva;
       }
+
+      this.state.clientes = clientesSalvos ? JSON.parse(clientesSalvos) : [];
 
       if (this.state.usandoFicticio && !produtosSalvos && !revendedorasSalvas) {
         this.state.produtos = this.obterProdutosMock();
@@ -2023,6 +2078,38 @@ const app = {
       
       this.state.feedImagens = feedSalvo ? JSON.parse(feedSalvo) : [];
 
+      // Carrega Maleta Própria em cache do LocalStorage
+      const maletaSalva = localStorage.getItem("conectajoias_minha_maleta");
+      if (maletaSalva && this.state.usuarioLogado) {
+        const res = JSON.parse(maletaSalva);
+        const maleta = res && res.consignado ? res.consignado : (Array.isArray(res) ? res : []);
+        const faixas = res && res.faixasComissao ? res.faixasComissao : [];
+        const config = res && res.config ? res.config : {};
+        
+        this.state.totalVendidoCiclo = res && typeof res.totalVendidoCiclo === 'number' ? res.totalVendidoCiclo : 0;
+        this.state.revendedoras = [{
+          id: this.state.usuarioLogado.id,
+          nome: this.state.usuarioLogado.nome,
+          whatsapp: this.state.usuarioLogado.whatsapp || "",
+          comissao: this.state.usuarioLogado.comissao,
+          consignado: maleta,
+          faixasComissao: faixas,
+          tipoComissao: config.tipoComissao || "FIXA",
+          metaUnicaValor: config.metaUnicaValor || 0.0,
+          metaUnicaBonus: config.metaUnicaBonus || 0.0,
+          metaUnicaTipoBonus: config.metaUnicaTipoBonus || "PERCENTUAL",
+          baseCalculo: config.baseCalculo || "BRUTO",
+          regraPerda: config.regraPerda || "VALOR_VENDA",
+          limiteIsencaoPerda: config.limiteIsencaoPerda || 0,
+          periodoAcumulo: config.periodoAcumulo || "MANUAL"
+        }];
+        this.state.revendedoraSelecionadaId = this.state.usuarioLogado.id;
+      }
+
+      // Carrega Vendas em cache do LocalStorage
+      const vendasSessaoSalvas = localStorage.getItem("conectajoias_vendas_sessao");
+      this.state.vendasSessao = vendasSessaoSalvas ? JSON.parse(vendasSessaoSalvas) : [];
+
       // Aplicar o tema carregado localmente imediatamente para evitar flashes de cores padrões
       aplicarTemaLoja({
         corPrimaria: this.state.corPrimaria,
@@ -2034,7 +2121,9 @@ const app = {
       console.error("Erro ao carregar dados do LocalStorage, inicializando vazios.", e);
       this.state.produtos = [];
       this.state.revendedoras = [];
+      this.state.clientes = [];
       this.state.feedImagens = [];
+      this.state.vendasSessao = [];
       this.state.usandoFicticio = true;
     }
   },
@@ -6172,6 +6261,9 @@ ${dinheiroAReceberDaRev >= comissaoApagarParaRev
     try {
       const clientes = await this.requisitarAPI("/clientes");
       this.state.clientes = clientes || [];
+      
+      // Salva no LocalStorage para carregamento instantâneo offline na inicialização
+      localStorage.setItem("conectajoias_clientes", JSON.stringify(this.state.clientes));
       this.carregarAniversariantes();
     } catch (err) {
       console.warn("Não foi possível carregar clientes:", err.message);

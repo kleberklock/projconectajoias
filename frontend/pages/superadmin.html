@@ -28,6 +28,7 @@
 </head>
 <body>
 
+
   <!-- ==========================================
        TELA DE LOGIN PREMIUM (REMOVIDA DESTA PÁGINA)
        ========================================== -->
@@ -104,9 +105,6 @@
           </li>
           <li class="nav-item" data-target="notas-fiscais">
             <button id="btn-tab-notas-fiscais"><i class="fa-solid fa-file-invoice"></i>Notas Fiscais</button>
-          </li>
-          <li class="nav-item" data-target="central-whatsapp">
-            <button id="btn-tab-central-whatsapp"><i class="fa-brands fa-whatsapp"></i>Fila WhatsApp</button>
           </li>
           <li class="nav-item" data-target="admin-treinamentos">
             <button id="btn-tab-admin-treinamentos"><i class="fa-solid fa-graduation-cap"></i>Treinamentos</button>
@@ -1441,42 +1439,6 @@
         </div>
       </section>
 
-      <!-- ==========================================
-           ABA: CENTRAL DE DISPAROS WHATSAPP (ADMIN)
-           ========================================== -->
-      <section id="central-whatsapp" class="app-section">
-        <div class="section-header">
-          <div class="section-title">
-            <h2>Fila de Disparos - WhatsApp</h2>
-            <p>Monitore e realize o envio manual das notificações de acertos, onboarding e comissão.</p>
-          </div>
-        </div>
-
-        <div class="dashboard-panel">
-          <div class="panel-header">
-            <h2><i class="fa-brands fa-whatsapp"></i> Fila de Mensagens Pendentes / Histórico</h2>
-          </div>
-          <div class="table-responsive">
-            <table class="premium-table">
-              <thead>
-                <tr>
-                  <th>Data Registro</th>
-                  <th>Destinatário</th>
-                  <th>Tipo Evento</th>
-                  <th>Mensagem</th>
-                  <th>Status</th>
-                  <th>Ações</th>
-                </tr>
-              </thead>
-              <tbody id="tbody-whatsapp-fila">
-                <tr>
-                  <td colspan="6" style="text-align: center; color: var(--text-secondary);">Nenhuma notificação na fila.</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
 
       <!-- ==========================================
            ABA: GESTÃO DE TREINAMENTOS (ADMIN)
@@ -2926,34 +2888,6 @@
     </div>
   </div>
 
-  <!-- ==========================================
-       MODAL: EDITAR MENSAGEM WHATSAPP
-       ========================================== -->
-  <div class="modal-backdrop" id="modal-editar-whats">
-    <div class="modal-card" style="width: 480px;">
-      <div class="modal-title-row">
-        <h3><i class="fa-solid fa-pen-to-square"></i> Editar Mensagem Fila</h3>
-        <button class="btn-close-modal" id="btn-close-modal-editar-whats" onclick="app.fecharEditarWhats()"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-
-      <input type="hidden" id="edit-whats-id">
-
-      <div class="form-group">
-        <label for="edit-whats-numero">Número do WhatsApp *</label>
-        <input type="text" id="edit-whats-numero" class="form-control" placeholder="Ex: (11) 99999-9999" required>
-      </div>
-
-      <div class="form-group">
-        <label for="edit-whats-mensagem">Mensagem de Cobrança / Notificação *</label>
-        <textarea id="edit-whats-mensagem" class="form-control" rows="8" style="resize: vertical; font-family: inherit; font-size: 0.9rem;" placeholder="Digite a mensagem..." required></textarea>
-      </div>
-
-      <div class="modal-footer">
-        <button class="btn-outline-gold" id="btn-cancelar-editar-whats" onclick="app.fecharEditarWhats()">Cancelar</button>
-        <button class="btn-gold" id="btn-salvar-editar-whats" onclick="app.salvarEditarWhats()"><i class="fa-solid fa-floppy-disk"></i> Salvar & Disparar</button>
-      </div>
-    </div>
-  </div>
 
   <!-- ==========================================
        MODAL: PLAYER DE VÍDEO TUTORIAL

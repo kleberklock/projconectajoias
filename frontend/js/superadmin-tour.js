@@ -445,19 +445,36 @@
     }, 250);
   }
 
-  // Inicializar o Onboarding Tour (Apenas quando disparado manualmente pelo usuário)
+  // Inicializar o Onboarding Tour
   window.initOnboardingTour = function(force = false) {
-    // Se não for disparado manualmente pelo botão de tutorial, não exibe
-    if (!force) return;
-
     currentStepIdx = 0;
     renderStep(0);
   };
 
-  // Garante a remoção de qualquer elemento residual de tour ao carregar a página
+  // Garante a remoção ou inicialização automática do tour ao carregar a página
   window.addEventListener('load', () => {
-    localStorage.setItem('conectajoias_tutorial_completo', 'true');
-    document.querySelectorAll('.tour-backdrop, .tour-popover, .tour-click-blocker').forEach(el => el.remove());
+    // Só inicia o tour se o usuário logado for MANAGER (Distribuidora)
+    const usuarioJson = localStorage.getItem("conectajoias_usuario");
+    if (!usuarioJson) return;
+    try {
+      const usuario = JSON.parse(usuarioJson);
+      const roleUpper = (usuario.role || "").toUpperCase();
+      if (roleUpper !== "MANAGER") {
+        return; // Não executa o tour se não for MANAGER
+      }
+    } catch(e) {
+      return;
+    }
+
+    const completo = localStorage.getItem('conectajoias_tutorial_completo');
+    if (!completo) {
+      // Primeiro login: executa o onboarding tour de forma amigável após a carga
+      setTimeout(() => {
+        window.initOnboardingTour(true);
+      }, 1500);
+    } else {
+      document.querySelectorAll('.tour-backdrop, .tour-popover, .tour-click-blocker').forEach(el => el.remove());
+    }
   });
 
 })();

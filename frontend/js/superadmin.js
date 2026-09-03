@@ -186,26 +186,44 @@ const app = {
       return;
     }
     
+    let usuario;
+    let roleUpper;
     try {
-      const usuario = JSON.parse(usuarioJson);
-      const roleUpper = (usuario.role || "").toUpperCase();
-      
-      // Permitir apenas Manager na página superadmin.html
-      if (roleUpper === 'MANAGER') {
-        this.state.token = token;
-        this.state.usuarioLogado = usuario;
-        this.exibirInterfacePosLogin();
-        this.carregarDadosIniciais();
-      } else if (roleUpper === 'SUPERADMIN') {
-        window.location.href = "saasadmin.html";
-      } else if (roleUpper === 'CONSULTANT') {
-        window.location.href = "manager.html";
-      } else {
-        console.warn("Role desconhecida ou inválida:", usuario.role);
-        this.fazerLogout();
-      }
+      usuario = JSON.parse(usuarioJson);
+      roleUpper = (usuario.role || "").toUpperCase();
     } catch (e) {
-      console.error("Erro na inicialização do Admin:", e);
+      console.error("Erro ao processar dados do usuário:", e);
+      this.fazerLogout();
+      return;
+    }
+    
+    // Permitir apenas Manager na página superadmin.html
+    if (roleUpper === 'MANAGER') {
+      this.state.token = token;
+      this.state.usuarioLogado = usuario;
+      
+      try {
+        this.exibirInterfacePosLogin();
+      } catch (e) {
+        console.error("Erro ao exibir interface pós-login:", e);
+      }
+      
+      // Renderizar imediatamente usando dados em cache do localStorage para evitar atrasos visuais
+      // Isolado em blocos try/catch para garantir que erros visuais de DOM/inicialização não desloguem o usuário
+      try { this.renderizarDashboard(); } catch (e) { console.error("Erro ao renderizar Dashboard no init:", e); }
+      try { this.renderizarEstoque(); } catch (e) { console.error("Erro ao renderizar Estoque no init:", e); }
+      try { this.renderizarRevendedoras(); } catch (e) { console.error("Erro ao renderizar Revendedoras no init:", e); }
+      try { this.renderizarClientes(); } catch (e) { console.error("Erro ao renderizar Clientes no init:", e); }
+      
+      this.carregarDadosIniciais().catch(e => {
+        console.error("Erro no carregamento assíncrono de dados iniciais:", e);
+      });
+    } else if (roleUpper === 'SUPERADMIN') {
+      window.location.href = "saasadmin.html";
+    } else if (roleUpper === 'CONSULTANT') {
+      window.location.href = "manager.html";
+    } else {
+      console.warn("Role desconhecida ou inválida:", usuario.role);
       this.fazerLogout();
     }
   },
@@ -418,6 +436,39 @@ const app = {
     this.state.corSecundaria = config.corSecundaria;
     this.state.bgPrimary = config.bgPrimary;
     this.state.bgCard = config.bgCard;
+
+    // Sincronizar o plano do backend com o localStorage e o estado
+    if (config.plano) {
+      const planoUpper = config.plano.toUpperCase();
+      this.state.plano = planoUpper;
+      
+      if (this.state.usuarioLogado) {
+        this.state.usuarioLogado.planoLoja = planoUpper;
+        localStorage.setItem("conectajoias_usuario", JSON.stringify(this.state.usuarioLogado));
+      }
+
+      const usuarioGenerico = localStorage.getItem("usuario");
+      if (usuarioGenerico) {
+        try {
+          const userGen = JSON.parse(usuarioGenerico);
+          userGen.planoLoja = planoUpper;
+          localStorage.setItem("usuario", JSON.stringify(userGen));
+        } catch (e) {
+          console.warn("Erro ao atualizar plano no usuario generico:", e);
+        }
+      }
+
+      const lojaRaw = localStorage.getItem("conectajoias_loja");
+      if (lojaRaw) {
+        try {
+          const loja = JSON.parse(lojaRaw);
+          loja.plano = planoUpper;
+          localStorage.setItem("conectajoias_loja", JSON.stringify(loja));
+        } catch (e) {
+          console.warn("Erro ao atualizar plano na loja local:", e);
+        }
+      }
+    }
     
     // Salvar localmente no localStorage
     localStorage.setItem("conectajoias_nome_empresa", config.nomeEmpresa);
@@ -563,43 +614,47 @@ const app = {
   },
 
   carregarDadosIniciais: async function() {
-    this.registrarEventosUI();
-    this.inicializarFeedPadrao();
-    
-    // Carrega a configuração da marca e tema do backend
-    await this.carregarConfiguracaoAPI();
-
-    // Dispara carregamento assíncrono dos dados da API
-    await this.carregarProdutosDaAPI();
-    
-    const role = this.state.usuarioLogado ? this.state.usuarioLogado.role : 'Consultant';
-    const isAdmin = ['Manager', 'SuperAdmin', 'ADMIN_LOJA', 'SUPER_ADMIN', 'admin'].includes(role);
-
-    if (isAdmin) {
-      await this.carregarRevendedorasDaAPI();
-      await this.carregarClientesDaAPI();
-      await this.carregarVendasConsolidadas();
-      this.renderizarAbas();
-      this.renderizarEstoque();
-      this.renderizarRevendedoras();
-      this.renderizarDashboard();
-      this.renderizarClientes();
+    try {
+      this.registrarEventosUI();
+      this.inicializarFeedPadrao();
       
-      // Inicia o polling de notificações de novas vendas
-      this.inicializarPollingNotificacoes();
-    } else {
-      // Revendedora: carrega maleta e navega direto para Minha Maleta
-      await this.carregarMaletaPropriaDaAPI();
-      await this.carregarVendasRevendedora();
-      this.aplicarRestricoesPerfil();
-      this.renderizarAbas();
-      this.renderizarMinhaMaleta();
-      // Atualiza boas-vindas com nome
-      const el = document.getElementById("maleta-boas-vindas");
-      if (el) el.innerText = `Olá, ${this.state.usuarioLogado.nome.split(' ')[0]}! 💎`;
+      // Carrega a configuração da marca e tema do backend
+      await this.carregarConfiguracaoAPI();
+
+      // Dispara carregamento assíncrono dos dados da API
+      await this.carregarProdutosDaAPI();
+      
+      const role = this.state.usuarioLogado ? this.state.usuarioLogado.role : 'Consultant';
+      const isAdmin = ['Manager', 'SuperAdmin', 'ADMIN_LOJA', 'SUPER_ADMIN', 'admin'].includes(role);
+
+      if (isAdmin) {
+        await this.carregarRevendedorasDaAPI();
+        await this.carregarClientesDaAPI();
+        await this.carregarVendasConsolidadas();
+        this.renderizarAbas();
+        this.renderizarEstoque();
+        this.renderizarRevendedoras();
+        this.renderizarDashboard();
+        this.renderizarClientes();
+        
+        // Inicia o polling de notificações de novas vendas
+        this.inicializarPollingNotificacoes();
+      } else {
+        // Revendedora: carrega maleta e navega direto para Minha Maleta
+        await this.carregarMaletaPropriaDaAPI();
+        await this.carregarVendasRevendedora();
+        this.aplicarRestricoesPerfil();
+        this.renderizarAbas();
+        this.renderizarMinhaMaleta();
+        // Atualiza boas-vindas com nome
+        const el = document.getElementById("maleta-boas-vindas");
+        if (el) el.innerText = `Olá, ${this.state.usuarioLogado.nome.split(' ')[0]}! 💎`;
+      }
+      
+      this.atualizarCadeadosUI();
+    } catch (e) {
+      console.error("Erro na inicialização dos dados:", e);
     }
-    
-    this.atualizarCadeadosUI();
     console.log("Conecta Joias inicializado com sucesso!");
   },
 
@@ -1110,6 +1165,7 @@ const app = {
     try {
       const produtosSalvos = localStorage.getItem("conectajoias_produtos");
       const revendedorasSalvas = localStorage.getItem("conectajoias_revendedoras");
+      const clientesSalvos = localStorage.getItem("conectajoias_clientes");
       const feedSalvo = localStorage.getItem("conectajoias_feed");
       const ficticioSalvo = localStorage.getItem("conectajoias_usando_ficticio");
       const colunasSalvas = localStorage.getItem("conectajoias_colunas");
@@ -1142,6 +1198,8 @@ const app = {
       this.state.dreDespesaFixa = despesaSalva ? parseFloat(despesaSalva) : 0.0;
       this.state.dreCmvEstimado = cmvSalvo ? parseFloat(cmvSalvo) : 33.0;
 
+      this.state.clientes = clientesSalvos ? JSON.parse(clientesSalvos) : [];
+
       if (this.state.usandoFicticio && !produtosSalvos && !revendedorasSalvas) {
         this.state.produtos = this.obterProdutosMock();
         this.state.revendedoras = this.obterRevendedorasMock();
@@ -1163,9 +1221,83 @@ const app = {
       } else {
         this.state.produtos = produtosSalvos ? JSON.parse(produtosSalvos) : [];
         this.state.revendedoras = revendedorasSalvas ? JSON.parse(revendedorasSalvas) : [];
+        
+        // Garante _valoresDinamicos preenchidos para os produtos do LocalStorage para evitar valores em branco/zerados
+        this.state.produtos.forEach(p => {
+          const custoTotal = (p.custoBruto || 0) + (p.custoBanho || 0) + (p.custoLiquido || 0);
+          const precoVendaCalculado = custoTotal * (p.markup || 3.0);
+          p._valoresDinamicos = {
+            "Código": p.codigo,
+            "Nome do Produto": p.nome,
+            "Categoria": p.categoria,
+            "Estoque Central": p.quantidade,
+            "Custo Bruto": p.custoBruto,
+            "Custo Banho": p.custoBanho,
+            "Custo Oper.": p.custoLiquido,
+            "Markup": p.markup,
+            "Preço Venda": p.precoVenda || precoVendaCalculado
+          };
+        });
       }
       
       this.state.feedImagens = feedSalvo ? JSON.parse(feedSalvo) : [];
+
+      // Recupera e consolida as vendas do LocalStorage para renderização instantânea do DRE e KPIs
+      const vendasDiretasSalvas = localStorage.getItem("conectajoias_vendas_diretas");
+      const vendasRevSalvas = localStorage.getItem("conectajoias_vendas_revendedoras");
+      
+      this.state.vendasDiretas = vendasDiretasSalvas ? JSON.parse(vendasDiretasSalvas) : [];
+      this.state.vendasRevendedoras = vendasRevSalvas ? JSON.parse(vendasRevSalvas) : [];
+      
+      const vendasConsolidadas = [];
+      this.state.vendasDiretas.forEach(v => {
+        const qtd = Number(v.quantidade) || 1;
+        const totalVenda = Number(v.preco) || 0;
+        const desc = Number(v.desconto) || 0;
+        const precoBrutoUnit = qtd > 0 ? (totalVenda + desc) / qtd : totalVenda;
+
+        vendasConsolidadas.push({
+          id: v.id,
+          data: v.data,
+          tipo: 'direta',
+          nomeProduto: v.nome,
+          codigoProduto: v.codigo,
+          quantidade: qtd,
+          precoVenda: precoBrutoUnit,
+          total: totalVenda,
+          desconto: desc,
+          motivoDesconto: v.motivoDesconto || '',
+          formaPagamento: v.formaPagamento || 'Pix',
+          comissao: 0,
+          vendedor: 'Conecta Joias (Direta)',
+          contato: v.whatsappCliente || '—',
+          cliente: v.nomeCliente || '—',
+          usuarioId: null
+        });
+      });
+      
+      this.state.vendasRevendedoras.forEach(v => {
+        vendasConsolidadas.push({
+          id: v.id,
+          data: v.data,
+          tipo: 'revendedora',
+          nomeProduto: v.nomeProduto,
+          codigoProduto: v.codigoProduto,
+          quantidade: v.quantidade,
+          precoVenda: v.precoVenda,
+          total: v.precoVenda * v.quantidade,
+          comissao: v.comissaoValor,
+          vendedor: v.usuario ? v.usuario.nome : 'Revendedora',
+          contato: v.cliente && v.cliente.whatsapp ? v.cliente.whatsapp : '—',
+          cliente: v.cliente ? v.cliente.nome : 'Cliente Avulso',
+          usuarioId: v.usuarioId,
+          desconto: v.desconto || 0,
+          motivoDesconto: v.motivoDesconto || ''
+        });
+      });
+      
+      vendasConsolidadas.sort((a, b) => new Date(b.data) - new Date(a.data));
+      this.state.vendasConsolidadas = vendasConsolidadas;
 
       // Aplicar o tema carregado localmente imediatamente para evitar flashes de cores padrões
       aplicarTemaLoja({
@@ -1178,7 +1310,9 @@ const app = {
       console.error("Erro ao carregar dados do LocalStorage, inicializando vazios.", e);
       this.state.produtos = [];
       this.state.revendedoras = [];
+      this.state.clientes = [];
       this.state.feedImagens = [];
+      this.state.vendasConsolidadas = [];
       this.state.usandoFicticio = true;
     }
   },
@@ -1713,7 +1847,8 @@ const app = {
     let retornoVendaProjetada = 0;
 
     // Estoque Central
-    this.state.produtos.forEach(p => {
+    const produtosLista = Array.isArray(this.state.produtos) ? this.state.produtos : [];
+    produtosLista.forEach(p => {
       const custoTotal = Number(p.custoBruto || 0) + Number(p.custoBanho || 0) + Number(p.custoLiquido || 0);
       estoqueCentralTotal += Number(p.quantidade || 0);
       capitalPecasCentral += custoTotal * Number(p.quantidade || 0);
@@ -1721,13 +1856,14 @@ const app = {
     });
 
     // Consignado
-    this.state.revendedoras.forEach(rev => {
-      if (rev.consignado && rev.consignado.length > 0) {
+    const revendedorasLista = Array.isArray(this.state.revendedoras) ? this.state.revendedoras : [];
+    revendedorasLista.forEach(rev => {
+      if (Array.isArray(rev.consignado) && rev.consignado.length > 0) {
         rev.consignado.forEach(item => {
           estoqueConsignadoTotal += Number(item.quantidadeConsignada || 0);
           
           // Encontra o produto de origem para ver o custo original
-          const prodOrigem = this.state.produtos.find(p => p.id === item.produtoId);
+          const prodOrigem = produtosLista.find(p => p.id === item.produtoId);
           if (prodOrigem) {
             const custoTotal = Number(prodOrigem.custoBruto || 0) + Number(prodOrigem.custoBanho || 0) + Number(prodOrigem.custoLiquido || 0);
             capitalPecasConsignado += custoTotal * Number(item.quantidadeConsignada || 0);
@@ -1742,116 +1878,137 @@ const app = {
       }
     });
 
-    // Renderiza nos cards
-    document.getElementById("val-estoque-central").innerText = `${estoqueCentralTotal} pçs`;
-    document.getElementById("val-capital-pecas").innerText = `R$ ${capitalPecasCentral.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-    document.getElementById("val-capital-consignado").innerText = `R$ ${capitalPecasConsignado.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-    document.getElementById("val-retorno-estimado").innerText = `R$ ${retornoVendaProjetada.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    // Renderiza nos cards de forma segura
+    const elEstoqueCentral = document.getElementById("val-estoque-central");
+    if (elEstoqueCentral) elEstoqueCentral.innerText = `${estoqueCentralTotal} pçs`;
+
+    const elCapitalPecas = document.getElementById("val-capital-pecas");
+    if (elCapitalPecas) elCapitalPecas.innerText = `R$ ${capitalPecasCentral.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
+    const elCapitalConsignado = document.getElementById("val-capital-consignado");
+    if (elCapitalConsignado) elCapitalConsignado.innerText = `R$ ${capitalPecasConsignado.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
+    const elRetornoEstimado = document.getElementById("val-retorno-estimado");
+    if (elRetornoEstimado) elRetornoEstimado.innerText = `R$ ${retornoVendaProjetada.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
 
     // Reaplica a ordem dos widgets no DOM da Administradora
-    this.aplicarOrdemWidgets();
+    if (typeof this.aplicarOrdemWidgets === 'function') {
+      try { this.aplicarOrdemWidgets(); } catch (e) { console.error(e); }
+    }
 
     // 2. Alertas de estoque crítico (Qtd <= limiarEstoqueCritico)
     const tableAlertasBody = document.querySelector("#table-alertas tbody");
-    tableAlertasBody.innerHTML = "";
-    
-    const produtosCriticos = this.state.produtos.filter(p => Number(p.quantidade || 0) <= (this.state.limiarEstoqueCritico || 3));
-    
-    // Ordenação dos produtos em alerta crítico: menor quantidade primeiro (críticos no topo)
-    produtosCriticos.sort((a, b) => Number(a.quantidade || 0) - Number(b.quantidade || 0));
-
-    // Controla o botão "Ver Mais" baseado na quantidade de produtos em alerta
-    const btnVerMais = document.getElementById("btn-view-all-stock");
-    if (btnVerMais) {
-      btnVerMais.style.display = produtosCriticos.length > 5 ? "inline-flex" : "none";
-    }
-
-    // Exibe apenas os primeiros 5 produtos no painel do Dashboard
-    const produtosCriticosExibidos = produtosCriticos.slice(0, 5);
-
-    if (produtosCriticos.length === 0) {
-      tableAlertasBody.innerHTML = `
-        <tr>
-          <td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
-            <i class="fa-solid fa-square-check" style="color: #81c784; font-size: 1.5rem; margin-bottom: 0.5rem; display: block;"></i>
-            Estoque Central 100% abastecido e seguro!
-          </td>
-        </tr>
-      `;
-    } else {
-      produtosCriticosExibidos.forEach(p => {
-        const custoTotal = Number(p.custoBruto || 0) + Number(p.custoBanho || 0) + Number(p.custoLiquido || 0);
-        const precoVenda = custoTotal * Number(p.markup || 1);
-        const statusText = p.quantidade === 0 ? "Esgotado" : "Crítico";
-        const badgeClass = p.quantidade === 0 ? "badge-low" : "badge-low";
-
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td><strong>${p.codigo || ""}</strong></td>
-          <td>${p.nome || ""}</td>
-          <td>${p.categoria || ""}</td>
-          <td><strong style="color: var(--danger);">${p.quantidade}</strong> unid.</td>
-          <td>R$ ${precoVenda.toFixed(2).replace(".", ",")}</td>
-          <td><span class="badge ${badgeClass}">${statusText}</span></td>
+    if (tableAlertasBody) {
+      tableAlertasBody.innerHTML = "";
+      
+      const produtosCriticos = produtosLista.filter(p => Number(p.quantidade || 0) <= (this.state.limiarEstoqueCritico || 3));
+      
+      // Ordenação dos produtos em alerta crítico: menor quantidade primeiro (críticos no topo)
+      produtosCriticos.sort((a, b) => Number(a.quantidade || 0) - Number(b.quantidade || 0));
+  
+      // Controla o botão "Ver Mais" baseado na quantidade de produtos em alerta
+      const btnVerMais = document.getElementById("btn-view-all-stock");
+      if (btnVerMais) {
+        btnVerMais.style.display = produtosCriticos.length > 5 ? "inline-flex" : "none";
+      }
+  
+      // Exibe apenas os primeiros 5 produtos no painel do Dashboard
+      const produtosCriticosExibidos = produtosCriticos.slice(0, 5);
+  
+      if (produtosCriticos.length === 0) {
+        tableAlertasBody.innerHTML = `
+          <tr>
+            <td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
+              <i class="fa-solid fa-square-check" style="color: #81c784; font-size: 1.5rem; margin-bottom: 0.5rem; display: block;"></i>
+              Estoque Central 100% abastecido e seguro!
+            </td>
+          </tr>
         `;
-        tableAlertasBody.appendChild(tr);
-      });
+      } else {
+        produtosCriticosExibidos.forEach(p => {
+          const custoTotal = Number(p.custoBruto || 0) + Number(p.custoBanho || 0) + Number(p.custoLiquido || 0);
+          const precoVenda = custoTotal * Number(p.markup || 1);
+          const statusText = p.quantidade === 0 ? "Esgotado" : "Crítico";
+          const badgeClass = p.quantidade === 0 ? "badge-low" : "badge-low";
+  
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td><strong>${p.codigo || ""}</strong></td>
+            <td>${p.nome || ""}</td>
+            <td>${p.categoria || ""}</td>
+            <td><strong style="color: var(--danger);">${p.quantidade}</strong> unid.</td>
+            <td>R$ ${precoVenda.toFixed(2).replace(".", ",")}</td>
+            <td><span class="badge ${badgeClass}">${statusText}</span></td>
+          `;
+          tableAlertasBody.appendChild(tr);
+        });
+      }
     }
 
     // 3. Tabela Resumo Revendedoras Actives
     const tableResumoRevBody = document.querySelector("#table-resumo-revendedoras tbody");
-    tableResumoRevBody.innerHTML = "";
-
-    if (this.state.revendedoras.length === 0) {
-      tableResumoRevBody.innerHTML = `
-        <tr>
-          <td colspan="3" style="text-align: center; color: var(--text-secondary); padding: 2rem;">Nenhuma revendedora cadastrada.</td>
-        </tr>
-      `;
-    } else {
-      this.state.revendedoras.forEach(rev => {
-        let qtdConsignadaRealtime = 0;
-        let valorConsignadoRealtime = 0;
-
-        if (rev.consignado) {
-          rev.consignado.forEach(item => {
-            const qCons = Number(item.quantidadeConsignada || 0);
-            const qDisp = item.quantidadeDisponivel !== undefined ? Number(item.quantidadeDisponivel) : Math.max(0, qCons - Number(item.quantidadeVendidaApp || 0));
-            const pVenda = Number(item.precoVenda || 0);
-            qtdConsignadaRealtime += qDisp;
-            valorConsignadoRealtime += pVenda * qDisp;
-          });
-        }
-
-        const tr = document.createElement("tr");
-        tr.style.cursor = "pointer";
-        tr.addEventListener("click", () => {
-          this.state.revendedoraSelecionadaId = rev.id;
-          this.navegarParaAba("revendedoras");
-        });
-
-        tr.innerHTML = `
-          <td><strong>${rev.nome}</strong></td>
-          <td>${qtdConsignadaRealtime} pçs</td>
-          <td style="color: var(--gold-primary); font-weight: 600;">R$ ${valorConsignadoRealtime.toFixed(2).replace(".", ",")}</td>
+    if (tableResumoRevBody) {
+      tableResumoRevBody.innerHTML = "";
+  
+      if (revendedorasLista.length === 0) {
+        tableResumoRevBody.innerHTML = `
+          <tr>
+            <td colspan="3" style="text-align: center; color: var(--text-secondary); padding: 2rem;">Nenhuma revendedora cadastrada.</td>
+          </tr>
         `;
-        tableResumoRevBody.appendChild(tr);
-      });
+      } else {
+        revendedorasLista.forEach(rev => {
+          let qtdConsignadaRealtime = 0;
+          let valorConsignadoRealtime = 0;
+  
+          if (Array.isArray(rev.consignado)) {
+            rev.consignado.forEach(item => {
+              const qCons = Number(item.quantidadeConsignada || 0);
+              const qDisp = item.quantidadeDisponivel !== undefined ? Number(item.quantidadeDisponivel) : Math.max(0, qCons - Number(item.quantidadeVendidaApp || 0));
+              const pVenda = Number(item.precoVenda || 0);
+              qtdConsignadaRealtime += qDisp;
+              valorConsignadoRealtime += pVenda * qDisp;
+            });
+          }
+  
+          const tr = document.createElement("tr");
+          tr.style.cursor = "pointer";
+          tr.addEventListener("click", () => {
+            this.state.revendedoraSelecionadaId = rev.id;
+            this.navegarParaAba("revendedoras");
+          });
+  
+          tr.innerHTML = `
+            <td><strong>${rev.nome}</strong></td>
+            <td>${qtdConsignadaRealtime} pçs</td>
+            <td style="color: var(--gold-primary); font-weight: 600;">R$ ${valorConsignadoRealtime.toFixed(2).replace(".", ",")}</td>
+          `;
+          tableResumoRevBody.appendChild(tr);
+        });
+      }
     }
 
-    this.renderizarGraficosDashboard();
+    try {
+      this.renderizarGraficosDashboard();
+    } catch (e) {
+      console.error("Erro ao renderizar gráficos do Dashboard:", e);
+    }
 
     // Atualiza cards de Vendas Diretas da Administradora
     if (typeof this.obterMetricasVendasAdmin === 'function') {
-      const metricas = this.obterMetricasVendasAdmin();
-      const elHoje = document.getElementById("val-vendas-diretas-hoje");
-      const elQtdHoje = document.getElementById("val-qtd-vendas-diretas-hoje");
-      const elMes = document.getElementById("val-vendas-diretas-mes");
-      const elQtdMes = document.getElementById("val-qtd-vendas-diretas-mes");
-      if (elHoje) elHoje.innerText = `R$ ${metricas.totalHoje.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-      if (elQtdHoje) elQtdHoje.innerText = metricas.qtdHoje;
-      if (elMes) elMes.innerText = `R$ ${metricas.totalMes.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-      if (elQtdMes) elQtdMes.innerText = metricas.qtdMes;
+      try {
+        const metricas = this.obterMetricasVendasAdmin();
+        const elHoje = document.getElementById("val-vendas-diretas-hoje");
+        const elQtdHoje = document.getElementById("val-qtd-vendas-diretas-hoje");
+        const elMes = document.getElementById("val-vendas-diretas-mes");
+        const elQtdMes = document.getElementById("val-qtd-vendas-diretas-mes");
+        if (elHoje) elHoje.innerText = `R$ ${metricas.totalHoje.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+        if (elQtdHoje) elQtdHoje.innerText = metricas.qtdHoje;
+        if (elMes) elMes.innerText = `R$ ${metricas.totalMes.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+        if (elQtdMes) elQtdMes.innerText = metricas.qtdMes;
+      } catch (e) {
+        console.error("Erro ao obter metricas de vendas do admin:", e);
+      }
     }
 
     // Inicializa datas do DRE se não estiverem preenchidas
@@ -1867,7 +2024,11 @@ const app = {
       inputFim.value = hoje.toISOString().split('T')[0];
     }
 
-    this.carregarDRE();
+    try {
+      this.carregarDRE();
+    } catch (e) {
+      console.error("Erro ao carregar DRE:", e);
+    }
   },
 
   abrirModalTodosAlertas: function() {
@@ -2243,12 +2404,23 @@ const app = {
   renderizarEstoque: function() {
     const thead = document.querySelector("#table-estoque-completo thead");
     const tbody = document.querySelector("#table-estoque-completo tbody");
+    if (!thead || !tbody) return;
+
+    const elFiltroBusca = document.getElementById("filtro-busca");
+    const elFiltroCategoria = document.getElementById("filtro-categoria");
+    const elFiltroStatus = document.getElementById("filtro-status");
+    if (!elFiltroBusca || !elFiltroCategoria || !elFiltroStatus) return;
+
+    const filtroBuscaVal = elFiltroBusca.value.toLowerCase();
+    const filtroCategoriaVal = elFiltroCategoria.value;
+    const filtroStatusVal = elFiltroStatus.value;
 
     // 1. Gera cabeçalho dinamicamente baseado em state.colunasEstoque
     thead.innerHTML = "";
     const trHead = document.createElement("tr");
     
-    this.state.colunasEstoque.forEach(col => {
+    const colunas = Array.isArray(this.state.colunasEstoque) ? this.state.colunasEstoque : [];
+    colunas.forEach(col => {
       const th = document.createElement("th");
       th.style.cursor = "pointer";
       
@@ -2268,12 +2440,8 @@ const app = {
     trHead.appendChild(thAcoes);
     thead.appendChild(trHead);
 
-    // 2. Filtros de busca no estoque
-    const filtroBuscaVal = document.getElementById("filtro-busca").value.toLowerCase();
-    const filtroCategoriaVal = document.getElementById("filtro-categoria").value;
-    const filtroStatusVal = document.getElementById("filtro-status").value;
-
-    let produtosFiltrados = this.state.produtos.filter(p => {
+    const produtos = Array.isArray(this.state.produtos) ? this.state.produtos : [];
+    let produtosFiltrados = produtos.filter(p => {
       const matchBusca = (p.nome || "").toLowerCase().includes(filtroBuscaVal) || (p.codigo || "").toLowerCase().includes(filtroBuscaVal);
       const matchCategoria = filtroCategoriaVal === "" || p.categoria === filtroCategoriaVal;
       
@@ -2300,8 +2468,8 @@ const app = {
         // Se for uma coluna numérica/monetária, limpar e comparar como número
         const colLower = col.toLowerCase();
         if (colLower.includes("custo") || colLower.includes("preço") || colLower.includes("preco") || colLower.includes("venda") || colLower.includes("valor") || colLower.includes("qtd") || colLower.includes("quantidade") || colLower.includes("estoque") || colLower.includes("markup")) {
-          const numA = ExcelHandler.limparNumeroExcel(valA);
-          const numB = ExcelHandler.limparNumeroExcel(valB);
+          const numA = typeof ExcelHandler !== 'undefined' ? ExcelHandler.limparNumeroExcel(valA) : parseFloat(valA) || 0;
+          const numB = typeof ExcelHandler !== 'undefined' ? ExcelHandler.limparNumeroExcel(valB) : parseFloat(valB) || 0;
           if (!isNaN(numA) && !isNaN(numB)) {
             return (numA - numB) * dir;
           }
@@ -2319,7 +2487,7 @@ const app = {
     if (produtosFiltrados.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="${this.state.colunasEstoque.length + 1}" style="text-align: center; color: var(--text-secondary); padding: 3rem;">
+          <td colspan="${colunas.length + 1}" style="text-align: center; color: var(--text-secondary); padding: 3rem;">
             Nenhum produto encontrado nos filtros selecionados.
           </td>
         </tr>
@@ -2331,7 +2499,7 @@ const app = {
     produtosFiltrados.forEach(p => {
       const tr = document.createElement("tr");
 
-      this.state.colunasEstoque.forEach(col => {
+      colunas.forEach(col => {
         const td = document.createElement("td");
         
         // Puxa o valor da célula dinâmica original
@@ -2340,7 +2508,7 @@ const app = {
         // Verifica se é uma coluna monetária para estilizar
         const colLower = col.toLowerCase();
         if (colLower.includes("custo") || colLower.includes("preço") || colLower.includes("preco") || colLower.includes("venda") || colLower.includes("valor")) {
-          let num = ExcelHandler.limparNumeroExcel(valor);
+          let num = typeof ExcelHandler !== 'undefined' ? ExcelHandler.limparNumeroExcel(valor) : parseFloat(valor) || 0;
           if (num > 0) {
             td.innerHTML = `<span style="color: ${colLower.includes("venda") ? 'var(--gold-primary); font-weight: 700;' : 'var(--text-primary)'}">R$ ${num.toFixed(2).replace(".", ",")}</span>`;
           } else {
@@ -2776,20 +2944,26 @@ const app = {
   // 8. ABA: GESTÃO DE REVENDEDORAS LÓGICA
   renderizarRevendedoras: function() {
     const listaContainer = document.getElementById("lista-revendedoras-container");
+    if (!listaContainer) return;
+    
     listaContainer.innerHTML = "";
 
-    if (this.state.revendedoras.length === 0) {
+    const painelDet = document.getElementById("painel-detalhes-revendedora");
+    const placeholderDet = document.getElementById("placeholder-detalhes-revendedora");
+    const revendedoras = Array.isArray(this.state.revendedoras) ? this.state.revendedoras : [];
+
+    if (revendedoras.length === 0) {
       listaContainer.innerHTML = `<p style="color: var(--text-secondary); text-align: center; padding: 2rem;">Nenhuma revendedora cadastrada.</p>`;
-      document.getElementById("painel-detalhes-revendedora").style.display = "none";
-      document.getElementById("placeholder-detalhes-revendedora").style.display = "flex";
+      if (painelDet) painelDet.style.display = "none";
+      if (placeholderDet) placeholderDet.style.display = "flex";
       return;
     }
 
-    this.state.revendedoras.forEach(rev => {
+    revendedoras.forEach(rev => {
       let qtdConsignada = 0;
       let valorConsignado = 0;
 
-      if (rev.consignado) {
+      if (Array.isArray(rev.consignado)) {
         rev.consignado.forEach(item => {
           const qDisp = item.quantidadeDisponivel !== undefined ? Number(item.quantidadeDisponivel) : Number(item.quantidadeConsignada || 0);
           qtdConsignada += qDisp;
@@ -2811,8 +2985,8 @@ const app = {
 
       itemDiv.innerHTML = `
         <div class="list-item-info">
-          <h4>${rev.nome}</h4>
-          <p><i class="fa-brands fa-whatsapp"></i> ${rev.whatsapp}</p>
+          <h4>${rev.nome || "Revendedora"}</h4>
+          <p><i class="fa-brands fa-whatsapp"></i> ${rev.whatsapp || "—"}</p>
         </div>
         <div class="list-item-value">
           <span>R$ ${valorConsignado.toFixed(2).replace(".", ",")}</span>
@@ -2823,14 +2997,17 @@ const app = {
     });
 
     // Se houver uma selecionada, mostra os detalhes
-    const revSelecionada = this.state.revendedoras.find(r => r.id === this.state.revendedoraSelecionadaId);
+    const revSelecionada = revendedoras.find(r => r.id === this.state.revendedoraSelecionadaId);
     
     if (revSelecionada) {
-      document.getElementById("placeholder-detalhes-revendedora").style.display = "none";
-      document.getElementById("painel-detalhes-revendedora").style.display = "block";
+      if (placeholderDet) placeholderDet.style.display = "none";
+      if (painelDet) painelDet.style.display = "block";
 
-      document.getElementById("detalhe-nome-revendedora").innerText = revSelecionada.nome;
-      document.getElementById("detalhe-whatsapp-revendedora").innerText = revSelecionada.whatsapp;
+      const elNome = document.getElementById("detalhe-nome-revendedora");
+      if (elNome) elNome.innerText = revSelecionada.nome || "";
+
+      const elWhats = document.getElementById("detalhe-whatsapp-revendedora");
+      if (elWhats) elWhats.innerText = revSelecionada.whatsapp || "";
       
       let textoComissaoHtml = `${revSelecionada.comissao || 30}% <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted); margin-left: 0.3rem;">(Fixa)</span>`;
       if (revSelecionada.tipoComissao === 'PROGRESSIVA') {
@@ -2847,9 +3024,11 @@ const app = {
       } else if (revSelecionada.tipoComissao === 'META_UNICA') {
         textoComissaoHtml = `${revSelecionada.comissao || 30}% <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted); margin-left: 0.3rem;">(Meta Única)</span>`;
       }
-      document.getElementById("detalhe-comissao-revendedora").innerHTML = textoComissaoHtml;
+      const elComissao = document.getElementById("detalhe-comissao-revendedora");
+      if (elComissao) elComissao.innerHTML = textoComissaoHtml;
       
-      document.getElementById("detalhe-pin-revendedora").innerText = revSelecionada.pin || "N/A";
+      const elPin = document.getElementById("detalhe-pin-revendedora");
+      if (elPin) elPin.innerText = revSelecionada.pin || "N/A";
 
       // Atualiza indicadores internos
       let qtdConsignadaInicial = 0;
@@ -2857,7 +3036,8 @@ const app = {
       let valorConsignadoInicial = 0;
       let valorConsignadoAtual = 0;
 
-      revSelecionada.consignado.forEach(item => {
+      const consignados = Array.isArray(revSelecionada.consignado) ? revSelecionada.consignado : [];
+      consignados.forEach(item => {
         const qCons = Number(item.quantidadeConsignada || 0);
         const qDisp = item.quantidadeDisponivel !== undefined ? Number(item.quantidadeDisponivel) : Math.max(0, qCons - Number(item.quantidadeVendidaApp || 0));
         const pVenda = Number(item.precoVenda || 0);
@@ -2871,77 +3051,93 @@ const app = {
       const comissaoRev = valorConsignadoAtual * (Number(revSelecionada.comissao || 30) / 100);
       const liquidoConectaJoias = valorConsignadoAtual - comissaoRev;
 
-      if (document.getElementById("detalhe-qtd-consignada")) document.getElementById("detalhe-qtd-consignada").innerText = `${qtdConsignadaInicial} pçs`;
-      if (document.getElementById("detalhe-qtd-atual")) document.getElementById("detalhe-qtd-atual").innerText = `${qtdAtualRealtime} pçs`;
-      if (document.getElementById("detalhe-valor-consignado")) document.getElementById("detalhe-valor-consignado").innerText = `R$ ${valorConsignadoAtual.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-      if (document.getElementById("detalhe-liquido-projetado")) document.getElementById("detalhe-liquido-projetado").innerText = `R$ ${liquidoConectaJoias.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+      const elQtdConsignada = document.getElementById("detalhe-qtd-consignada");
+      if (elQtdConsignada) elQtdConsignada.innerText = `${qtdConsignadaInicial} pçs`;
+      
+      const elQtdAtual = document.getElementById("detalhe-qtd-atual");
+      if (elQtdAtual) elQtdAtual.innerText = `${qtdAtualRealtime} pçs`;
+      
+      const elValorConsignado = document.getElementById("detalhe-valor-consignado");
+      if (elValorConsignado) elValorConsignado.innerText = `R$ ${valorConsignadoAtual.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+      
+      const elLiquidoProjetado = document.getElementById("detalhe-liquido-projetado");
+      if (elLiquidoProjetado) elLiquidoProjetado.innerText = `R$ ${liquidoConectaJoias.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
 
       // Preenche a tabela de peças na maleta
       const tableItensBody = document.querySelector("#table-itens-consignados tbody");
-      tableItensBody.innerHTML = "";
-
-      if (revSelecionada.consignado.length === 0) {
-        tableItensBody.innerHTML = `
-          <tr>
-            <td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
-              Esta revendedora ainda não levou peças em consignação.
-            </td>
-          </tr>
-        `;
-      } else {
-        revSelecionada.consignado.forEach(item => {
-          const qDisp = item.quantidadeDisponivel !== undefined ? Number(item.quantidadeDisponivel) : Number(item.quantidadeConsignada || 0);
-          const subtotal = Number(item.precoVenda || 0) * qDisp;
-          const tr = document.createElement("tr");
-          tr.innerHTML = `
-            <td><strong>${item.codigo}</strong></td>
-            <td>${item.nome}</td>
-            <td>${qDisp} unidades</td>
-            <td>R$ ${Number(item.precoVenda).toFixed(2).replace(".", ",")}</td>
-            <td style="color: var(--gold-primary); font-weight: 600;">R$ ${subtotal.toFixed(2).replace(".", ",")}</td>
-            <td>
-              <button type="button" class="btn-devolver-item" onclick="app.devolverEstoqueConsignado('${item.id}', ${qDisp})" title="Devolver ao Estoque Central" style="background: rgba(212, 175, 55, 0.12); border: 1px solid rgba(212, 175, 55, 0.3); color: var(--gold-primary); padding: 4px 10px; border-radius: 6px; font-size: 0.78rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.2s ease;" onmouseover="this.style.background='var(--gold-primary)'; this.style.color='#000';" onmouseout="this.style.background='rgba(212, 175, 55, 0.12)'; this.style.color='var(--gold-primary)';">
-                <i class="fa-solid fa-arrow-rotate-left"></i> Devolver
-              </button>
-            </td>
+      if (tableItensBody) {
+        tableItensBody.innerHTML = "";
+  
+        if (consignados.length === 0) {
+          tableItensBody.innerHTML = `
+            <tr>
+              <td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
+                Esta revendedora ainda não levou peças em consignação.
+              </td>
+            </tr>
           `;
-          tableItensBody.appendChild(tr);
-        });
+        } else {
+          consignados.forEach(item => {
+            const qDisp = item.quantidadeDisponivel !== undefined ? Number(item.quantidadeDisponivel) : Number(item.quantidadeConsignada || 0);
+            const subtotal = Number(item.precoVenda || 0) * qDisp;
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+              <td><strong>${item.codigo}</strong></td>
+              <td>${item.nome}</td>
+              <td>${qDisp} unidades</td>
+              <td>R$ ${Number(item.precoVenda).toFixed(2).replace(".", ",")}</td>
+              <td style="color: var(--gold-primary); font-weight: 600;">R$ ${subtotal.toFixed(2).replace(".", ",")}</td>
+              <td>
+                <button type="button" class="btn-devolver-item" onclick="app.devolverEstoqueConsignado('${item.id}', ${qDisp})" title="Devolver ao Estoque Central" style="background: rgba(212, 175, 55, 0.12); border: 1px solid rgba(212, 175, 55, 0.3); color: var(--gold-primary); padding: 4px 10px; border-radius: 6px; font-size: 0.78rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.2s ease;" onmouseover="this.style.background='var(--gold-primary)'; this.style.color='#000';" onmouseout="this.style.background='rgba(212, 175, 55, 0.12)'; this.style.color='var(--gold-primary)';">
+                  <i class="fa-solid fa-arrow-rotate-left"></i> Devolver
+                </button>
+              </td>
+            `;
+            tableItensBody.appendChild(tr);
+          });
+        }
       }
 
       // Preenche a tabela do histórico
       const tableHistoricoBody = document.querySelector("#table-historico-acertos tbody");
-      tableHistoricoBody.innerHTML = "";
-      if(!revSelecionada.historico || revSelecionada.historico.length === 0) {
-        tableHistoricoBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">Nenhum acerto registrado para esta revendedora.</td></tr>`;
-      } else {
-        revSelecionada.historico.slice().reverse().forEach(hist => {
-          const dataObj = new Date(hist.data);
-          const dataStr = `${dataObj.getDate().toString().padStart(2, '0')}/${(dataObj.getMonth()+1).toString().padStart(2, '0')}/${dataObj.getFullYear()}`;
-          const tr = document.createElement("tr");
-          tr.innerHTML = `
-            <td>${dataStr}</td>
-            <td>${hist.totalConsignada} / ${hist.totalVendida} / ${hist.totalDevolvida}</td>
-            <td style="color: var(--gold-primary);">R$ ${hist.faturamentoBruto.toFixed(2).replace(".", ",")}</td>
-            <td>R$ ${hist.comissaoPaga.toFixed(2).replace(".", ",")}</td>
-            <td style="color: #81c784; font-weight: 600;">R$ ${hist.liquidoConectaJoias.toFixed(2).replace(".", ",")}</td>
-            <td><span class="badge badge-low" style="background: rgba(129, 199, 132, 0.1); color: #81c784;">Concluído</span></td>
-          `;
-          tableHistoricoBody.appendChild(tr);
-        });
+      if (tableHistoricoBody) {
+        tableHistoricoBody.innerHTML = "";
+        const historicoList = Array.isArray(revSelecionada.historico) ? revSelecionada.historico : [];
+        if(historicoList.length === 0) {
+          tableHistoricoBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">Nenhum acerto registrado para esta revendedora.</td></tr>`;
+        } else {
+          historicoList.slice().reverse().forEach(hist => {
+            const dataObj = new Date(hist.data);
+            const dataStr = `${dataObj.getDate().toString().padStart(2, '0')}/${(dataObj.getMonth()+1).toString().padStart(2, '0')}/${dataObj.getFullYear()}`;
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+              <td>${dataStr}</td>
+              <td>${hist.totalConsignada} / ${hist.totalVendida} / ${hist.totalDevolvida}</td>
+              <td style="color: var(--gold-primary);">R$ ${hist.faturamentoBruto.toFixed(2).replace(".", ",")}</td>
+              <td>R$ ${hist.comissaoPaga.toFixed(2).replace(".", ",")}</td>
+              <td style="color: #81c784; font-weight: 600;">R$ ${hist.liquidoConectaJoias.toFixed(2).replace(".", ",")}</td>
+              <td><span class="badge badge-low" style="background: rgba(129, 199, 132, 0.1); color: #81c784;">Concluído</span></td>
+            `;
+            tableHistoricoBody.appendChild(tr);
+          });
+        }
       }
 
       // Força a atualização da sub-aba ativa se for dinâmica para a revendedora selecionada
-      if (document.getElementById("btn-subtab-termos").classList.contains("active")) {
+      const elTabTermos = document.getElementById("btn-subtab-termos");
+      const elTabDocs = document.getElementById("btn-subtab-documentos");
+      const elTabVendasRev = document.getElementById("btn-subtab-vendas-rev");
+
+      if (elTabTermos && elTabTermos.classList.contains("active")) {
         this.carregarTermosRevendedora();
-      } else if (document.getElementById("btn-subtab-documentos").classList.contains("active")) {
+      } else if (elTabDocs && elTabDocs.classList.contains("active")) {
         this.carregarCofreDocumentos();
-      } else if (document.getElementById("btn-subtab-vendas-rev").classList.contains("active")) {
+      } else if (elTabVendasRev && elTabVendasRev.classList.contains("active")) {
         this.renderizarVendasIndividuaisRevendedora();
       }
     } else {
-      document.getElementById("painel-detalhes-revendedora").style.display = "none";
-      document.getElementById("placeholder-detalhes-revendedora").style.display = "flex";
+      if (painelDet) painelDet.style.display = "none";
+      if (placeholderDet) placeholderDet.style.display = "flex";
     }
   },
 
@@ -5094,54 +5290,74 @@ const app = {
   },
 
   renderizarGraficosDashboard: function() {
-    if(typeof Chart === 'undefined') return;
+    if(typeof Chart === 'undefined') {
+      // Se Chart não estiver carregado ainda, tenta novamente em breve para evitar que os gráficos fiquem em branco
+      if (!this._chartRetryCount) this._chartRetryCount = 0;
+      if (this._chartRetryCount < 10) {
+        this._chartRetryCount++;
+        setTimeout(() => this.renderizarGraficosDashboard(), 500);
+      }
+      return;
+    }
+    this._chartRetryCount = 0; // Reseta o contador se a biblioteca estiver carregada
 
-    if(window.chartCategorias) window.chartCategorias.destroy();
-    if(window.chartRevendedoras) window.chartRevendedoras.destroy();
-
+    if(window.chartCategorias && typeof window.chartCategorias.destroy === 'function') {
+      try { window.chartCategorias.destroy(); } catch (e) { console.error("Erro ao destruir chartCategorias:", e); }
+    }
+    if(window.chartRevendedoras && typeof window.chartRevendedoras.destroy === 'function') {
+      try { window.chartRevendedoras.destroy(); } catch (e) { console.error("Erro ao destruir chartRevendedoras:", e); }
+    }
+ 
     const ctxCat = document.getElementById('chart-categorias');
     const ctxRev = document.getElementById('chart-revendedoras');
+ 
+    const produtos = Array.isArray(this.state.produtos) ? this.state.produtos : [];
+    const revendedoras = Array.isArray(this.state.revendedoras) ? this.state.revendedoras : [];
 
     if(ctxCat) {
       const catData = {};
-      this.state.produtos.forEach(p => {
+      produtos.forEach(p => {
         const cat = p.categoria || "Outros";
         const val = (Number(p.custoBruto || 0) + Number(p.custoBanho || 0) + Number(p.custoLiquido || 0)) * Number(p.quantidade || 0);
         catData[cat] = (catData[cat] || 0) + val;
       });
-
-      window.chartCategorias = new Chart(ctxCat, {
-        type: 'doughnut',
-        data: {
-          labels: Object.keys(catData),
-          datasets: [{
-            data: Object.values(catData),
-            backgroundColor: ['#d4af37', '#b38e24', '#f9e8a2', '#8c6d17', '#e2c668', '#423004'],
-            borderColor: '#0a0a0a',
-            borderWidth: 2
-          }]
-        },
-        options: { 
-          plugins: { 
-            legend: { labels: { color: '#e0e0e0' } },
-            tooltip: {
-              callbacks: {
-                label: function(context) {
-                  let value = context.parsed;
-                  return ` ${context.label}: R$ ${value.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+ 
+      try {
+        window.chartCategorias = new Chart(ctxCat, {
+          type: 'doughnut',
+          data: {
+            labels: Object.keys(catData),
+            datasets: [{
+              data: Object.values(catData),
+              backgroundColor: ['#d4af37', '#b38e24', '#f9e8a2', '#8c6d17', '#e2c668', '#423004'],
+              borderColor: '#0a0a0a',
+              borderWidth: 2
+            }]
+          },
+          options: { 
+            plugins: { 
+              legend: { labels: { color: '#e0e0e0' } },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    let value = context.parsed;
+                    return ` ${context.label}: R$ ${value.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                  }
                 }
               }
-            }
-          } 
-        }
-      });
+            } 
+          }
+        });
+      } catch (e) {
+        console.error("Erro ao criar chartCategorias:", e);
+      }
     }
-
+ 
     if(ctxRev) {
-      const rankingRev = this.state.revendedoras.map(r => {
+      const rankingRev = revendedoras.map(r => {
         let volumeVendas = r.totalPecasVendidasGeral !== undefined ? Number(r.totalPecasVendidasGeral) : 0;
         let faturamentoTotal = r.faturamentoTotalGeral !== undefined ? Number(r.faturamentoTotalGeral) : 0;
-
+ 
         if (volumeVendas === 0 && r.vendas && Array.isArray(r.vendas)) {
           r.vendas.forEach(v => {
             volumeVendas += Number(v.quantidade || 1);
@@ -5156,48 +5372,52 @@ const app = {
         }
         return { nome: r.nome ? r.nome.split(" ")[0] : "Revendedora", volumeVendas, faturamentoTotal };
       }).sort((a, b) => b.faturamentoTotal - a.faturamentoTotal || b.volumeVendas - a.volumeVendas);
-
-      window.chartRevendedoras = new Chart(ctxRev, {
-        type: 'bar',
-        data: {
-          labels: rankingRev.map(r => r.nome),
-          datasets: [{
-            label: 'Faturamento Total Gerado (R$)',
-            data: rankingRev.map(r => r.faturamentoTotal),
-            backgroundColor: '#d4af37',
-            borderRadius: 4
-          }]
-        },
-        options: { 
-          scales: { 
-            y: { 
-              ticks: { 
-                color: '#e0e0e0',
-                callback: function(value) {
-                  return 'R$ ' + value.toLocaleString('pt-BR', {minimumFractionDigits: 0});
-                }
-              }, 
-              grid: { color: 'rgba(255,255,255,0.1)' } 
-            },
-            x: { ticks: { color: '#e0e0e0' }, grid: { display: false } }
+ 
+      try {
+        window.chartRevendedoras = new Chart(ctxRev, {
+          type: 'bar',
+          data: {
+            labels: rankingRev.map(r => r.nome),
+            datasets: [{
+              label: 'Faturamento Total Gerado (R$)',
+              data: rankingRev.map(r => r.faturamentoTotal),
+              backgroundColor: '#d4af37',
+              borderRadius: 4
+            }]
           },
-          plugins: { 
-            legend: { display: false },
-            tooltip: {
-              callbacks: {
-                label: function(context) {
-                  const idx = context.dataIndex;
-                  const item = rankingRev[idx];
-                  return [
-                    ` Faturamento: R$ ${item.faturamentoTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`,
-                    ` Peças Vendidas: ${item.volumeVendas} pçs`
-                  ];
+          options: { 
+            scales: { 
+              y: { 
+                ticks: { 
+                  color: '#e0e0e0',
+                  callback: function(value) {
+                    return 'R$ ' + value.toLocaleString('pt-BR', {minimumFractionDigits: 0});
+                  }
+                }, 
+                grid: { color: 'rgba(255,255,255,0.1)' } 
+              },
+              x: { ticks: { color: '#e0e0e0' }, grid: { display: false } }
+            },
+            plugins: { 
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    const idx = context.dataIndex;
+                    const item = rankingRev[idx];
+                    return [
+                      ` Faturamento: R$ ${item.faturamentoTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`,
+                      ` Peças Vendidas: ${item.volumeVendas} pçs`
+                    ];
+                  }
                 }
               }
             }
           }
-        }
-      });
+        });
+      } catch (e) {
+        console.error("Erro ao criar chartRevendedoras:", e);
+      }
     }
   },
 
@@ -5309,6 +5529,10 @@ const app = {
       
       this.state.vendasDiretas = vendasDiretas;
       this.state.vendasRevendedoras = vendasRevendedoras;
+      
+      // Salva no LocalStorage para carregamento instantâneo offline na inicialização
+      localStorage.setItem("conectajoias_vendas_diretas", JSON.stringify(vendasDiretas));
+      localStorage.setItem("conectajoias_vendas_revendedoras", JSON.stringify(vendasRevendedoras));
       
       const vendasConsolidadas = [];
       
@@ -5699,6 +5923,9 @@ const app = {
     try {
       const clientes = await this.requisitarAPI("/clientes");
       this.state.clientes = clientes || [];
+      
+      // Salva no LocalStorage para carregamento instantâneo offline na inicialização
+      localStorage.setItem("conectajoias_clientes", JSON.stringify(this.state.clientes));
     } catch (err) {
       console.warn("Não foi possível carregar clientes:", err.message);
       this.state.clientes = [];
@@ -5708,7 +5935,7 @@ const app = {
   renderizarClientes: function() {
     const tbody = document.getElementById("tbody-clientes");
     if (!tbody) return;
-
+ 
     // Configura cabeçalhos de ordenação dinamicamente
     const headers = document.querySelectorAll("#table-clientes thead th");
     const ordClientes = this.state.ordenacao && this.state.ordenacao.clientes;
@@ -5716,26 +5943,27 @@ const app = {
       headers[0].style.cursor = "pointer";
       headers[0].onclick = () => this.ordenarTabela("clientes", "nome");
       headers[0].innerHTML = `Nome da Cliente ${ordClientes.coluna === 'nome' ? `<i class="fa-solid ${ordClientes.direcao === 'asc' ? 'fa-sort-up' : 'fa-sort-down'}" style="color:var(--gold-primary);"></i>` : '<i class="fa-solid fa-sort" style="opacity:0.3;"></i>'}`;
-
+ 
       headers[1].style.cursor = "pointer";
       headers[1].onclick = () => this.ordenarTabela("clientes", "whatsapp");
       headers[1].innerHTML = `WhatsApp ${ordClientes.coluna === 'whatsapp' ? `<i class="fa-solid ${ordClientes.direcao === 'asc' ? 'fa-sort-up' : 'fa-sort-down'}" style="color:var(--gold-primary);"></i>` : '<i class="fa-solid fa-sort" style="opacity:0.3;"></i>'}`;
-
+ 
       headers[2].style.cursor = "pointer";
       headers[2].onclick = () => this.ordenarTabela("clientes", "dataNascimento");
       headers[2].innerHTML = `Data de Nascimento ${ordClientes.coluna === 'dataNascimento' ? `<i class="fa-solid ${ordClientes.direcao === 'asc' ? 'fa-sort-up' : 'fa-sort-down'}" style="color:var(--gold-primary);"></i>` : '<i class="fa-solid fa-sort" style="opacity:0.3;"></i>'}`;
-
+ 
       headers[4].style.cursor = "pointer";
       headers[4].onclick = () => this.ordenarTabela("clientes", "createdAt");
       headers[4].innerHTML = `Cadastrada em ${ordClientes.coluna === 'createdAt' ? `<i class="fa-solid ${ordClientes.direcao === 'asc' ? 'fa-sort-up' : 'fa-sort-down'}" style="color:var(--gold-primary);"></i>` : '<i class="fa-solid fa-sort" style="opacity:0.3;"></i>'}`;
     }
-
+ 
     const busca = ((document.getElementById("filtro-clientes-busca") || {}).value || "").toLowerCase();
-
-    let filtradas = this.state.clientes.filter(c =>
-      c.nome.toLowerCase().includes(busca) || (c.whatsapp || "").toLowerCase().includes(busca)
+ 
+    const clientesLista = Array.isArray(this.state.clientes) ? this.state.clientes : [];
+    let filtradas = clientesLista.filter(c =>
+      (c.nome || "").toLowerCase().includes(busca) || (c.whatsapp || "").toLowerCase().includes(busca)
     );
-
+ 
     // Lógica de Ordenação
     if (ordClientes && ordClientes.coluna) {
       const col = ordClientes.coluna;
@@ -5746,7 +5974,7 @@ const app = {
         return String(valA).localeCompare(String(valB), 'pt-BR', { sensitivity: 'base' }) * dir;
       });
     }
-
+ 
     tbody.innerHTML = "";
     if (filtradas.length === 0) {
       tbody.innerHTML = `
@@ -5758,9 +5986,9 @@ const app = {
         </tr>`;
       return;
     }
-
+ 
     filtradas.forEach(c => {
-      const dataCadastro = new Date(c.createdAt).toLocaleDateString('pt-BR');
+      const dataCadastro = c.createdAt ? new Date(c.createdAt).toLocaleDateString('pt-BR') : "—";
       let aniversarioStr = "—";
       if (c.dataNascimento) {
         const partes = c.dataNascimento.split("-");
@@ -5769,8 +5997,8 @@ const app = {
       }
       const nomeRevendedora = c.usuario ? c.usuario.nome : null;
       const clienteNomeHTML = nomeRevendedora 
-        ? `<strong>${c.nome}</strong><br><small style="color: var(--gold-primary);">Cliente de: ${nomeRevendedora}</small>`
-        : `<strong>${c.nome}</strong>`;
+        ? `<strong>${c.nome || "Sem Nome"}</strong><br><small style="color: var(--gold-primary);">Cliente de: ${nomeRevendedora}</small>`
+        : `<strong>${c.nome || "Sem Nome"}</strong>`;
         
       const tr = document.createElement("tr");
       tr.innerHTML = `
@@ -7156,6 +7384,25 @@ const app = {
           if (estoqueBar && res.uso) {
             const pct = res.uso.limiteEstoque >= 9999 ? 10 : Math.min(100, Math.round((res.uso.totalEstoque / res.uso.limiteEstoque) * 100));
             estoqueBar.style.width = `${pct}%`;
+          }
+
+          // Aviso dinâmico de limitação do Plano Básico
+          const elAvisoBasico = document.getElementById("saas-aviso-plano-basico");
+          if (res.plano === 'BASICO') {
+            if (!elAvisoBasico) {
+              const divAviso = document.createElement("div");
+              divAviso.id = "saas-aviso-plano-basico";
+              divAviso.style.cssText = "margin-top: 1.5rem; padding: 0.8rem 1rem; background: rgba(244, 67, 54, 0.1); border: 1px solid rgba(244, 67, 54, 0.3); border-radius: 8px; color: #ff8a80; font-size: 0.85rem; display: flex; align-items: center; gap: 0.6rem;";
+              divAviso.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="font-size: 1.1rem;"></i> <span><strong>Plano Básico Ativo:</strong> Você está no plano de demonstração gratuito. Você <strong>não poderá</strong> cadastrar mais de 2 revendedoras e 50 peças no estoque central. Faça o upgrade de sua assinatura abaixo para liberar limites maiores.</span>`;
+              const kpiGrid = document.querySelector("#meu-plano-saas .kpi-grid");
+              if (kpiGrid) {
+                kpiGrid.parentNode.insertBefore(divAviso, kpiGrid.nextSibling);
+              }
+            } else {
+              elAvisoBasico.style.display = "flex";
+            }
+          } else {
+            if (elAvisoBasico) elAvisoBasico.style.display = "none";
           }
 
           this.atualizarCadeadosUI();
