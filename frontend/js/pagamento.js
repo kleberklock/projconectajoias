@@ -514,6 +514,16 @@ async function assinarPlano(planoNome, preco, event) {
     }
 
     if (!usuarioId) {
+      const lojaRaw = localStorage.getItem("conectajoias_loja");
+      if (lojaRaw) {
+        try {
+          const lojaObj = JSON.parse(lojaRaw);
+          if (lojaObj.id) usuarioId = lojaObj.id;
+        } catch (e) {}
+      }
+    }
+
+    if (!usuarioId) {
       const planoClean = (planoNome || "gold").toLowerCase().includes("bronze") ? "bronze" : ((planoNome || "gold").toLowerCase().includes("platinum") ? "platinum" : "gold");
       localStorage.setItem("plano_selecionado", planoClean);
       const isPagesDir = window.location.pathname.includes("/pages/");

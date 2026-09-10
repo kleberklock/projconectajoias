@@ -5,9 +5,15 @@
     "start": "scripts/start.bat",
     "dev": "scripts/start.bat",
     "server": "cd server && npm run dev",
-    "frontend": "cd frontend && npx http-server -p 8080 -c-1"
+    "frontend": "cd frontend && npx http-server -p 8080 -c-1",
+    "test:google": "node scripts/test_google.js",
+    "test:system": "node scripts/test_conectajoias_system.js",
+    "test:live": "node scripts/test_live_demo.js"
   },
   "dependencies": {
     "mercadopago": "^3.3.0"
+  },
+  "devDependencies": {
+    "puppeteer": "^25.10.0"
   }
 }

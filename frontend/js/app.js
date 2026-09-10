@@ -49,6 +49,16 @@ const app = {
     }
   },
 
+  debounce: function(func, delay = 250) {
+    let timeoutId;
+    return function(...args) {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        func.apply(this, args);
+      }, delay);
+    };
+  },
+
   // Sistema de Toast premium
   toast: function(message, type = "info") {
     const container = document.getElementById("toast-container");
@@ -396,22 +406,15 @@ const app = {
     if (logoBrand) {
       if (config.logoUrl && config.logoUrl !== "" && !config.logoUrl.includes("logo.svg") && !config.logoUrl.includes("logo.png")) {
         logoBrand.src = config.logoUrl;
-        logoBrand.alt = config.nomeEmpresa;
-        logoBrand.style.display = "block";
-        if (brandTextSpan) brandTextSpan.style.display = "none";
+        logoBrand.alt = config.nomeEmpresa || "Conecta Joias";
       } else {
-        if (config.nomeEmpresa && config.nomeEmpresa !== "Conecta Joias" && config.nomeEmpresa !== "") {
-          logoBrand.style.display = "none";
-          if (brandTextSpan) {
-            brandTextSpan.innerText = config.nomeEmpresa;
-            brandTextSpan.style.display = "block";
-          }
-        } else {
-          logoBrand.src = "/assets/logo.png";
-          logoBrand.alt = "Conecta Joias";
-          logoBrand.style.display = "block";
-          if (brandTextSpan) brandTextSpan.style.display = "none";
-        }
+        logoBrand.src = "/assets/logo.png";
+        logoBrand.alt = config.nomeEmpresa || "Conecta Joias";
+      }
+      logoBrand.style.display = "block";
+      if (brandTextSpan) {
+        brandTextSpan.innerText = config.nomeEmpresa || "Conecta Joias";
+        brandTextSpan.style.display = "none";
       }
     }
     
@@ -1120,7 +1123,7 @@ const app = {
     const filtroCategoria = document.getElementById("filtro-categoria");
     const filtroStatus = document.getElementById("filtro-status");
     
-    if (filtroBusca) filtroBusca.addEventListener("input", () => this.renderizarEstoque());
+    if (filtroBusca) filtroBusca.addEventListener("input", this.debounce(() => this.renderizarEstoque(), 250));
     if (filtroCategoria) filtroCategoria.addEventListener("change", () => this.renderizarEstoque());
     if (filtroStatus) filtroStatus.addEventListener("change", () => this.renderizarEstoque());
 
@@ -2159,35 +2162,72 @@ const app = {
 
   alterarQtdEstoque: async function(prodId, delta) {
     const prod = this.state.produtos.find(p => p.id === prodId);
-    if (prod) {
-      const novaQtd = Number(prod.quantidade || 0) + delta;
-      if (novaQtd >= 0) {
-        prod.quantidade = novaQtd;
-        // Atualiza _valoresDinamicos localmente
-        if (prod._valoresDinamicos) {
-          prod._valoresDinamicos["Estoque Central"] = novaQtd;
+    if (!prod) return;
+
+    const qtdAntiga = Number(prod.quantidade || 0);
+    const novaQtd = qtdAntiga + delta;
+    if (novaQtd < 0) return;
+
+    // 1. Trava de Planos para Estoque Central
+    if (delta > 0) {
+      const planoAtual = (
+        (this.state.loja && this.state.loja.plano) ||
+        (this.state.usuarioLogado && this.state.usuarioLogado.planoLoja) ||
+        localStorage.getItem("conectajoias_plano") ||
+        "BASICO"
+      ).toUpperCase();
+
+      let limiteEst = 300;
+      if (planoAtual === 'BASICO') limiteEst = 50;
+      else if (planoAtual === 'BRONZE') limiteEst = 300;
+      else if (planoAtual === 'GOLD') limiteEst = 1500;
+      else if (planoAtual === 'PLATINUM') limiteEst = 999999;
+
+      let totalEstAtual = 0;
+      (this.state.produtos || []).forEach(p => { totalEstAtual += (parseInt(p.quantidade) || 0); });
+
+      if (totalEstAtual + delta > limiteEst) {
+        this.toast(`Limite de peças do plano ${planoAtual} atingido (${totalEstAtual}/${limiteEst >= 9999 ? 'Ilimitado' : limiteEst} peças em estoque central). Faça upgrade do seu plano para adicionar mais.`, "warning");
+        return;
+      }
+    }
+
+    // 2. Atualização Otimista Instantânea (0ms de atraso visual)
+    prod.quantidade = novaQtd;
+    if (prod._valoresDinamicos) {
+      prod._valoresDinamicos["Estoque Central"] = novaQtd;
+    }
+    this.salvarDadosNoLocalStorage();
+    this.renderizarEstoque();
+    this.renderizarDashboard();
+
+    // 3. Persistência assíncrona em segundo plano no servidor
+    if (this.state.token && !this.state.token.startsWith("mock_")) {
+      try {
+        const res = await this.requisitarAPI(`/produtos/${prodId}`, "PUT", {
+          codigo: prod.codigo,
+          nome: prod.nome,
+          categoria: prod.categoria,
+          quantidade: novaQtd,
+          custoBruto: prod.custoBruto,
+          custoBanho: prod.custoBanho,
+          custoLiquido: prod.custoLiquido,
+          markup: prod.markup,
+          fotoUrl: prod.fotoUrl
+        });
+        if (res && res.error) {
+          throw new Error(res.error);
         }
-        // Persiste no servidor se autenticado
-        if (this.state.token) {
-          try {
-            await this.requisitarAPI(`/produtos/${prodId}`, "PUT", {
-              codigo: prod.codigo,
-              nome: prod.nome,
-              categoria: prod.categoria,
-              quantidade: novaQtd,
-              custoBruto: prod.custoBruto,
-              custoBanho: prod.custoBanho,
-              custoLiquido: prod.custoLiquido,
-              markup: prod.markup,
-              fotoUrl: prod.fotoUrl
-            });
-          } catch (err) {
-            console.warn("Falha ao persistir quantidade na API:", err.message);
-          }
+      } catch (err) {
+        console.warn("Falha ao persistir quantidade na API:", err.message);
+        prod.quantidade = qtdAntiga;
+        if (prod._valoresDinamicos) {
+          prod._valoresDinamicos["Estoque Central"] = qtdAntiga;
         }
         this.salvarDadosNoLocalStorage();
         this.renderizarEstoque();
         this.renderizarDashboard();
+        this.toast(err.message || "Erro ao salvar alteração de estoque no servidor.", "error");
       }
     }
   },
@@ -2248,12 +2288,44 @@ const app = {
     const custoBanho = parseFloat(document.getElementById("prod-banho").value) || 0;
     const custoLiquido = parseFloat(document.getElementById("prod-liquido").value) || 0;
     const markup = parseFloat(document.getElementById("prod-markup").value) || 1.0;
-    const fotoUrl = document.getElementById("prod-foto-url").value.trim() || null;
+    let fotoUrl = document.getElementById("prod-foto-url").value.trim() || null;
     const quantidadeDefeito = parseInt(document.getElementById("prod-defeito").value) || 0;
 
     const editId = document.getElementById("btn-salvar-produto").getAttribute("data-edit-id");
 
+    const btnSalvar = document.getElementById("btn-salvar-produto");
+    const textoOriginalBtn = btnSalvar ? btnSalvar.innerHTML : "";
+
     try {
+      if (btnSalvar) {
+        btnSalvar.disabled = true;
+        btnSalvar.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Salvando...';
+      }
+
+      // Se houver arquivo selecionado no input de foto, faz o upload primeiro
+      const fotoFileInput = document.getElementById("prod-foto-file");
+      if (fotoFileInput && fotoFileInput.files && fotoFileInput.files[0]) {
+        try {
+          const formData = new FormData();
+          formData.append("imagem", fotoFileInput.files[0]);
+          const uploadResp = await fetch(`${this.state.apiUrl}/uploads`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${this.state.token}`
+            },
+            body: formData
+          });
+          if (uploadResp.ok) {
+            const uploadData = await uploadResp.json();
+            if (uploadData && uploadData.url) {
+              fotoUrl = uploadData.url;
+            }
+          }
+        } catch (errUpload) {
+          console.warn("Aviso ao fazer upload da imagem do produto:", errUpload.message);
+        }
+      }
+
       let produtoSalvo;
 
       const bodyData = {
@@ -2312,19 +2384,31 @@ const app = {
         };
       });
 
-      this.salvarDadosNoLocalStorage();
-      this.renderizarEstoque();
-      this.renderizarDashboard();
-      
-      document.getElementById("modal-produto").classList.remove("active");
+      // Reseta input de arquivo de foto se houver
+      if (fotoFileInput) fotoFileInput.value = "";
+
+      const modalProduto = document.getElementById("modal-produto");
+      if (modalProduto) modalProduto.classList.remove("active");
       
       // Navega para aba de estoque para o usuário ver o produto que acabou de cadastrar/editar
       this.navegarParaAba("estoque");
-      
       this.toast(editId ? "Produto atualizado com sucesso!" : "Produto cadastrado com sucesso!", "success");
+
+      // Atualiza os dados no LocalStorage e renderiza no próximo ciclo assíncrono para zero lag visual
+      setTimeout(() => {
+        this.salvarDadosNoLocalStorage();
+        this.renderizarEstoque();
+        this.renderizarDashboard();
+      }, 50);
+
     } catch (error) {
       console.error(error);
       this.toast("Erro ao salvar produto no banco de dados: " + error.message, "error");
+    } finally {
+      if (btnSalvar) {
+        btnSalvar.disabled = false;
+        btnSalvar.innerHTML = textoOriginalBtn;
+      }
     }
   },
 

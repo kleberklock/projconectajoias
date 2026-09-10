@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const compression = require('compression');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
@@ -185,6 +186,7 @@ app.use(cors({
   credentials: true
 }));
 
+app.use(compression());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
@@ -264,7 +266,7 @@ async function verificarLimiteConsultoras(lojaId, adicionais = 1) {
     const lojaObj = await prisma.loja.findUnique({ where: { id: lojaId } });
     if (!lojaObj) return { ok: true };
     
-    const plano = (lojaObj.plano || 'BRONZE').toUpperCase();
+    const plano = (lojaObj.plano || 'BASICO').toUpperCase();
     if (plano === 'PLATINUM') return { ok: true };
 
     const totalConsultoras = await prisma.usuario.count({
@@ -299,7 +301,7 @@ async function verificarLimiteEstoque(lojaId, adicionais = 0) {
     const lojaObj = await prisma.loja.findUnique({ where: { id: lojaId } });
     if (!lojaObj) return { ok: true };
 
-    const plano = (lojaObj.plano || 'BRONZE').toUpperCase();
+    const plano = (lojaObj.plano || 'BASICO').toUpperCase();
     if (plano === 'PLATINUM') return { ok: true };
 
     const totalProdutos = await prisma.produtoVariacao.aggregate({
@@ -912,6 +914,20 @@ app.post('/api/auth/register', autenticarJWT, autorizarRole(['Manager', 'SuperAd
 
     // Validação de limite de plano de assinatura para consultoras (SaaS)
     if (normalizedRole === 'Consultant') {
+      if (whatsapp) {
+        const duplicadaExiste = await prisma.usuario.findFirst({
+          where: {
+            lojaId: req.lojaId,
+            role: 'Consultant',
+            whatsapp: whatsapp.trim(),
+            nome: nome.trim()
+          }
+        });
+        if (duplicadaExiste) {
+          return res.status(400).json({ error: 'Esta revendedora já está cadastrada nesta loja.' });
+        }
+      }
+
       const limitCheck = await verificarLimiteConsultoras(req.lojaId, 1);
       if (!limitCheck.ok) {
         return res.status(403).json({ error: limitCheck.error });
@@ -1143,12 +1159,25 @@ app.put('/api/produtos/:id', autenticarJWT, autorizarRole(['Manager', 'SuperAdmi
   const { codigo, nome, categoria, quantidade, custoBruto, custoBanho, custoLiquido, markup, fotoUrl, quantidadeDefeito } = req.body;
 
   try {
-    const prod = await prisma.produto.findFirst({ where: { id, lojaId: req.lojaId } });
+    const prod = await prisma.produto.findFirst({
+      where: { id, lojaId: req.lojaId },
+      include: { variacoes: true }
+    });
     if (!prod) {
       return res.status(403).json({ error: 'Acesso negado ou produto não encontrado nesta loja.' });
     }
 
     const qtdInt = parseInt(quantidade) || 0;
+    let varExistente = prod.variacoes.find(v => v.tamanho === "Único" && v.banho === "OURO");
+    const qtdAntiga = varExistente ? (varExistente.quantidade || 0) : 0;
+    const deltaEstoque = qtdInt - qtdAntiga;
+
+    if (deltaEstoque > 0) {
+      const limitCheck = await verificarLimiteEstoque(req.lojaId, deltaEstoque);
+      if (!limitCheck.ok) {
+        return res.status(403).json({ error: limitCheck.error });
+      }
+    }
     const produtoAtualizado = await prisma.produto.update({
       where: { id },
       data: {
@@ -2812,10 +2841,10 @@ app.post('/api/importar', autenticarJWT, autorizarRole(['Manager', 'SuperAdmin']
       let totalPecasPlanilha = produtos.reduce((sum, p) => sum + (parseInt(p.quantidade) || 0), 0);
       if (substituirTudo) {
         const lojaObj = await prisma.loja.findUnique({ where: { id: req.lojaId } });
-        const plano = lojaObj ? (lojaObj.plano || 'BRONZE').toUpperCase() : 'BRONZE';
+        const plano = lojaObj ? (lojaObj.plano || 'BASICO').toUpperCase() : 'BASICO';
         if (plano !== 'PLATINUM') {
           let limite = 300;
-          if (plano === 'BASICO') limite = 100;
+          if (plano === 'BASICO') limite = 50;
           else if (plano === 'BRONZE') limite = 300;
           else if (plano === 'GOLD') limite = 1500;
           if (totalPecasPlanilha > limite) {
@@ -4209,8 +4238,12 @@ app.post('/api/criar-pagamento', async (req, res) => {
     const planoRefClean = nomePlanoClean.toUpperCase().includes('BRONZE') ? 'BRONZE' : (nomePlanoClean.toUpperCase().includes('PLATINUM') ? 'PLATINUM' : 'GOLD');
     const externalRef = `${usuarioId || 'admin'}|${planoRefClean}`;
     
-    // Frontend URL para redirecionamento do navegador do usuário pós-pagamento (Live Server)
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5500';
+    // Detecta dinamicamente a URL de origem do Frontend (ex: http://localhost:8080 de scripts/start.bat ou http://localhost:5500)
+    let originUrl = req.headers.origin;
+    if (!originUrl && req.headers.referer) {
+      try { originUrl = new URL(req.headers.referer).origin; } catch (e) {}
+    }
+    const frontendUrl = originUrl || process.env.FRONTEND_URL || 'http://localhost:8080';
     // Public URL / Ngrok para recebimento de webhooks do servidor do Mercado Pago
     const publicUrl = process.env.PUBLIC_URL || 'http://localhost:5000';
 
@@ -4878,7 +4911,7 @@ app.get('/api/saas/lojas', autenticarJWT, autorizarRole(['SuperAdmin']), async (
         id: loja.id,
         nome: loja.nome,
         cnpj: loja.cnpj || "Não Informado",
-        plano: loja.plano || "BRONZE",
+        plano: loja.plano || "BASICO",
         createdAt: loja.createdAt,
         status: loja.statusPlano === 'SUSPENSO' ? 'SUSPENDED' : 'ACTIVE',
         consultorasCount: loja._count.usuarios,
@@ -4986,18 +5019,15 @@ app.put('/api/saas/lojas/:id/plano', autenticarJWT, autorizarRole(['SuperAdmin']
 });
 
 // Buscar detalhes do plano atual da loja do usuário logado (Gestor)
-app.get('/api/saas/meu-plano', autenticarJWT, async (req, res) => {
+app.get('/api/saas/meu-plano', autenticarJWTOpcional, identificarLoja, async (req, res) => {
   try {
-    const usuario = await prisma.usuario.findUnique({
-      where: { id: req.user.id },
-      include: { loja: true }
-    });
-
-    if (!usuario || !usuario.lojaId || !usuario.loja) {
-      return res.status(404).json({ error: 'Loja não encontrada para este usuário.' });
+    let loja = await prisma.loja.findUnique({ where: { id: req.lojaId } });
+    if (!loja) {
+      loja = await prisma.loja.create({
+        data: { id: req.lojaId, nome: 'Minha Marca de Semijoias', plano: 'BASICO', statusPlano: 'PENDENTE' }
+      });
     }
 
-    const loja = usuario.loja;
     const planoStr = (loja.plano || 'BASICO').toUpperCase();
 
     // Contar consultoras cadastradas
@@ -5053,6 +5083,110 @@ app.get('/api/saas/meu-plano', autenticarJWT, async (req, res) => {
   } catch (error) {
     console.error("Erro ao buscar dados do plano da loja:", error);
     res.status(500).json({ error: 'Erro ao buscar dados do plano.' });
+  }
+});
+
+// Endpoint para confirmar pagamento no retorno do checkout (Mercado Pago / Asaas) e ativar o plano imediatamente
+app.post('/api/saas/confirmar-retorno-pagamento', autenticarJWTOpcional, identificarLoja, async (req, res) => {
+  try {
+    const { paymentId, status, externalReference, planoDesejado } = req.body;
+    let planoExt = (planoDesejado || 'GOLD').toUpperCase();
+    let refId = null;
+
+    if (externalReference && externalReference.includes('|')) {
+      const parts = externalReference.split('|');
+      if (parts[0]) refId = parts[0];
+      if (parts[1]) planoExt = parts[1].toUpperCase();
+    }
+
+    let lojaTargetId = req.lojaId || 'default-loja';
+    let downgradePendente = null;
+
+    // 1. Tenta identificar a loja via usuário autenticado (JWT)
+    if (req.user && req.user.id) {
+      const usuario = await prisma.usuario.findUnique({
+        where: { id: req.user.id },
+        include: { loja: true }
+      });
+      if (usuario && usuario.lojaId) {
+        lojaTargetId = usuario.lojaId;
+        downgradePendente = usuario.loja?.downgradePendente;
+      }
+    }
+
+    // 2. Fallback: Tenta identificar a loja via refId da externalReference
+    if (refId) {
+      const usuarioRef = await prisma.usuario.findUnique({ where: { id: refId } });
+      if (usuarioRef && usuarioRef.lojaId) {
+        lojaTargetId = usuarioRef.lojaId;
+      } else {
+        const lojaRef = await prisma.loja.findUnique({ where: { id: refId } });
+        if (lojaRef) {
+          lojaTargetId = lojaRef.id;
+          downgradePendente = lojaRef.downgradePendente;
+        }
+      }
+    }
+
+    let statusAprovado = false;
+    const statusClean = String(status || '').toLowerCase();
+    if (['approved', 'aprovado', 'active', 'pago', 'paid'].includes(statusClean)) {
+      statusAprovado = true;
+    } else if (paymentId && clientMercadoPago) {
+      try {
+        const payment = new Payment(clientMercadoPago);
+        const pagamentoMP = await payment.get({ id: paymentId });
+        if (pagamentoMP && pagamentoMP.status === 'approved') {
+          statusAprovado = true;
+        }
+      } catch (mpErr) {
+        console.warn('⚠️ Não foi possível consultar a API do MP no retorno (usando validação por parâmetro):', mpErr.message);
+        if (statusClean === 'approved' || statusClean === 'aprovado') statusAprovado = true;
+      }
+    } else {
+      // Se chamado sem paymentId (ex: sandbox/retorno direto com status na URL)
+      statusAprovado = true;
+    }
+
+    if (statusAprovado) {
+      const dataVencimento = new Date();
+      dataVencimento.setDate(dataVencimento.getDate() + 30);
+      const novoPlanoFinal = downgradePendente || planoExt;
+
+      // Usa upsert para garantir a criação se a loja ainda não existia na tabela de lojas
+      const lojaAtualizada = await prisma.loja.upsert({
+        where: { id: lojaTargetId },
+        update: {
+          statusPlano: 'ATIVO',
+          plano: novoPlanoFinal,
+          downgradePendente: null,
+          vencimentoPlano: dataVencimento
+        },
+        create: {
+          id: lojaTargetId,
+          nome: 'Minha Marca de Semijoias',
+          statusPlano: 'ATIVO',
+          plano: novoPlanoFinal,
+          downgradePendente: null,
+          vencimentoPlano: dataVencimento
+        }
+      });
+
+      console.log(`✅ [Sincronização Pós-Pagamento] Plano ${lojaAtualizada.plano} ativado com sucesso para a loja ${lojaAtualizada.id}.`);
+
+      return res.json({
+        ok: true,
+        plano: lojaAtualizada.plano,
+        statusPlano: lojaAtualizada.statusPlano,
+        vencimentoPlano: lojaAtualizada.vencimentoPlano,
+        message: 'Plano ativado e sincronizado com sucesso!'
+      });
+    }
+
+    return res.status(400).json({ error: 'Pagamento não aprovado ou pendente de confirmação.' });
+  } catch (err) {
+    console.error('Erro ao confirmar retorno de pagamento:', err);
+    res.status(500).json({ error: 'Erro interno ao sincronizar plano.' });
   }
 });
 

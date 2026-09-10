@@ -6,8 +6,8 @@
   <title>Conecta Joias - Login Premium</title>
   
   <!-- Favicon e Ícones -->
-  <link rel="icon" type="image/png" href="../assets/favicon.png">
-  <link rel="apple-touch-icon" href="../assets/favicon.png">
+  <link rel="icon" type="image/png" href="/assets/favicon.png">
+  <link rel="apple-touch-icon" href="/assets/favicon.png">
   
   <!-- Fontes de Luxo - Montserrat e Cormorant Garamond -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -15,9 +15,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   
   <!-- Estilos Globais & PWA -->
-  <link rel="manifest" href="../manifest.json">
-  <link rel="stylesheet" href="../css/style.css">
-  <link rel="stylesheet" href="../css/pwa-install.css">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/pwa-install.css">
   
   <!-- FontAwesome para Ícones de Alta Qualidade -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -237,7 +237,7 @@
     <!-- Card de Login -->
     <div class="login-card" id="login-card">
       <div class="login-logo">
-        <img src="../assets/logo.png" alt="Conecta Joias" id="login-logo-img">
+        <img src="/assets/logo.png" alt="Conecta Joias" id="login-logo-img">
       </div>
       <h2>Gestão Premium</h2>
       <p>Insira suas credenciais de acesso</p>
@@ -266,8 +266,8 @@
       <div class="login-footer">
         <p id="login-footer-text">Conecta Joias &copy; 2026 - Controle de Luxo</p>
         <p style="font-size: 0.72rem; margin-top: 0.5rem; display: flex; justify-content: center; gap: 1rem;">
-          <a href="termos_uso.html" target="_blank" style="color: var(--text-secondary); text-decoration: underline;">Termos de Uso</a>
-          <a href="politica_privacidade.html" target="_blank" style="color: var(--text-secondary); text-decoration: underline;">Política de Privacidade</a>
+          <a href="/pages/termos_uso.html" target="_blank" style="color: var(--text-secondary); text-decoration: underline;">Termos de Uso</a>
+          <a href="/pages/politica_privacidade.html" target="_blank" style="color: var(--text-secondary); text-decoration: underline;">Política de Privacidade</a>
         </p>
       </div>
     </div>
@@ -275,7 +275,7 @@
     <!-- Card de Recuperação de Senha -->
     <div class="login-card" id="recuperar-senha-card" style="display: none;">
       <div class="login-logo">
-        <img src="../assets/logo.png" alt="Conecta Joias" id="recuperar-logo-img">
+        <img src="/assets/logo.png" alt="Conecta Joias" id="recuperar-logo-img">
       </div>
       <h2>Recuperar Acesso</h2>
       <p>Informe seu e-mail, PIN de 4 dígitos ou WhatsApp</p>
@@ -316,7 +316,7 @@
     <!-- Card de Cadastro (Sign Up) -->
     <div class="login-card" id="signup-card" style="display: none;">
       <div class="login-logo">
-        <img src="../assets/logo.png" alt="Conecta Joias" id="signup-logo-img">
+        <img src="/assets/logo.png" alt="Conecta Joias" id="signup-logo-img">
       </div>
       <h2>Cadastrar Gestão</h2>
       <p>Crie sua conta para gerenciar sua marca</p>
@@ -573,30 +573,8 @@
 
   </div>
 
-  <script src="../js/login.js"></script>
+  <script src="/js/login.js" defer></script>
 
-  <!-- Script de Autolimpeza imperativa de Cache e Service Workers do Navegador -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        for(let registration of registrations) {
-          registration.unregister().then(function() {
-            console.log("Service Worker desregistrado com sucesso para forçar atualização.");
-          });
-        }
-      });
-    }
-    if ('caches' in window) {
-      caches.keys().then(function(names) {
-        for (let name of names) {
-          caches.delete(name).then(function() {
-            console.log("Cache deletado com sucesso:", name);
-          });
-        }
-      });
-    }
-  </script>
-
-  <script src="../js/pwa-install.js"></script>
+  <script src="/js/pwa-install.js" defer></script>
 </body>
 </html>

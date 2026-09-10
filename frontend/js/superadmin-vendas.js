@@ -251,6 +251,10 @@ Object.assign(app, {
   // ==========================================
 
   confirmarVendaAdmin: async function() {
+    if (window.app && typeof window.app.validarCompatibilidadePlanoAntesDeSalvar === "function") {
+      if (!window.app.validarCompatibilidadePlanoAntesDeSalvar('venda', 'realizar e registrar vendas')) return;
+    }
+
     const selectProduto = document.getElementById("venda-admin-produto");
     const selectCliente = document.getElementById("venda-admin-cliente");
     const qtdInput = document.getElementById("venda-admin-qtd");

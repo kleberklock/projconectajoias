@@ -6,25 +6,29 @@
   <title>Conecta Joias - Gestão Premium</title>
   
   <!-- PWA e Configurações Mobile -->
-  <link rel="manifest" href="../manifest.json">
+  <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#d4af37">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="icon" type="image/png" href="../assets/favicon.png">
-  <link rel="apple-touch-icon" href="../assets/favicon.png">
+  <link rel="icon" type="image/png" href="/assets/favicon.png">
+  <link rel="apple-touch-icon" href="/assets/favicon.png">
 
   <!-- SEO Meta Tags -->
   <meta name="description" content="Plataforma de gestão inteligente e precificação para vendedoras e revendedoras de semijoias. Controle de estoque, consignação e marketing integrado.">
   <meta name="author" content="Conecta Joias">
   
   <!-- CSS Principal -->
-  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="/css/style.css">
   
   <!-- FontAwesome para Ícones de Alta Qualidade -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
+  <!-- Verificação Prévia de Autenticação e Plano (Zero Latência) -->
+  <script src="/js/auth-guard.js"></script>
+
   <!-- Biblioteca Chart.js para Gráficos de BI -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
 </head>
 <body>
 
@@ -34,7 +38,7 @@
        ========================================== -->
   <!-- Barra Superior Mobile com Hambúrguer -->
   <div class="mobile-top-bar">
-    <img src="../assets/logo.png" alt="Conecta Joias" class="mobile-brand">
+    <img src="/assets/logo.png" alt="Conecta Joias" class="mobile-brand">
     <button class="btn-mobile-toggle" id="btn-toggle-sidebar-mobile" onclick="app.toggleSidebarMobile()" aria-label="Abrir Menu">
       <i class="fa-solid fa-bars"></i>
     </button>
@@ -49,7 +53,7 @@
     <aside class="sidebar mobile-drawer">
       <div class="brand" style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 2.5rem; padding: 0 0.5rem;">
         <!-- Inclusão do logotipo SVG premium criado previamente -->
-        <img src="../assets/logo.png" alt="Conecta Joias" id="logo-brand" style="max-width: 140px; height: auto;">
+        <img src="/assets/logo.png" alt="Conecta Joias" id="logo-brand" style="max-width: 140px; height: auto;">
         
         <!-- Sino de Notificações na Sidebar (Super Admin) -->
         <div id="notif-wrapper" style="position: relative; z-index: 100;">
@@ -1594,13 +1598,13 @@
             <div>
               <span style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px;">Plano Ativo no Momento</span>
               <div style="display: flex; align-items: center; gap: 0.8rem; margin-top: 0.3rem;">
-                <h2 id="saas-plano-nome" style="font-family: var(--font-title); font-size: 1.8rem; color: var(--gold-primary); margin: 0;">Plano Bronze</h2>
+                <h2 id="saas-plano-nome" style="font-family: var(--font-title); font-size: 1.8rem; color: var(--gold-primary); margin: 0;">Plano Básico</h2>
                 <span id="saas-plano-badge-status" class="badge-status" style="background: rgba(129, 199, 132, 0.15); color: #81c784; border: 1px solid #81c784; font-size: 0.75rem; padding: 4px 10px; border-radius: 20px; font-weight: bold;">ATIVO</span>
               </div>
             </div>
             <div style="text-align: right;">
               <span style="font-size: 0.8rem; color: var(--text-secondary);">Renovação / Vencimento:</span>
-              <div id="saas-plano-vencimento" style="font-size: 1.1rem; font-weight: bold; color: var(--text-primary); margin-top: 0.2rem;">30 dias de acesso</div>
+              <div id="saas-plano-vencimento" style="font-size: 1.1rem; font-weight: bold; color: var(--text-primary); margin-top: 0.2rem;">Acesso Gratuito</div>
             </div>
           </div>
 
@@ -1609,7 +1613,7 @@
             <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); padding: 1rem; border-radius: var(--radius-md);">
               <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.85rem;">
                 <span style="color: var(--text-secondary);"><i class="fa-solid fa-users" style="color: var(--gold-primary); margin-right: 6px;"></i> Consultoras Cadastradas</span>
-                <span id="saas-uso-consultoras-txt" style="font-weight: bold; color: var(--text-primary);">0 / 5</span>
+                <span id="saas-uso-consultoras-txt" style="font-weight: bold; color: var(--text-primary);">0 / 2</span>
               </div>
               <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
                 <div id="saas-bar-consultoras" style="width: 0%; height: 100%; background: var(--gold-gradient); transition: width 0.4s ease;"></div>
@@ -1618,7 +1622,7 @@
             <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); padding: 1rem; border-radius: var(--radius-md);">
               <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.85rem;">
                 <span style="color: var(--text-secondary);"><i class="fa-solid fa-gem" style="color: var(--gold-primary); margin-right: 6px;"></i> Peças em Estoque Central</span>
-                <span id="saas-uso-estoque-txt" style="font-weight: bold; color: var(--text-primary);">0 / 300</span>
+                <span id="saas-uso-estoque-txt" style="font-weight: bold; color: var(--text-primary);">0 / 50</span>
               </div>
               <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
                 <div id="saas-bar-estoque" style="width: 0%; height: 100%; background: var(--gold-gradient); transition: width 0.4s ease;"></div>
@@ -1842,8 +1846,8 @@
       </div>
 
       <div class="modal-footer">
-        <button class="btn-outline-gold" id="btn-cancelar-produto">Cancelar</button>
-        <button class="btn-gold" id="btn-salvar-produto"><i class="fa-solid fa-floppy-disk"></i> Salvar Produto</button>
+        <button class="btn-outline-gold" id="btn-cancelar-produto" onclick="app.fecharModalProduto()">Cancelar</button>
+        <button class="btn-gold" id="btn-salvar-produto" onclick="app.salvarNovoProduto()"><i class="fa-solid fa-floppy-disk"></i> Salvar Produto</button>
       </div>
     </div>
   </div>
@@ -2025,7 +2029,7 @@
 
       <!-- Footer Fixo -->
       <div class="modal-footer" style="padding: 1rem 1.5rem; border-top: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: flex-end; gap: 1rem; background: rgba(0,0,0,0.15); margin-top: 0;">
-        <button class="btn-outline-gold" id="btn-cancelar-revendedora" style="cursor: pointer;">Cancelar</button>
+        <button class="btn-outline-gold" id="btn-cancelar-revendedora" style="cursor: pointer;" onclick="app.fecharModalRevendedora()">Cancelar</button>
         <button class="btn-gold" id="btn-salvar-revendedora" style="cursor: pointer;"><i class="fa-solid fa-floppy-disk"></i> Cadastrar</button>
       </div>
     </div>
@@ -2110,8 +2114,8 @@
       </div>
 
       <div class="modal-footer">
-        <button class="btn-outline-gold" id="btn-cancelar-consignar">Cancelar</button>
-        <button class="btn-gold" id="btn-confirmar-consignar"><i class="fa-solid fa-briefcase"></i> Enviar para Maleta</button>
+        <button class="btn-outline-gold" id="btn-cancelar-consignar" onclick="app.fecharModalConsignar()">Cancelar</button>
+        <button class="btn-gold" id="btn-confirmar-consignar" onclick="app.processarConsignacao()"><i class="fa-solid fa-briefcase"></i> Enviar para Maleta</button>
       </div>
     </div>
   </div>
@@ -2271,7 +2275,7 @@
             <div id="acerto-pref-info-revendedora" style="display: none; margin-top: -0.5rem; margin-bottom: 1rem; font-size: 0.8rem; padding: 0.6rem; background: rgba(212, 175, 55, 0.08); border: 1px dashed rgba(212, 175, 55, 0.3); border-radius: var(--radius-sm); color: var(--text-secondary); line-height: 1.4;"></div>
 
             <div style="display: flex; flex-direction: column; gap: 0.8rem; margin-top: 1.5rem;">
-              <button class="btn-gold" id="btn-finalizar-acerto-whats" style="font-size: 0.85rem; padding: 0.75rem; justify-content: center; width: 100%;">
+              <button class="btn-gold" id="btn-finalizar-acerto-whats" onclick="app.finalizarAcerto(true)" style="font-size: 0.85rem; padding: 0.75rem; justify-content: center; width: 100%;">
                 <i class="fa-brands fa-whatsapp"></i> WhatsApp e Fechar
               </button>
               <button class="btn-outline-gold" id="btn-finalizar-acerto-pdf" onclick="app.imprimirAcerto()" style="font-size: 0.85rem; padding: 0.75rem; justify-content: center; width: 100%;">
@@ -2285,8 +2289,8 @@
 
       <!-- Footer Fixo -->
       <div class="modal-footer" style="padding: 1rem 1.5rem; border-top: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: flex-end; gap: 1rem; background: rgba(0,0,0,0.15); margin-top: 0;">
-        <button class="btn-outline-gold" id="btn-cancelar-acerto" style="cursor: pointer;">Cancelar Fechamento</button>
-        <button class="btn-gold" id="btn-salvar-acerto-apenas" style="cursor: pointer;"><i class="fa-solid fa-check"></i> Apenas Concluir no Sistema</button>
+        <button class="btn-outline-gold" id="btn-cancelar-acerto" style="cursor: pointer;" onclick="app.fecharModalAcerto()">Cancelar Fechamento</button>
+        <button class="btn-gold" id="btn-salvar-acerto-apenas" style="cursor: pointer;" onclick="app.finalizarAcerto(false)"><i class="fa-solid fa-check"></i> Apenas Concluir no Sistema</button>
       </div>
     </div>
   </div>
@@ -2351,8 +2355,8 @@
       </div>
 
       <div class="modal-footer">
-        <button class="btn-outline-gold" id="btn-cancelar-venda-rapida">Cancelar</button>
-        <button class="btn-gold" id="btn-enviar-venda-rapida"><i class="fa-brands fa-whatsapp"></i> Gerar e Enviar</button>
+        <button class="btn-outline-gold" id="btn-cancelar-venda-rapida" onclick="app.fecharModalVendaRapida()">Cancelar</button>
+        <button class="btn-gold" id="btn-enviar-venda-rapida" onclick="app.processarVendaRapidaWhats()"><i class="fa-brands fa-whatsapp"></i> Gerar e Enviar</button>
       </div>
     </div>
   </div>
@@ -2416,7 +2420,7 @@
 
       <div class="modal-footer">
         <button class="btn-outline-gold" id="btn-cancelar-venda-rev">Cancelar</button>
-        <button class="btn-gold" id="btn-confirmar-venda-rev">
+        <button class="btn-gold" id="btn-confirmar-venda-rev" onclick="app.confirmarVendaRevendedora()">
           <i class="fa-solid fa-check"></i> Confirmar Venda
         </button>
       </div>
@@ -2996,39 +3000,17 @@
   </div>
 
   <!-- 2. Biblioteca Robusta de CSV (PapaParse) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" defer></script>
   <!-- 3. Funções de Manipulação do Excel/CSV -->
-  <script src="../js/excel-handler.js"></script>
+  <script src="/js/excel-handler.js" defer></script>
   <!-- 3. Lógica do Aplicativo Principal -->
-  <script src="../js/superadmin.js"></script>
+  <script src="/js/superadmin.js" defer></script>
   <!-- 4. Módulo de Vendas Diretas da Administradora -->
-  <script src="../js/superadmin-vendas.js"></script>
+  <script src="/js/superadmin-vendas.js" defer></script>
   <!-- 5. Módulo de Tutorial Interativo (Onboarding Tour) -->
-  <script src="../js/superadmin-tour.js"></script>
+  <script src="/js/superadmin-tour.js" defer></script>
   <!-- 6. Módulo de Checkout de Pagamento e Assinaturas -->
-  <script src="../js/pagamento.js"></script>
-
-  <!-- Script de Autolimpeza imperativa de Cache e Service Workers do Navegador -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        for(let registration of registrations) {
-          registration.unregister().then(function() {
-            console.log("Service Worker desregistrado com sucesso para forçar atualização.");
-          });
-        }
-      });
-    }
-    if ('caches' in window) {
-      caches.keys().then(function(names) {
-        for (let name of names) {
-          caches.delete(name).then(function() {
-            console.log("Cache deletado com sucesso:", name);
-          });
-        }
-      });
-    }
-  </script>
+  <script src="/js/pagamento.js" defer></script>
 
 </body>
 </html>

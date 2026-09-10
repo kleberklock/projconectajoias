@@ -1,11 +1,14 @@
-const CACHE_NAME = "conectajoias-v5";
+const CACHE_NAME = "conectajoias-v9";
 const ASSETS = [
   "/",
   "/index.html",
   "/css/style.css",
+  "/css/pwa-install.css",
+  "/js/auth-guard.js",
   "/js/app.js",
   "/js/excel-handler.js",
   "/js/marketing-data.js",
+  "/js/pwa-install.js",
   "/assets/logo.png",
   "/assets/favicon.png",
   "/manifest.json",
@@ -22,16 +25,23 @@ const ASSETS = [
   "/pages/superadmin.html",
   "/js/superadmin.js",
   "/js/superadmin-vendas.js",
+  "/js/superadmin-tour.js",
   "/pages/termo_assinatura.html",
   "/js/termo_assinatura.js",
   "/pages/apresentacao.html"
 ];
 
-// Instalação do Service Worker e caching inicial
+// Instalação do Service Worker e caching inicial seguro
 self.addEventListener("install", (e) => {
   e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS);
+    caches.open(CACHE_NAME).then(async (cache) => {
+      await Promise.all(
+        ASSETS.map((url) =>
+          cache.add(url).catch((err) => {
+            console.warn("Aviso ao adicionar recurso ao cache:", url, err);
+          })
+        )
+      );
     }).then(() => self.skipWaiting())
   );
 });
@@ -48,7 +58,7 @@ self.addEventListener("activate", (e) => {
           }
         })
       );
-    }).then(() => self.clients.claim())
+    }).then(() => self.clients.claim().catch(() => {}))
   );
 });
 

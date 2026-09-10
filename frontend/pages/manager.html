@@ -6,25 +6,29 @@
   <title>Conecta Joias - Gestão Premium</title>
   
   <!-- PWA e Configurações Mobile -->
-  <link rel="manifest" href="../manifest.json">
+  <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#d4af37">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="icon" type="image/png" href="../assets/favicon.png">
-  <link rel="apple-touch-icon" href="../assets/favicon.png">
+  <link rel="icon" type="image/png" href="/assets/favicon.png">
+  <link rel="apple-touch-icon" href="/assets/favicon.png">
 
   <!-- SEO Meta Tags -->
   <meta name="description" content="Plataforma de gestão inteligente e precificação para vendedoras e revendedoras de semijoias. Controle de estoque, consignação e marketing integrado.">
   <meta name="author" content="Conecta Joias">
   
   <!-- CSS Principal -->
-  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="/css/style.css">
   
   <!-- FontAwesome para Ícones de Alta Qualidade -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
+  <!-- Verificação Prévia de Autenticação e Plano (Zero Latência) -->
+  <script src="/js/auth-guard.js"></script>
+
   <!-- Biblioteca Chart.js para Gráficos de BI -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
 </head>
 <body>
 
@@ -34,7 +38,7 @@
        ========================================== -->
   <!-- Barra Superior Mobile com Hambúrguer -->
   <div class="mobile-top-bar">
-    <img src="../assets/logo.png" alt="Conecta Joias" class="mobile-brand">
+    <img src="/assets/logo.png" alt="Conecta Joias" class="mobile-brand">
     <button class="btn-mobile-toggle" id="btn-toggle-sidebar-mobile" onclick="app.toggleSidebarMobile()" aria-label="Abrir Menu">
       <i class="fa-solid fa-bars"></i>
     </button>
@@ -49,7 +53,7 @@
     <aside class="sidebar mobile-drawer">
       <div class="brand" style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 2.5rem; padding: 0 0.5rem;">
         <!-- Inclusão do logotipo SVG premium criado previamente -->
-        <img src="../assets/logo.png" alt="Conecta Joias" id="logo-brand" style="max-width: 140px; height: auto;">
+        <img src="/assets/logo.png" alt="Conecta Joias" id="logo-brand" style="max-width: 140px; height: auto;">
         
         <!-- Sino de Notificações na Sidebar (Manager) -->
         <div id="notif-wrapper" style="position: relative; z-index: 100;">
@@ -1811,13 +1815,13 @@
             <div>
               <span style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px;">Plano Ativo no Momento</span>
               <div style="display: flex; align-items: center; gap: 0.8rem; margin-top: 0.3rem;">
-                <h2 id="saas-plano-nome" style="font-family: var(--font-title); font-size: 1.8rem; color: var(--gold-primary); margin: 0;">Plano Bronze</h2>
+                <h2 id="saas-plano-nome" style="font-family: var(--font-title); font-size: 1.8rem; color: var(--gold-primary); margin: 0;">Plano Básico</h2>
                 <span id="saas-plano-badge-status" class="badge-status" style="background: rgba(129, 199, 132, 0.15); color: #81c784; border: 1px solid #81c784; font-size: 0.75rem; padding: 4px 10px; border-radius: 20px; font-weight: bold;">ATIVO</span>
               </div>
             </div>
             <div style="text-align: right;">
               <span style="font-size: 0.8rem; color: var(--text-secondary);">Renovação / Vencimento:</span>
-              <div id="saas-plano-vencimento" style="font-size: 1.1rem; font-weight: bold; color: var(--text-primary); margin-top: 0.2rem;">30 dias de acesso</div>
+              <div id="saas-plano-vencimento" style="font-size: 1.1rem; font-weight: bold; color: var(--text-primary); margin-top: 0.2rem;">Acesso Gratuito</div>
             </div>
           </div>
 
@@ -1826,7 +1830,7 @@
             <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); padding: 1rem; border-radius: var(--radius-md);">
               <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.85rem;">
                 <span style="color: var(--text-secondary);"><i class="fa-solid fa-users" style="color: var(--gold-primary); margin-right: 6px;"></i> Consultoras Cadastradas</span>
-                <span id="saas-uso-consultoras-txt" style="font-weight: bold; color: var(--text-primary);">0 / 5</span>
+                <span id="saas-uso-consultoras-txt" style="font-weight: bold; color: var(--text-primary);">0 / 2</span>
               </div>
               <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
                 <div id="saas-bar-consultoras" style="width: 0%; height: 100%; background: var(--gold-gradient); transition: width 0.4s ease;"></div>
@@ -1835,7 +1839,7 @@
             <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); padding: 1rem; border-radius: var(--radius-md);">
               <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.85rem;">
                 <span style="color: var(--text-secondary);"><i class="fa-solid fa-gem" style="color: var(--gold-primary); margin-right: 6px;"></i> Peças em Estoque Central</span>
-                <span id="saas-uso-estoque-txt" style="font-weight: bold; color: var(--text-primary);">0 / 300</span>
+                <span id="saas-uso-estoque-txt" style="font-weight: bold; color: var(--text-primary);">0 / 50</span>
               </div>
               <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
                 <div id="saas-bar-estoque" style="width: 0%; height: 100%; background: var(--gold-gradient); transition: width 0.4s ease;"></div>
@@ -2253,7 +2257,7 @@
         <div class="form-group" id="group-rev-faixas" style="margin-bottom: 0; display: none; grid-column: 1/-1;">
           <label style="display: flex; justify-content: space-between; align-items: center; font-weight: 600; margin-bottom: 6px;">
             Tabela de Faixas Progressivas
-            <button type="button" class="btn-gold" id="btn-add-faixa-ui" onclick="app.adicionarFaixaLinha()" style="padding: 4px 8px; font-size: 0.75rem; margin: 0; cursor: pointer;">
+            <button type="button" class="btn-gold" id="btn-add-faixa-ui" style="padding: 4px 8px; font-size: 0.75rem; margin: 0; cursor: pointer;">
               <i class="fa-solid fa-plus"></i> Adicionar Faixa
             </button>
           </label>
@@ -2356,7 +2360,7 @@
 
       <div class="modal-footer" style="margin-top:1rem;">
         <button class="btn-outline-gold" id="btn-cancelar-revendedora" onclick="app.fecharModalRevendedora()">Cancelar</button>
-        <button class="btn-gold" id="btn-salvar-revendedora" onclick="app.salvarNovaRevendedora()"><i class="fa-solid fa-floppy-disk"></i> Cadastrar</button>
+        <button class="btn-gold" id="btn-salvar-revendedora"><i class="fa-solid fa-floppy-disk"></i> Cadastrar</button>
       </div>
     </div>
   </div>
@@ -2927,35 +2931,13 @@
   <!-- 1. Dados Estáticos e Modelos de Marketing -->
   <!-- script src="marketing-data.js" removido pois a seção de marketing foi excluída -->
   <!-- 2. Biblioteca Robusta de CSV (PapaParse) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" defer></script>
   <!-- 3. Funções de Manipulação do Excel/CSV -->
-  <script src="../js/excel-handler.js"></script>
+  <script src="/js/excel-handler.js" defer></script>
   <!-- 4. Integração de Pagamento Mercado Pago -->
-  <script src="../js/pagamento.js"></script>
+  <script src="/js/pagamento.js" defer></script>
   <!-- 5. Lógica do Aplicativo Principal -->
-  <script src="../js/manager.js"></script>
-
-  <!-- Script de Autolimpeza imperativa de Cache e Service Workers do Navegador -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        for(let registration of registrations) {
-          registration.unregister().then(function() {
-            console.log("Service Worker desregistrado com sucesso para forçar atualização.");
-          });
-        }
-      });
-    }
-    if ('caches' in window) {
-      caches.keys().then(function(names) {
-        for (let name of names) {
-          caches.delete(name).then(function() {
-            console.log("Cache deletado com sucesso:", name);
-          });
-        }
-      });
-    }
-  </script>
+  <script src="/js/manager.js" defer></script>
 
   <!-- Modal Forçado de Upload de RG no Primeiro Acesso -->
   <div class="modal-backdrop" id="modal-upload-rg-obrigatorio" style="display: none; align-items: center; justify-content: center; z-index: 10000; background: rgba(0,0,0,0.9);">
@@ -2980,7 +2962,7 @@
         <div class="form-group" id="wrapper-termo-resp" style="text-align: left; display: none;">
           <label style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 600; display: block; margin-bottom: 0.4rem;">Termo de Responsabilidade Assinado *</label>
           <div style="margin-bottom: 0.3rem;">
-            <a href="../assets/modelo_termo_responsabilidade.pdf" target="_blank" style="color: var(--gold-primary); text-decoration: underline; font-weight: 500; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-file-pdf"></i> Baixar Modelo do Termo</a>
+            <a href="/assets/modelo_termo_responsabilidade.pdf" target="_blank" style="color: var(--gold-primary); text-decoration: underline; font-weight: 500; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-file-pdf"></i> Baixar Modelo do Termo</a>
           </div>
           <input type="file" id="termo-file" accept="image/*,application/pdf" style="width: 100%; padding: 0.5rem; background: rgba(0,0,0,0.4); border: 1px solid rgba(212,175,55,0.2); border-radius: var(--radius-sm); color: #fff;">
         </div>

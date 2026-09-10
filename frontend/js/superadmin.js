@@ -53,6 +53,15 @@ const app = {
       defeitos: { coluna: null, direcao: "asc" }
     }
   },
+  debounce: function(func, delay = 250) {
+    let timeoutId;
+    return function(...args) {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        func.apply(this, args);
+      }, delay);
+    };
+  },
 
   // Sistema de Toast premium
   toast: function(message, type = "info") {
@@ -208,6 +217,10 @@ const app = {
         console.error("Erro ao exibir interface pós-login:", e);
       }
       
+      // Aplica os cadeados IMEDIATAMENTE e SÍNCRONAMENTE antes de renderizar qualquer conteúdo visual
+      this.atualizarCadeadosUI();
+      try { this.carregarMeuPlanoSaaS(); } catch (e) { console.error("Erro ao carregar plano no init:", e); }
+
       // Renderizar imediatamente usando dados em cache do localStorage para evitar atrasos visuais
       // Isolado em blocos try/catch para garantir que erros visuais de DOM/inicialização não desloguem o usuário
       try { this.renderizarDashboard(); } catch (e) { console.error("Erro ao renderizar Dashboard no init:", e); }
@@ -487,22 +500,15 @@ const app = {
     if (logoBrand) {
       if (config.logoUrl && config.logoUrl !== "" && !config.logoUrl.includes("logo.svg") && !config.logoUrl.includes("logo.png")) {
         logoBrand.src = config.logoUrl;
-        logoBrand.alt = config.nomeEmpresa;
-        logoBrand.style.display = "block";
-        if (brandTextSpan) brandTextSpan.style.display = "none";
+        logoBrand.alt = config.nomeEmpresa || "Conecta Joias";
       } else {
-        if (config.nomeEmpresa && config.nomeEmpresa !== "Conecta Joias" && config.nomeEmpresa !== "") {
-          logoBrand.style.display = "none";
-          if (brandTextSpan) {
-            brandTextSpan.innerText = config.nomeEmpresa;
-            brandTextSpan.style.display = "block";
-          }
-        } else {
-          logoBrand.src = "/assets/logo.png";
-          logoBrand.alt = "Conecta Joias";
-          logoBrand.style.display = "block";
-          if (brandTextSpan) brandTextSpan.style.display = "none";
-        }
+        logoBrand.src = "/assets/logo.png";
+        logoBrand.alt = config.nomeEmpresa || "Conecta Joias";
+      }
+      logoBrand.style.display = "block";
+      if (brandTextSpan) {
+        brandTextSpan.innerText = config.nomeEmpresa || "Conecta Joias";
+        brandTextSpan.style.display = "none";
       }
     }
     
@@ -1385,12 +1391,12 @@ const app = {
       });
     });
 
-    // Filtros de busca no estoque
+    // Filtros de busca no estoque (com debounce de 250ms para fluidez máxima)
     const filtroBusca = document.getElementById("filtro-busca");
     const filtroCategoria = document.getElementById("filtro-categoria");
     const filtroStatus = document.getElementById("filtro-status");
     
-    if (filtroBusca) filtroBusca.addEventListener("input", () => this.renderizarEstoque());
+    if (filtroBusca) filtroBusca.addEventListener("input", this.debounce(() => this.renderizarEstoque(), 250));
     if (filtroCategoria) filtroCategoria.addEventListener("change", () => this.renderizarEstoque());
     if (filtroStatus) filtroStatus.addEventListener("change", () => this.renderizarEstoque());
 
@@ -1410,6 +1416,20 @@ const app = {
     this.configurarModal("modal-acerto", "btn-open-modal-acerto", "btn-close-modal-acerto", "btn-cancelar-acerto");
     this.configurarModal("modal-todos-alertas", null, "btn-close-modal-todos-alertas", "btn-fechar-todos-alertas");
     this.configurarModal("modal-notificacoes", "btn-notificacoes", "btn-close-modal-notificacoes", "btn-fechar-notificacoes");
+    this.configurarModal("modal-venda-rapida", "btn-quick-sale", "btn-close-modal-venda-rapida", "btn-cancelar-venda-rapida");
+    this.configurarModal("modal-venda-rev", "btn-open-modal-venda-rev", "btn-close-modal-venda-rev", "btn-cancelar-venda-rev");
+
+    // Ações de Salvar/Confirmar dos Modais
+    addListenerSafe("btn-salvar-produto", "click", () => this.salvarNovoProduto());
+    addListenerSafe("btn-salvar-revendedora", "click", () => this.salvarNovaRevendedora());
+    addListenerSafe("btn-confirmar-consignar", "click", () => this.processarConsignacao());
+    addListenerSafe("btn-salvar-acerto-apenas", "click", () => this.finalizarAcerto(false));
+    addListenerSafe("btn-finalizar-acerto-whats", "click", () => this.finalizarAcerto(true));
+    addListenerSafe("btn-enviar-venda-rapida", "click", () => this.processarVendaRapidaWhats());
+    addListenerSafe("btn-quick-sale", "click", () => this.abrirModalVendaRapida());
+    addListenerSafe("btn-confirmar-venda-rev", "click", () => this.confirmarVendaRevendedora());
+    addListenerSafe("btn-open-modal-venda-rev", "click", () => this._abrirModalVendaRevInterno());
+    addListenerSafe("btn-add-faixa-ui", "click", () => this.adicionarFaixaLinha());
 
     // Sincronização e eventos bidirecionais de Cores nas configurações
     const syncColor = (colorId, hexId) => {
@@ -1677,37 +1697,6 @@ const app = {
     const cancelBtn = document.getElementById(cancelBtnId);
 
     const abrir = () => {
-      const isSuperAdmin = this.state.usuarioLogado && this.state.usuarioLogado.role === 'SuperAdmin';
-      const plano = (this.state.usuarioLogado && this.state.usuarioLogado.planoLoja || 'BASICO').toUpperCase();
-
-      if (modalId === "modal-produto" && !isSuperAdmin) {
-        let limiteEstoque = 300;
-        if (plano === 'BASICO') limiteEstoque = 50;
-        else if (plano === 'BRONZE') limiteEstoque = 300;
-        else if (plano === 'GOLD') limiteEstoque = 1500;
-        else if (plano === 'PLATINUM') limiteEstoque = 999999;
-
-        const totalEstoqueAtual = this.state.produtos.reduce((sum, p) => sum + (p.quantidade || 0), 0);
-        if (totalEstoqueAtual >= limiteEstoque) {
-          this.exibirAvisoUpgradePlano("Estoque do Plano", `Seu plano atual (${plano}) atingiu o limite de ${limiteEstoque} peças em estoque central. Faça o upgrade do seu plano para cadastrar mais produtos.`, plano === 'BASICO' ? 'BRONZE' : (plano === 'BRONZE' ? 'GOLD' : 'PLATINUM'));
-          return;
-        }
-      }
-
-      if (modalId === "modal-revendedora" && !isSuperAdmin) {
-        let limiteConsultoras = 5;
-        if (plano === 'BASICO') limiteConsultoras = 2;
-        else if (plano === 'BRONZE') limiteConsultoras = 5;
-        else if (plano === 'GOLD') limiteConsultoras = 25;
-        else if (plano === 'PLATINUM') limiteConsultoras = 99999;
-
-        const totalConsultoras = this.state.revendedoras.length;
-        if (totalConsultoras >= limiteConsultoras) {
-          this.exibirAvisoUpgradePlano("Limite de Revendedoras", `Seu plano atual (${plano}) atingiu o limite de ${limiteConsultoras} revendedoras. Faça o upgrade do seu plano para cadastrar mais.`, plano === 'BASICO' ? 'BRONZE' : (plano === 'BRONZE' ? 'GOLD' : 'PLATINUM'));
-          return;
-        }
-      }
-
       if (modalId === "modal-produto") this.abrirModalProduto();
       else if (modalId === "modal-revendedora") this.abrirModalRevendedora();
       else if (modalId === "modal-consignar") this.abrirModalConsignar();
@@ -1758,7 +1747,7 @@ const app = {
     // Mapeamento de abas para recursos do plano
     const abasMapeadas = {
       'planilhas': 'importar-excel',
-      'notas-fiscais': 'links-pagamento'
+      'notas-fiscais': 'notas-fiscais'
     };
 
     if (abasMapeadas[tabId]) {
@@ -1805,6 +1794,9 @@ const app = {
     if (tabId === "vendas-geral") {
       this.carregarVendasConsolidadas().then(() => this.renderizarVendasConsolidadas());
     }
+    if (tabId === "notas-fiscais") {
+      this.carregarVendasConsolidadas().then(() => this.renderizarNotasFiscais());
+    }
     if (tabId === "configuracoes") {
       this.renderizarConfiguracoes();
     }
@@ -1835,6 +1827,9 @@ const app = {
         sec.style.display = "none";
       }
     });
+
+    // Atualização imediata dos cadeados ao alternar ou renderizar abas
+    this.atualizarCadeadosUI();
   },
 
   // 6. ABA: DASHBOARD LÓGICA
@@ -2495,7 +2490,8 @@ const app = {
       return;
     }
 
-    // 3. Renderiza linhas dinamicamente baseadas em state.colunasEstoque
+    // 3. Renderiza linhas em lote utilizando DocumentFragment (Reflow único)
+    const fragmento = document.createDocumentFragment();
     produtosFiltrados.forEach(p => {
       const tr = document.createElement("tr");
 
@@ -2527,7 +2523,7 @@ const app = {
           if (p.fotoUrl) {
             td.innerHTML = `
               <div style="display: flex; align-items: center; gap: 8px;">
-                <img src="${p.fotoUrl}" style="width: 30px; height: 30px; border-radius: 50%; object-fit: cover; border: 1px solid rgba(212,175,55,0.2);">
+                <img src="${p.fotoUrl}" loading="lazy" style="width: 30px; height: 30px; border-radius: 50%; object-fit: cover; border: 1px solid rgba(212,175,55,0.2);">
                 <span>${valor || p.nome || ""}</span>
               </div>
             `;
@@ -2552,8 +2548,10 @@ const app = {
         </div>
       `;
       tr.appendChild(tdAcoes);
-      tbody.appendChild(tr);
+      fragmento.appendChild(tr);
     });
+
+    tbody.appendChild(fragmento);
   },
 
   mudarSubAbaEstoque: function(subAbaId) {
@@ -2710,35 +2708,73 @@ const app = {
 
   alterarQtdEstoque: async function(prodId, delta) {
     const prod = this.state.produtos.find(p => p.id === prodId);
-    if (prod) {
-      const novaQtd = Number(prod.quantidade || 0) + delta;
-      if (novaQtd >= 0) {
-        prod.quantidade = novaQtd;
-        // Atualiza _valoresDinamicos localmente
-        if (prod._valoresDinamicos) {
-          prod._valoresDinamicos["Estoque Central"] = novaQtd;
+    if (!prod) return;
+
+    const qtdAntiga = Number(prod.quantidade || 0);
+    const novaQtd = qtdAntiga + delta;
+    if (novaQtd < 0) return;
+
+    // 1. Trava de Planos para Estoque Central
+    if (delta > 0) {
+      const planoAtual = (
+        (this.state.loja && this.state.loja.plano) ||
+        (this.state.usuarioLogado && this.state.usuarioLogado.planoLoja) ||
+        localStorage.getItem("conectajoias_plano") ||
+        "BASICO"
+      ).toUpperCase();
+
+      let limiteEst = 300;
+      if (planoAtual === 'BASICO') limiteEst = 50;
+      else if (planoAtual === 'BRONZE') limiteEst = 300;
+      else if (planoAtual === 'GOLD') limiteEst = 1500;
+      else if (planoAtual === 'PLATINUM') limiteEst = 999999;
+
+      let totalEstAtual = 0;
+      (this.state.produtos || []).forEach(p => { totalEstAtual += (parseInt(p.quantidade) || 0); });
+
+      if (totalEstAtual + delta > limiteEst) {
+        this.toast(`Limite de peças do plano ${planoAtual} atingido (${totalEstAtual}/${limiteEst >= 9999 ? 'Ilimitado' : limiteEst} peças em estoque central). Faça upgrade do seu plano para adicionar mais.`, "warning");
+        return;
+      }
+    }
+
+    // 2. Atualização Otimista Instantânea (0ms de atraso visual)
+    prod.quantidade = novaQtd;
+    if (prod._valoresDinamicos) {
+      prod._valoresDinamicos["Estoque Central"] = novaQtd;
+    }
+    this.salvarDadosNoLocalStorage();
+    this.renderizarEstoque();
+    this.renderizarDashboard();
+
+    // 3. Persistência assíncrona em segundo plano no servidor
+    if (this.state.token && !this.state.token.startsWith("mock_")) {
+      try {
+        const res = await this.requisitarAPI(`/produtos/${prodId}`, "PUT", {
+          codigo: prod.codigo,
+          nome: prod.nome,
+          categoria: prod.categoria,
+          quantidade: novaQtd,
+          custoBruto: prod.custoBruto,
+          custoBanho: prod.custoBanho,
+          custoLiquido: prod.custoLiquido,
+          markup: prod.markup,
+          fotoUrl: prod.fotoUrl
+        });
+        if (res && res.error) {
+          throw new Error(res.error);
         }
-        // Persiste no servidor se autenticado
-        if (this.state.token && !this.state.token.startsWith("mock_")) {
-          try {
-            await this.requisitarAPI(`/produtos/${prodId}`, "PUT", {
-              codigo: prod.codigo,
-              nome: prod.nome,
-              categoria: prod.categoria,
-              quantidade: novaQtd,
-              custoBruto: prod.custoBruto,
-              custoBanho: prod.custoBanho,
-              custoLiquido: prod.custoLiquido,
-              markup: prod.markup,
-              fotoUrl: prod.fotoUrl
-            });
-          } catch (err) {
-            console.warn("Falha ao persistir quantidade na API:", err.message);
-          }
+      } catch (err) {
+        console.warn("Falha ao persistir quantidade na API:", err.message);
+        // Reverte a quantidade local se o servidor rejeitar (ex: trava no backend)
+        prod.quantidade = qtdAntiga;
+        if (prod._valoresDinamicos) {
+          prod._valoresDinamicos["Estoque Central"] = qtdAntiga;
         }
         this.salvarDadosNoLocalStorage();
         this.renderizarEstoque();
         this.renderizarDashboard();
+        this.toast(err.message || "Erro ao salvar alteração de estoque no servidor.", "error");
       }
     }
   },
@@ -2783,11 +2819,12 @@ const app = {
   },
 
   salvarNovoProduto: async function() {
-    if (!this.verificarPlanoAtivoAntesDeCriar()) return;
+    const editId = document.getElementById("btn-salvar-produto")?.getAttribute("data-edit-id");
+    const quantidade = parseInt(document.getElementById("prod-quantidade")?.value) || 0;
+    if (!this.validarCompatibilidadePlanoAntesDeSalvar('produto', 'cadastrar novas joias', editId, quantidade)) return;
     const nomeEl = document.getElementById("prod-nome");
     const nome = nomeEl ? nomeEl.value.trim() : "";
     const categoria = document.getElementById("prod-categoria")?.value || "Brincos";
-    const quantidade = parseInt(document.getElementById("prod-quantidade")?.value) || 0;
     
     if (!nome) {
       this.toast("Por favor, preencha o nome do produto.", "warning");
@@ -2806,7 +2843,7 @@ const app = {
     const custoBanho = parseFloat(document.getElementById("prod-banho")?.value) || 0;
     const custoLiquido = parseFloat(document.getElementById("prod-liquido")?.value) || 0;
     const markup = parseFloat(document.getElementById("prod-markup")?.value) || 1.0;
-    const fotoUrl = document.getElementById("prod-foto-url")?.value.trim() || null;
+    let fotoUrl = document.getElementById("prod-foto-url")?.value.trim() || null;
     const quantidadeDefeito = parseInt(document.getElementById("prod-defeito")?.value) || 0;
 
     const chkManual = document.getElementById("prod-usar-preco-manual");
@@ -2816,9 +2853,39 @@ const app = {
       precoVendaManual = parseFloat(valManualInput.value);
     }
 
-    const editId = document.getElementById("btn-salvar-produto")?.getAttribute("data-edit-id");
+    const btnSalvar = document.getElementById("btn-salvar-produto");
+    const textoOriginalBtn = btnSalvar ? btnSalvar.innerHTML : "";
 
     try {
+      if (btnSalvar) {
+        btnSalvar.disabled = true;
+        btnSalvar.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Salvando...';
+      }
+
+      // Se houver arquivo selecionado no input de foto, faz o upload primeiro
+      const fotoFileInput = document.getElementById("prod-foto-file");
+      if (fotoFileInput && fotoFileInput.files && fotoFileInput.files[0]) {
+        try {
+          const formData = new FormData();
+          formData.append("imagem", fotoFileInput.files[0]);
+          const uploadResp = await fetch(`${this.state.apiUrl}/uploads`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${this.state.token}`
+            },
+            body: formData
+          });
+          if (uploadResp.ok) {
+            const uploadData = await uploadResp.json();
+            if (uploadData && uploadData.url) {
+              fotoUrl = uploadData.url;
+            }
+          }
+        } catch (errUpload) {
+          console.warn("Aviso ao fazer upload da imagem do produto:", errUpload.message);
+        }
+      }
+
       let produtoSalvo;
 
       const bodyData = {
@@ -2883,19 +2950,29 @@ const app = {
         });
       }
 
-      this.salvarDadosNoLocalStorage();
-      this.renderizarEstoque();
-      this.renderizarDashboard();
-      
+      // Reseta input de arquivo de foto se houver
+      if (fotoFileInput) fotoFileInput.value = "";
+
+      // Fecha o modal e navega imediatamente sem esperar a re-renderização
       this.fecharModalProduto();
-      
-      // Navega para aba de estoque para o usuário ver o produto que acabou de cadastrar/editar
       this.navegarParaAba("estoque");
-      
       this.toast(editId ? "Produto atualizado com sucesso!" : "Produto cadastrado com sucesso!", "success");
+
+      // Atualiza os dados no LocalStorage e renderiza no próximo ciclo assíncrono para zero lag visual
+      setTimeout(() => {
+        this.salvarDadosNoLocalStorage();
+        this.renderizarEstoque();
+        this.renderizarDashboard();
+      }, 50);
+
     } catch (error) {
       console.error(error);
       this.toast("Erro ao salvar produto no banco de dados: " + error.message, "error");
+    } finally {
+      if (btnSalvar) {
+        btnSalvar.disabled = false;
+        btnSalvar.innerHTML = textoOriginalBtn;
+      }
     }
   },
 
@@ -2973,13 +3050,8 @@ const app = {
 
       const itemDiv = document.createElement("div");
       itemDiv.className = `list-item ${this.state.revendedoraSelecionadaId === rev.id ? 'selected' : ''}`;
-      itemDiv.addEventListener("click", async () => {
+      itemDiv.addEventListener("click", () => {
         this.state.revendedoraSelecionadaId = rev.id;
-        try {
-          await this.carregarRevendedorasDaAPI();
-        } catch (e) {
-          console.warn("Falha ao recarregar revendedoras em tempo real:", e);
-        }
         this.renderizarRevendedoras();
       });
 
@@ -3501,14 +3573,22 @@ const app = {
   },
 
   salvarNovaRevendedora: async function() {
-    if (!this.verificarPlanoAtivoAntesDeCriar()) return;
+    if (this._isSavingRevendedora) return;
+    this._isSavingRevendedora = true;
+
+    const btnSalvar = document.getElementById("btn-salvar-revendedora");
+    const editId = btnSalvar?.getAttribute("data-edit-id");
+
+    if (!this.validarCompatibilidadePlanoAntesDeSalvar('revendedora', 'cadastrar consultoras', editId)) {
+      this._isSavingRevendedora = false;
+      return;
+    }
     const nomeEl = document.getElementById("rev-nome");
     const whatsEl = document.getElementById("rev-whatsapp");
     const nome = nomeEl ? nomeEl.value.trim() : "";
     const whatsapp = whatsEl ? whatsEl.value.trim() : "";
     const comissao = parseInt(document.getElementById("rev-comissao")?.value) || 30;
     const faixasComissao = this.obterFaixasComissaoDaUI();
-    const editId = document.getElementById("btn-salvar-revendedora")?.getAttribute("data-edit-id");
 
     if (!nome || !whatsapp) {
       this.toast("Por favor, preencha o nome e o WhatsApp da revendedora.", "warning");
@@ -3521,6 +3601,7 @@ const app = {
         whatsEl.style.borderColor = "#ff4d4d";
         setTimeout(() => { whatsEl.style.borderColor = ""; }, 3000);
       }
+      this._isSavingRevendedora = false;
       return;
     }
 
@@ -3538,10 +3619,15 @@ const app = {
         senhaEl.style.borderColor = "#ff4d4d";
         setTimeout(() => { senhaEl.style.borderColor = ""; }, 3000);
       }
+      this._isSavingRevendedora = false;
       return;
     }
 
-    // Novos campos adicionados
+    if (btnSalvar) {
+      btnSalvar.disabled = true;
+      btnSalvar.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${editId ? 'Salvando...' : 'Cadastrando...'}`;
+    }
+
     const tipoComissao = document.getElementById("rev-tipo-comissao")?.value || "FIXA";
     const metaUnicaValor = parseFloat(document.getElementById("rev-meta-valor")?.value) || 0;
     const metaUnicaTipoBonus = document.getElementById("rev-meta-bonus-tipo")?.value || "PERCENTUAL";
@@ -3553,7 +3639,6 @@ const app = {
 
     try {
       if (editId) {
-        // Envia atualização para a API Azure se autenticado
         if (this.state.token && !this.state.token.startsWith("mock_")) {
           await this.requisitarAPI(`/revendedoras/${editId}`, "PUT", { 
             nome, 
@@ -3572,7 +3657,6 @@ const app = {
           });
         }
         
-        // Atualização no estado local
         const rev = this.state.revendedoras.find(r => r.id === editId);
         if (rev) {
           rev.nome = nome;
@@ -3592,7 +3676,6 @@ const app = {
         let novaRev;
         const emailTemporario = nome.toLowerCase().replace(/\s+/g, '') + "_" + Math.floor(Math.random() * 1000) + "@conectajoias.com";
 
-        // Cria na API Azure se autenticado
         if (this.state.token && !this.state.token.startsWith("mock_")) {
           const res = await this.requisitarAPI("/auth/register", "POST", {
             nome,
@@ -3630,7 +3713,6 @@ const app = {
             historico: []
           };
         } else {
-          // Fallback sem servidor
           novaRev = {
             id: 'rev_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
             nome: nome,
@@ -3675,7 +3757,13 @@ const app = {
       }
     } catch (error) {
       console.error(error);
-      this.toast("Erro ao salvar dados da revendedora no banco de dados Azure: " + error.message, "error");
+      this.toast("Erro ao salvar dados da revendedora: " + error.message, "error");
+    } finally {
+      this._isSavingRevendedora = false;
+      if (btnSalvar) {
+        btnSalvar.disabled = false;
+        btnSalvar.innerHTML = `<i class="fa-solid fa-floppy-disk"></i> ${editId ? 'Salvar Alterações' : 'Cadastrar'}`;
+      }
     }
   },
 
@@ -3828,7 +3916,7 @@ const app = {
   },
 
   processarConsignacao: async function() {
-    if (!this.verificarPlanoAtivoAntesDeCriar()) return;
+    if (!this.validarCompatibilidadePlanoAntesDeSalvar('consignacao', 'realizar consignações')) return;
     const rev = this.state.revendedoras.find(r => r.id === this.state.revendedoraSelecionadaId);
     if (!rev) return;
 
@@ -5606,6 +5694,134 @@ const app = {
     });
   },
 
+  mudarAbaNF: function(aba) {
+    const btnPendentes = document.getElementById("btn-nf-pendentes");
+    const btnEmitidas = document.getElementById("btn-nf-emitidas");
+    const painelPendentes = document.getElementById("painel-nf-pendentes");
+    const painelEmitidas = document.getElementById("painel-nf-emitidas");
+
+    if (aba === "pendentes") {
+      if (btnPendentes) btnPendentes.classList.add("active");
+      if (btnEmitidas) btnEmitidas.classList.remove("active");
+      if (painelPendentes) painelPendentes.style.display = "block";
+      if (painelEmitidas) painelEmitidas.style.display = "none";
+    } else {
+      if (btnPendentes) btnPendentes.classList.remove("active");
+      if (btnEmitidas) btnEmitidas.classList.add("active");
+      if (painelPendentes) painelPendentes.style.display = "none";
+      if (painelEmitidas) painelEmitidas.style.display = "block";
+    }
+  },
+
+  renderizarNotasFiscais: function() {
+    const tbodyPendentes = document.getElementById("tbody-nf-pendentes");
+    const tbodyEmitidas = document.getElementById("tbody-nf-emitidas");
+    if (!tbodyPendentes || !tbodyEmitidas) return;
+
+    const nfeEmitidasLocais = JSON.parse(localStorage.getItem("conectajoias_nfe_emitidas") || "[]");
+    const idsEmitidos = new Set(nfeEmitidasLocais.map(n => String(n.vendaId)));
+
+    const vendas = this.state.vendasConsolidadas || [];
+    const pendentes = vendas.filter(v => !idsEmitidos.has(String(v.id)));
+
+    // 1. Renderiza Faturamentos Pendentes
+    if (pendentes.length === 0) {
+      tbodyPendentes.innerHTML = `
+        <tr>
+          <td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
+            <i class="fa-solid fa-circle-check" style="font-size: 1.8rem; color: #28a745; margin-bottom: 0.5rem; display: block;"></i>
+            Nenhum faturamento pendente de emissão fiscal no momento.
+          </td>
+        </tr>`;
+    } else {
+      tbodyPendentes.innerHTML = pendentes.map(v => {
+        const dataFmt = v.data ? new Date(v.data).toLocaleDateString('pt-BR') : '—';
+        const valorFmt = (v.total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const origem = v.tipo === 'revendedora' ? `Venda Consignada (${v.vendedor})` : `Venda Direta (${v.vendedor || 'Loja'})`;
+        const cliente = v.cliente || 'Cliente final';
+        
+        return `
+          <tr>
+            <td>${dataFmt}</td>
+            <td><span class="badge" style="background: rgba(212,175,55,0.15); color: var(--gold-primary); padding: 4px 10px; border-radius: 12px; font-weight: 600; font-size: 0.8rem;">${origem}</span></td>
+            <td><strong>${cliente}</strong></td>
+            <td style="color: var(--gold-primary); font-weight: 700;">R$ ${valorFmt}</td>
+            <td><span class="badge" style="background: rgba(255, 193, 7, 0.15); color: #ffc107; padding: 4px 10px; border-radius: 12px; font-weight: 600; font-size: 0.8rem;"><i class="fa-solid fa-clock"></i> Pendente NF-e</span></td>
+            <td>
+              <button class="btn btn-sm btn-gold" onclick="app.emitirNotaFiscalSimulada('${v.id}')" style="padding: 0.35rem 0.8rem; font-size: 0.8rem; border-radius: var(--radius-sm); cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;">
+                <i class="fa-solid fa-file-invoice"></i> Emitir NF-e
+              </button>
+            </td>
+          </tr>`;
+      }).join('');
+    }
+
+    // 2. Renderiza Notas Fiscais Emitidas
+    if (nfeEmitidasLocais.length === 0) {
+      tbodyEmitidas.innerHTML = `
+        <tr>
+          <td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
+            Nenhuma nota fiscal emitida ainda.
+          </td>
+        </tr>`;
+    } else {
+      tbodyEmitidas.innerHTML = nfeEmitidasLocais.map(nf => {
+        const dataFmt = nf.dataEmissao ? new Date(nf.dataEmissao).toLocaleDateString('pt-BR') : '—';
+        const valorFmt = (nf.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return `
+          <tr>
+            <td>${dataFmt}</td>
+            <td style="font-family: monospace; font-size: 0.85rem; color: var(--gold-primary);">${nf.chaveAcesso}</td>
+            <td><strong>${nf.destinatario}</strong></td>
+            <td style="color: var(--gold-primary); font-weight: 700;">R$ ${valorFmt}</td>
+            <td><span class="badge" style="background: rgba(40, 167, 69, 0.15); color: #28a745; padding: 4px 10px; border-radius: 12px; font-weight: 600; font-size: 0.8rem;">Modelo 55 (NF-e)</span></td>
+            <td>
+              <button class="btn btn-sm btn-outline" onclick="app.visualizarDANFE('${nf.id}')" style="padding: 0.35rem 0.8rem; font-size: 0.8rem; border-radius: var(--radius-sm); cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;">
+                <i class="fa-solid fa-eye"></i> DANFE
+              </button>
+            </td>
+          </tr>`;
+      }).join('');
+    }
+  },
+
+  emitirNotaFiscalSimulada: function(vendaId) {
+    const vendas = this.state.vendasConsolidadas || [];
+    const venda = vendas.find(v => String(v.id) === String(vendaId));
+    if (!venda) return;
+
+    const nfeEmitidas = JSON.parse(localStorage.getItem("conectajoias_nfe_emitidas") || "[]");
+    
+    // Gerar chave de acesso de 44 dígitos
+    const chave = "352609" + Math.floor(1000000000000000 + Math.random() * 9000000000000000) + "100001";
+    
+    const novaNF = {
+      id: "nfe_" + Date.now(),
+      vendaId: venda.id,
+      chaveAcesso: chave.substring(0, 44),
+      destinatario: venda.cliente || "Cliente Final",
+      valor: venda.total || 0,
+      dataEmissao: new Date().toISOString()
+    };
+
+    nfeEmitidas.unshift(novaNF);
+    localStorage.setItem("conectajoias_nfe_emitidas", JSON.stringify(nfeEmitidas));
+
+    this.toast(`Nota Fiscal NF-e homologada com sucesso para ${novaNF.destinatario}!`, "success");
+    this.renderizarNotasFiscais();
+  },
+
+  visualizarDANFE: function(nfId) {
+    const nfeEmitidas = JSON.parse(localStorage.getItem("conectajoias_nfe_emitidas") || "[]");
+    const nf = nfeEmitidas.find(n => n.id === nfId);
+    if (!nf) return;
+
+    this.confirmar(
+      `DANFE NF-e\n\nChave de Acesso: ${nf.chaveAcesso}\nDestinatário: ${nf.destinatario}\nValor Total: R$ ${nf.valor.toFixed(2)}\nStatus SEFAZ: Homologada Autorizada`,
+      "Visualização de DANFE (Simulação SEFAZ)"
+    );
+  },
+
   renderizarVendasConsolidadas: function() {
     const tbody = document.getElementById("tbody-historico-vendas-geral");
     if (!tbody) return;
@@ -6138,7 +6354,7 @@ const app = {
   },
 
   salvarCliente: async function() {
-    if (!this.verificarPlanoAtivoAntesDeCriar()) return;
+    if (!this.validarCompatibilidadePlanoAntesDeSalvar('cliente', 'cadastrar clientes')) return;
     const nome = document.getElementById("cliente-nome").value.trim();
     const whatsapp = document.getElementById("cliente-whatsapp").value.trim();
     const dataNascimento = document.getElementById("cliente-nascimento").value || null;
@@ -6289,7 +6505,8 @@ const app = {
           this.state.sseSource.close();
         }
 
-        const url = `${this.apiUrl}/realtime/notificacoes?token=${encodeURIComponent(this.state.token)}`;
+        const baseUrl = this.state.apiUrl || `${window.location.origin}/api`;
+        const url = `${baseUrl.replace(/\/api\/?$/, '')}/api/realtime/notificacoes?token=${encodeURIComponent(this.state.token)}`;
         this.state.sseSource = new EventSource(url);
 
         this.state.sseSource.onmessage = (event) => {
@@ -7114,6 +7331,7 @@ const app = {
     const regras = {
       'importar-excel': ['BRONZE', 'GOLD', 'PLATINUM'],
       'links-pagamento': ['BRONZE', 'GOLD', 'PLATINUM'],
+      'notas-fiscais': ['GOLD', 'PLATINUM'],
       'dre': ['GOLD', 'PLATINUM'],
       'termos-maleta': ['GOLD', 'PLATINUM'],
       'cofre-virtual': ['GOLD', 'PLATINUM']
@@ -7135,6 +7353,11 @@ const app = {
           nome: 'Links de Pagamento',
           desc: 'Gere links de pagamento integrados (PIX, boleto ou cartão) e envie para suas clientes. O status compensa automaticamente no caixa. Disponível a partir do plano <strong>Bronze</strong>.',
           plano: 'BRONZE'
+        },
+        'notas-fiscais': {
+          nome: 'Gestão de Notas Fiscais Eletrônicas',
+          desc: 'A emissão e gestão de notas fiscais (NF-e/NFC-e) está disponível nos planos <strong>Gold</strong> e <strong>Platinum</strong>.',
+          plano: 'GOLD'
         },
         'dre': {
           nome: 'Demonstrativo do Resultado do Exercício (DRE)',
@@ -7167,7 +7390,6 @@ const app = {
   },
 
   exibirAvisoUpgradePlano: function(titulo, mensagem, planoRequerido = 'GOLD') {
-    // Remove modal anterior se já existir
     const existente = document.getElementById("modal-aviso-upgrade");
     if (existente) existente.remove();
 
@@ -7175,28 +7397,25 @@ const app = {
     backdrop.className = "modal-backdrop active";
     backdrop.id = "modal-aviso-upgrade";
     backdrop.style.display = "flex";
-    backdrop.style.zIndex = "10000";
+    backdrop.style.zIndex = "100000";
 
     backdrop.innerHTML = `
-      <div class="modal-card" style="width: 450px; max-width: 95%; text-align: center; padding: 2.2rem; background: var(--bg-card); border: 1px solid rgba(212,175,55,0.25); border-radius: var(--radius-md); box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-        <div style="margin-bottom: 1.5rem;">
-          <i class="fa-solid fa-crown" style="font-size: 3.8rem; color: var(--gold-primary); filter: drop-shadow(0 0 12px rgba(212,175,55,0.45));"></i>
+      <div class="modal-card" style="width: 460px; max-width: 95%; text-align: center; padding: 2.2rem; background: var(--bg-card); border: 1px solid var(--border-gold); border-radius: var(--radius-lg); box-shadow: var(--shadow-premium);">
+        <div style="margin-bottom: 1.2rem;">
+          <i class="fa-solid fa-crown" style="font-size: 3.5rem; color: var(--gold-primary); filter: drop-shadow(0 0 12px rgba(212,175,55,0.45));"></i>
         </div>
-        <h3 style="font-family: var(--font-title); color: var(--gold-light); font-size: 1.5rem; margin-bottom: 0.8rem; letter-spacing: 0.5px;">
-          Upgrade de Plano Requerido
+        <h3 style="font-family: var(--font-title); color: var(--gold-light); font-size: 1.4rem; margin-bottom: 0.6rem; letter-spacing: 0.5px;">
+          ${titulo}
         </h3>
-        <h4 style="color: var(--text-primary); font-size: 1.1rem; margin-bottom: 1.2rem; font-weight: 600;">
-          Recurso: ${titulo}
-        </h4>
-        <p style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6; margin-bottom: 2rem;">
+        <p style="color: var(--text-secondary); font-size: 0.88rem; line-height: 1.6; margin-bottom: 1.8rem;">
           ${mensagem}
         </p>
         <div style="display: flex; gap: 1rem; justify-content: center;">
           <button class="btn btn-outline" onclick="document.getElementById('modal-aviso-upgrade').remove()" style="padding: 0.6rem 1.4rem; font-size: 0.85rem; border-color: rgba(255,255,255,0.15); color: var(--text-secondary); border-radius: var(--radius-sm); cursor: pointer; background: transparent;">
             Voltar
           </button>
-          <button class="btn btn-gold" onclick="document.getElementById('modal-aviso-upgrade').remove(); app.navegarParaAba('meu-plano-saas');" style="padding: 0.6rem 1.6rem; font-size: 0.85rem; border-radius: var(--radius-sm); cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem;">
-            Ver Planos <i class="fa-solid fa-arrow-right"></i>
+          <button class="btn btn-gold" onclick="document.getElementById('modal-aviso-upgrade').remove(); document.querySelectorAll('.modal-backdrop').forEach(m => { m.style.display='none'; m.classList.remove('active'); }); app.navegarParaAba('meu-plano-saas');" style="padding: 0.6rem 1.6rem; font-size: 0.85rem; border-radius: var(--radius-sm); cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem;">
+            Ver Planos & Assinar <i class="fa-solid fa-arrow-right"></i>
           </button>
         </div>
       </div>
@@ -7205,16 +7424,78 @@ const app = {
     document.body.appendChild(backdrop);
   },
 
+  validarCompatibilidadePlanoAntesDeSalvar: function(recurso, acaoNome = 'realizar esta ação', editId = null, qtdAdicional = 1) {
+    const isSuperAdmin = this.state.usuarioLogado && (this.state.usuarioLogado.role === 'SuperAdmin' || this.state.usuarioLogado.role === 'SUPERADMIN');
+    if (isSuperAdmin) return true;
+
+    const plano = ((this.state.loja && this.state.loja.plano) || (this.state.usuarioLogado && this.state.usuarioLogado.planoLoja) || localStorage.getItem("conectajoias_plano") || 'BASICO').toUpperCase();
+
+    // Se for alteração de um registro que já existe (edição), permite salvar
+    if (editId) return true;
+
+    if (recurso === 'produto' || recurso === 'produtos') {
+      let limiteEstoque = 50;
+      let planoSugerido = 'BRONZE';
+
+      if (plano === 'BASICO') {
+        limiteEstoque = 50;
+        planoSugerido = 'BRONZE';
+      } else if (plano === 'BRONZE') {
+        limiteEstoque = 300;
+        planoSugerido = 'GOLD';
+      } else if (plano === 'GOLD') {
+        limiteEstoque = 1500;
+        planoSugerido = 'PLATINUM';
+      } else if (plano === 'PLATINUM') {
+        limiteEstoque = 999999;
+      }
+
+      const totalEstoqueAtual = (this.state.produtos || []).reduce((sum, p) => sum + (parseInt(p.quantidade) || 0), 0);
+      if (totalEstoqueAtual + qtdAdicional > limiteEstoque) {
+        const proximoPlanoNome = plano === 'BASICO' ? 'Bronze' : (plano === 'BRONZE' ? 'Gold' : 'Platinum');
+        const mensagem = `Você atingiu o limite de <strong>${limiteEstoque} peças</strong> no estoque central do <strong>Plano ${plano}</strong> (Total atual: ${totalEstoqueAtual} peças).<br><br>Faça o upgrade para o <strong>Plano ${proximoPlanoNome}</strong> para cadastrar mais joias!`;
+        this.exibirAvisoUpgradePlano("Limite de Estoque Atingido", mensagem, planoSugerido);
+        return false;
+      }
+    }
+
+    if (recurso === 'revendedora' || recurso === 'revendedoras') {
+      let limiteConsultoras = 2;
+      let planoSugerido = 'BRONZE';
+
+      if (plano === 'BASICO') {
+        limiteConsultoras = 2;
+        planoSugerido = 'BRONZE';
+      } else if (plano === 'BRONZE') {
+        limiteConsultoras = 5;
+        planoSugerido = 'GOLD';
+      } else if (plano === 'GOLD') {
+        limiteConsultoras = 25;
+        planoSugerido = 'PLATINUM';
+      } else if (plano === 'PLATINUM') {
+        limiteConsultoras = 99999;
+      }
+
+      const totalConsultoras = (this.state.revendedoras || []).length;
+      if (totalConsultoras + 1 > limiteConsultoras) {
+        const proximoPlanoNome = plano === 'BASICO' ? 'Bronze' : (plano === 'BRONZE' ? 'Gold' : 'Platinum');
+        const mensagem = `Você atingiu o limite de <strong>${limiteConsultoras} consultoras ativas</strong> do <strong>Plano ${plano}</strong> (Total atual: ${totalConsultoras} revendedoras).<br><br>Faça o upgrade para o <strong>Plano ${proximoPlanoNome}</strong> para cadastrar mais consultoras!`;
+        this.exibirAvisoUpgradePlano("Limite de Consultoras Atingido", mensagem, planoSugerido);
+        return false;
+      }
+    }
+
+    return true;
+  },
+
   atualizarCadeadosUI: function() {
     if (!this.state.usuarioLogado) return;
     
-    const plano = (this.state.usuarioLogado.planoLoja || 'BASICO').toUpperCase();
     const isSuperAdmin = this.state.usuarioLogado.role === 'SuperAdmin';
     
-    // 1. Sidebar Tabs
     const abas = {
       'planilhas': 'importar-excel',
-      'notas-fiscais': 'links-pagamento'
+      'notas-fiscais': 'notas-fiscais'
     };
     
     for (const [tabId, recurso] of Object.entries(abas)) {
@@ -7228,188 +7509,102 @@ const app = {
         }
       }
     }
-    
-    // 2. Botões específicos na interface (Importar Excel no Estoque, etc.)
-    const btnImportarExcel = document.getElementById("btn-open-import-modal"); // se houver
-    if (btnImportarExcel) {
-      const temAcessoExcel = isSuperAdmin || this.validarAcessoRecurso('importar-excel', false);
-      if (!temAcessoExcel) {
-        btnImportarExcel.classList.add("btn-locked");
-      } else {
-        btnImportarExcel.classList.remove("btn-locked");
-      }
-    }
-
-    // 3. Sub-abas de Consultora (Termos de Maleta e Cofre Virtual)
-    const btnSubtabTermos = document.getElementById("btn-subtab-termos");
-    if (btnSubtabTermos) {
-      const temAcessoTermos = isSuperAdmin || this.validarAcessoRecurso('termos-maleta', false);
-      if (!temAcessoTermos) {
-        btnSubtabTermos.innerHTML = '<i class="fa-solid fa-file-contract"></i> Termos Maleta 🔒';
-      } else {
-        btnSubtabTermos.innerHTML = '<i class="fa-solid fa-file-contract"></i> Termos Maleta';
-      }
-    }
-    
-    const btnSubtabDocumentos = document.getElementById("btn-subtab-documentos");
-    if (btnSubtabDocumentos) {
-      const temAcessoDocs = isSuperAdmin || this.validarAcessoRecurso('cofre-virtual', false);
-      if (!temAcessoDocs) {
-        btnSubtabDocumentos.innerHTML = '<i class="fa-solid fa-vault"></i> Cofre Virtual 🔒';
-      } else {
-        btnSubtabDocumentos.innerHTML = '<i class="fa-solid fa-vault"></i> Cofre Virtual';
-      }
-    }
-
-    // 4. Limites de Consultoras / Produtos (Desabilita botões ou adiciona aviso)
-    // Obter limites
-    let limiteConsultoras = 5;
-    if (plano === 'BASICO') limiteConsultoras = 2;
-    else if (plano === 'BRONZE') limiteConsultoras = 5;
-    else if (plano === 'GOLD') limiteConsultoras = 25;
-    else if (plano === 'PLATINUM') limiteConsultoras = 99999;
-
-    const totalConsultoras = this.state.revendedoras.length;
-    const btnCadastrarConsultora = document.getElementById("btn-open-modal-revendedora");
-    if (btnCadastrarConsultora) {
-      if (!isSuperAdmin && totalConsultoras >= limiteConsultoras) {
-        btnCadastrarConsultora.classList.add("btn-locked");
-        btnCadastrarConsultora.title = `Limite do plano atingido (${totalConsultoras}/${limiteConsultoras} revendedoras). Faça upgrade para cadastrar mais.`;
-      } else {
-        btnCadastrarConsultora.classList.remove("btn-locked");
-        btnCadastrarConsultora.removeAttribute("title");
-      }
-    }
-
-    let limiteEstoque = 300;
-    if (plano === 'BASICO') limiteEstoque = 50;
-    else if (plano === 'BRONZE') limiteEstoque = 300;
-    else if (plano === 'GOLD') limiteEstoque = 1500;
-    else if (plano === 'PLATINUM') limiteEstoque = 999999;
-
-    // Calcular estoque atual
-    let totalEstoqueAtual = 0;
-    this.state.produtos.forEach(p => {
-      totalEstoqueAtual += (p.quantidade || 0);
-    });
-
-    const btnCadastrarProduto = document.getElementById("btn-open-modal-produto");
-    if (btnCadastrarProduto) {
-      if (!isSuperAdmin && totalEstoqueAtual >= limiteEstoque) {
-        btnCadastrarProduto.classList.add("btn-locked");
-        btnCadastrarProduto.title = `Limite de estoque do plano atingido (${totalEstoqueAtual}/${limiteEstoque} peças). Faça upgrade para cadastrar mais.`;
-      } else {
-        btnCadastrarProduto.classList.remove("btn-locked");
-        btnCadastrarProduto.removeAttribute("title");
-      }
-    }
   },
 
   verificarPlanoAtivoAntesDeCriar: function(acaoCallback) {
-    const statusPlano = ((this.state.loja && this.state.loja.statusPlano) || localStorage.getItem("conectajoias_status_plano") || "ATIVO").toUpperCase();
-    const isSuperAdmin = this.state.usuarioLogado && ["SUPERADMIN", "SUPER_ADMIN", "MANAGER", "ADMIN_LOJA", "ADMIN"].includes((this.state.usuarioLogado.role || "").toUpperCase());
-    const isMock = !this.state.token || this.state.token.startsWith("mock_");
-
-    if (isSuperAdmin || isMock || ["ATIVO", "TRIAL", "PENDENTE", "DEMO", "TESTE", "DEGUSTACAO"].includes(statusPlano)) {
-      if (typeof acaoCallback === "function") acaoCallback();
-      return true;
+    const acao = typeof acaoCallback === 'string' ? acaoCallback : 'cadastrar novas informações';
+    const permitido = this.validarCompatibilidadePlanoAntesDeSalvar('geral', acao);
+    if (permitido && typeof acaoCallback === 'function') {
+      acaoCallback();
     }
-
-    const modal = document.getElementById("modal-bloqueio-plano");
-    if (modal) {
-      modal.style.display = "flex";
-      modal.classList.add("active");
-    } else {
-      alert("Para realizar esta ação, é necessário assinar um dos nossos planos ativos.");
-      const isPagesDir = window.location.pathname.includes("/pages/");
-      window.location.href = isPagesDir ? "pagamento.html" : "pages/pagamento.html";
-    }
-    return false;
+    return permitido;
   },
 
   carregarMeuPlanoSaaS: async function() {
+    // 1. Renderização SÍNCRONA imediata com base no perfil logado (Zero Latência)
+    const planoAtual = (this.state.usuarioLogado && this.state.usuarioLogado.planoLoja) 
+      ? this.state.usuarioLogado.planoLoja.toUpperCase() 
+      : (localStorage.getItem("conectajoias_plano") || "BASICO").toUpperCase();
+
+    const elNome = document.getElementById("saas-plano-nome");
+    const elStatus = document.getElementById("saas-plano-badge-status");
+    const elVenc = document.getElementById("saas-plano-vencimento");
+    const consultorasTxt = document.getElementById("saas-uso-consultoras-txt");
+    const consultorasBar = document.getElementById("saas-bar-consultoras");
+    const estoqueTxt = document.getElementById("saas-uso-estoque-txt");
+    const estoqueBar = document.getElementById("saas-bar-estoque");
+
+    let limiteRev = 5;
+    let limiteEst = 300;
+    if (planoAtual === 'BASICO') { limiteRev = 2; limiteEst = 50; }
+    else if (planoAtual === 'BRONZE') { limiteRev = 5; limiteEst = 300; }
+    else if (planoAtual === 'GOLD') { limiteRev = 25; limiteEst = 1500; }
+    else if (planoAtual === 'PLATINUM') { limiteRev = 9999; limiteEst = 999999; }
+
+    const totalRev = (this.state.revendedoras || []).length;
+    let totalEst = 0;
+    (this.state.produtos || []).forEach(p => { totalEst += (parseInt(p.quantidade) || 0); });
+
+    const nomeFmt = planoAtual.charAt(0) + planoAtual.slice(1).toLowerCase();
+    if (elNome) elNome.innerText = `Plano ${nomeFmt}`;
+    if (elStatus) {
+      elStatus.innerText = 'ATIVO';
+      elStatus.style.borderColor = '#81c784';
+      elStatus.style.color = '#81c784';
+    }
+    if (elVenc) elVenc.innerText = planoAtual === 'BASICO' ? 'Acesso Gratuito' : 'Assinatura Ativa';
+
+    if (consultorasTxt) consultorasTxt.innerText = `${totalRev} / ${limiteRev >= 999 ? 'Ilimitado' : limiteRev}`;
+    if (consultorasBar) {
+      const pct = limiteRev >= 999 ? 10 : Math.min(100, Math.round((totalRev / limiteRev) * 100));
+      consultorasBar.style.width = `${pct}%`;
+    }
+
+    if (estoqueTxt) estoqueTxt.innerText = `${totalEst} / ${limiteEst >= 9999 ? 'Ilimitado' : limiteEst}`;
+    if (estoqueBar) {
+      const pct = limiteEst >= 9999 ? 10 : Math.min(100, Math.round((totalEst / limiteEst) * 100));
+      estoqueBar.style.width = `${pct}%`;
+    }
+
+    const elAvisoBasico = document.getElementById("saas-aviso-plano-basico");
+    if (planoAtual === 'BASICO') {
+      if (!elAvisoBasico) {
+        const divAviso = document.createElement("div");
+        divAviso.id = "saas-aviso-plano-basico";
+        divAviso.style.cssText = "margin-top: 1.5rem; padding: 0.8rem 1rem; background: rgba(244, 67, 54, 0.1); border: 1px solid rgba(244, 67, 54, 0.3); border-radius: 8px; color: #ff8a80; font-size: 0.85rem; display: flex; align-items: center; gap: 0.6rem;";
+        divAviso.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="font-size: 1.1rem;"></i> <span><strong>Plano Básico Ativo:</strong> Você está no plano de demonstração gratuito. Você <strong>não poderá</strong> cadastrar mais de 2 revendedoras e 50 peças no estoque central. Faça o upgrade de sua assinatura abaixo para liberar limites maiores.</span>`;
+        const kpiGrid = document.querySelector("#meu-plano-saas .kpi-grid");
+        if (kpiGrid) kpiGrid.parentNode.insertBefore(divAviso, kpiGrid.nextSibling);
+      } else {
+        elAvisoBasico.style.display = "flex";
+      }
+    } else if (elAvisoBasico) {
+      elAvisoBasico.style.display = "none";
+    }
+
+    this.atualizarCadeadosUI();
+
+    // 2. Tenta sincronizar com a API em segundo plano
     try {
       if (this.state.token && !this.state.token.startsWith("mock_")) {
         const res = await this.requisitarAPI('/saas/meu-plano');
-        if (res) {
-          this.state.statusPlano = res.statusPlano || 'PENDENTE';
-          this.state.plano = res.plano || 'BASICO';
+        if (res && res.plano) {
+          const planoServer = res.plano.toUpperCase();
+          localStorage.setItem("conectajoias_plano", planoServer);
+          if (res.statusPlano) localStorage.setItem("conectajoias_status_plano", res.statusPlano);
+          if (this.state.loja) this.state.loja.plano = planoServer;
           if (this.state.usuarioLogado) {
-            this.state.usuarioLogado.planoLoja = res.plano || 'BASICO';
+            this.state.usuarioLogado.planoLoja = planoServer;
+            this.state.usuarioLogado.plano = planoServer;
             localStorage.setItem("conectajoias_usuario", JSON.stringify(this.state.usuarioLogado));
           }
-          this.state.excedeuCota = !!res.excedeuCota;
-          this.state.downgradePendente = res.downgradePendente || null;
-          localStorage.setItem("conectajoias_status_plano", this.state.statusPlano);
-
-          const elNome = document.getElementById("saas-plano-nome");
-          const elStatus = document.getElementById("saas-plano-badge-status");
-          const elVenc = document.getElementById("saas-plano-vencimento");
-
-          if (elNome) {
-            let txtPlano = `Plano ${res.plano}`;
-            if (res.downgradePendente) txtPlano += ` (Downgrade para ${res.downgradePendente} agendado)`;
-            elNome.innerText = txtPlano;
+          if (planoServer !== planoAtual) {
+            this.carregarMeuPlanoSaaS();
           }
-          if (elStatus) {
-            elStatus.innerText = res.statusPlano || 'ATIVO';
-            elStatus.style.borderColor = res.statusPlano === 'ATIVO' ? '#81c784' : 'var(--warning)';
-            elStatus.style.color = res.statusPlano === 'ATIVO' ? '#81c784' : 'var(--warning)';
-          }
-          if (elVenc) {
-            if (res.vencimentoPlano) {
-              elVenc.innerText = `Vence em ${new Date(res.vencimentoPlano).toLocaleDateString('pt-BR')}`;
-            } else {
-              elVenc.innerText = 'Acesso no Plano Básico';
-            }
-          }
-
-          if (res.statusPlano === 'SUSPENSO') {
-            this.toast("Sua assinatura foi suspensa ou reembolsada. Acesso retornado ao Plano Básico.", "warning");
-          } else if (res.excedeuCota && res.plano !== 'BASICO') {
-            this.toast("Atenção: Os dados atuais excedem a cota do seu plano pós-downgrade. Faça upgrade para adicionar novos itens.", "warning");
-          }
-
-          const consultorasTxt = document.getElementById("saas-uso-consultoras-txt");
-          const consultorasBar = document.getElementById("saas-bar-consultoras");
-          if (consultorasTxt && res.uso) consultorasTxt.innerText = `${res.uso.totalConsultoras} / ${res.uso.limiteConsultoras >= 999 ? 'Ilimitado' : res.uso.limiteConsultoras}`;
-          if (consultorasBar && res.uso) {
-            const pct = res.uso.limiteConsultoras >= 999 ? 10 : Math.min(100, Math.round((res.uso.totalConsultoras / res.uso.limiteConsultoras) * 100));
-            consultorasBar.style.width = `${pct}%`;
-          }
-
-          const estoqueTxt = document.getElementById("saas-uso-estoque-txt");
-          const estoqueBar = document.getElementById("saas-bar-estoque");
-          if (estoqueTxt && res.uso) estoqueTxt.innerText = `${res.uso.totalEstoque} / ${res.uso.limiteEstoque >= 9999 ? 'Ilimitado' : res.uso.limiteEstoque}`;
-          if (estoqueBar && res.uso) {
-            const pct = res.uso.limiteEstoque >= 9999 ? 10 : Math.min(100, Math.round((res.uso.totalEstoque / res.uso.limiteEstoque) * 100));
-            estoqueBar.style.width = `${pct}%`;
-          }
-
-          // Aviso dinâmico de limitação do Plano Básico
-          const elAvisoBasico = document.getElementById("saas-aviso-plano-basico");
-          if (res.plano === 'BASICO') {
-            if (!elAvisoBasico) {
-              const divAviso = document.createElement("div");
-              divAviso.id = "saas-aviso-plano-basico";
-              divAviso.style.cssText = "margin-top: 1.5rem; padding: 0.8rem 1rem; background: rgba(244, 67, 54, 0.1); border: 1px solid rgba(244, 67, 54, 0.3); border-radius: 8px; color: #ff8a80; font-size: 0.85rem; display: flex; align-items: center; gap: 0.6rem;";
-              divAviso.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="font-size: 1.1rem;"></i> <span><strong>Plano Básico Ativo:</strong> Você está no plano de demonstração gratuito. Você <strong>não poderá</strong> cadastrar mais de 2 revendedoras e 50 peças no estoque central. Faça o upgrade de sua assinatura abaixo para liberar limites maiores.</span>`;
-              const kpiGrid = document.querySelector("#meu-plano-saas .kpi-grid");
-              if (kpiGrid) {
-                kpiGrid.parentNode.insertBefore(divAviso, kpiGrid.nextSibling);
-              }
-            } else {
-              elAvisoBasico.style.display = "flex";
-            }
-          } else {
-            if (elAvisoBasico) elAvisoBasico.style.display = "none";
-          }
-
-          this.atualizarCadeadosUI();
         }
       }
     } catch (e) {
-      console.error("Erro ao carregar dados do plano SaaS:", e);
+      console.warn("Erro ao sincronizar plano do servidor:", e);
     }
   }
 

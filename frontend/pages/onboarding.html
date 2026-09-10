@@ -6,13 +6,13 @@
   <title id="onboarding-page-title">Conecta Joias - Cadastro & Onboarding Premium</title>
   
   <!-- Favicon e Ícones -->
-  <link rel="icon" type="image/png" href="../assets/favicon.png">
-  <link rel="apple-touch-icon" href="../assets/favicon.png">
+  <link rel="icon" type="image/png" href="/assets/favicon.png">
+  <link rel="apple-touch-icon" href="/assets/favicon.png">
   
   <!-- Estilos base do aplicativo & PWA -->
-  <link rel="manifest" href="../manifest.json">
-  <link rel="stylesheet" href="../css/style.css">
-  <link rel="stylesheet" href="../css/pwa-install.css">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/pwa-install.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
   <style>
@@ -421,7 +421,7 @@
 
   <div class="onboarding-card">
     <div class="onboarding-header">
-      <img src="../assets/logo.png" alt="Conecta Joias" id="onboarding-logo" onerror="this.src='../assets/logo.png';">
+      <img src="/assets/logo.png" alt="Conecta Joias" id="onboarding-logo" onerror="this.src='/assets/logo.png';">
       <h1 id="onboarding-title">Conecta Joias</h1>
       <p id="onboarding-subtitle">Cadastre-se para se tornar uma Revendedora</p>
     </div>
@@ -623,7 +623,7 @@
           <div class="form-group">
             <label>Termo de Responsabilidade Assinado *</label>
             <div style="margin-bottom: 0.3rem;">
-              <a href="../assets/modelo_termo_responsabilidade.pdf" target="_blank" style="color: var(--gold-primary); text-decoration: underline; font-weight: 500; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-file-pdf"></i> Baixar Modelo do Termo</a>
+              <a href="/assets/modelo_termo_responsabilidade.pdf" target="_blank" style="color: var(--gold-primary); text-decoration: underline; font-weight: 500; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-file-pdf"></i> Baixar Modelo do Termo</a>
             </div>
             <div class="file-upload-box" onclick="document.getElementById('termoFile').click()">
               <i class="fa-solid fa-file-signature"></i>
@@ -640,7 +640,7 @@
           <div class="form-group" style="margin-top: 1.5rem; display: flex; align-items: flex-start; gap: 0.8rem; background: rgba(0, 0, 0, 0.25); padding: 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); box-sizing: border-box;">
             <input type="checkbox" id="aceite-termos-lgpd" style="width: auto; margin-top: 0.3rem; cursor: pointer;" required>
             <label for="aceite-termos-lgpd" style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; cursor: pointer; user-select: none;">
-              Declaro que li e concordo com os <a href="termos_uso.html" target="_blank" style="color: var(--gold-primary); text-decoration: underline; font-weight: 500;">Termos de Uso</a> e aceito a coleta e tratamento de meus dados cadastrais e fotos de documentos conforme a <a href="politica_privacidade.html" target="_blank" style="color: var(--gold-primary); text-decoration: underline; font-weight: 500;">Política de Privacidade (LGPD)</a> para fins de análise cadastral e segurança jurídica da consignação.
+              Declaro que li e concordo com os <a href="/pages/termos_uso.html" target="_blank" style="color: var(--gold-primary); text-decoration: underline; font-weight: 500;">Termos de Uso</a> e aceito a coleta e tratamento de meus dados cadastrais e fotos de documentos conforme a <a href="/pages/politica_privacidade.html" target="_blank" style="color: var(--gold-primary); text-decoration: underline; font-weight: 500;">Política de Privacidade (LGPD)</a> para fins de análise cadastral e segurança jurídica da consignação.
             </label>
           </div>
         </div>
@@ -692,7 +692,7 @@
 
   <div id="toast-container" style="position: fixed; bottom: 20px; right: 20px; z-index: 9999;"></div>
 
-  <script src="../js/onboarding.js"></script>
-  <script src="../js/pwa-install.js"></script>
+  <script src="/js/onboarding.js" defer></script>
+  <script src="/js/pwa-install.js" defer></script>
 </body>
 </html>

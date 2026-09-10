@@ -6,11 +6,11 @@
   <title>Pagamento Aprovado - Conecta Joias</title>
   
   <!-- Favicon e Ícones -->
-  <link rel="icon" type="image/png" href="../assets/favicon.png">
-  <link rel="apple-touch-icon" href="../assets/favicon.png">
+  <link rel="icon" type="image/png" href="/assets/favicon.png">
+  <link rel="apple-touch-icon" href="/assets/favicon.png">
   
   <!-- Estilos Globais -->
-  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="/css/style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
   <style>
@@ -138,22 +138,81 @@
       </p>
     </div>
 
-    <a href="superadmin.html" class="btn-painel">
+    <a href="/pages/superadmin.html" class="btn-painel">
       <i class="fa-solid fa-gauge-high"></i> Acessar Painel Agora
     </a>
   </div>
 
   <script>
-    // 1. Atualiza os dados do usuário no localStorage para refletir status 'ATIVO'
-    (function atualizarSessaoLocal() {
+    (async function atualizarSessaoLocal() {
       try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const paymentId = urlParams.get("payment_id") || urlParams.get("collection_id") || urlParams.get("id");
+        const status = urlParams.get("status") || urlParams.get("collection_status") || "approved";
+        const externalReference = urlParams.get("external_reference") || "";
+        const planoQuery = urlParams.get("plano") || "";
+
+        let planoAdquirido = "GOLD";
+        if (externalReference && externalReference.includes("|")) {
+          const parts = externalReference.split("|");
+          if (parts[1]) planoAdquirido = parts[1].toUpperCase();
+        } else if (planoQuery) {
+          planoAdquirido = planoQuery.toUpperCase();
+        }
+
+        function getApiBaseUrl() {
+          const savedUrl = localStorage.getItem("conectajoias_api_url");
+          if (savedUrl) return savedUrl;
+
+          const hostname = window.location.hostname;
+          const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1" || /^192\.168\./.test(hostname) || /^10\./.test(hostname);
+          if (isLocalHost) {
+            return `${window.location.protocol}//${hostname}:5000/api`;
+          }
+          return `${window.location.origin}/api`;
+        }
+
+        // Tenta enviar a confirmação de pagamento para a API
+        const token = localStorage.getItem("conectajoias_token") || localStorage.getItem("token") || "";
+        const headers = { "Content-Type": "application/json" };
+        if (token && !token.startsWith("mock_")) {
+          headers["Authorization"] = `Bearer ${token}`;
+        }
+
+        try {
+          const apiBase = getApiBaseUrl();
+          const resp = await fetch(`${apiBase}/saas/confirmar-retorno-pagamento`, {
+            method: "POST",
+            headers: headers,
+            body: JSON.stringify({
+              paymentId,
+              status,
+              externalReference,
+              planoDesejado: planoAdquirido
+            })
+          });
+          if (resp.ok) {
+            const resData = await resp.json();
+            if (resData.plano) planoAdquirido = resData.plano.toUpperCase();
+            console.log(`✅ [API Sync Sucesso] Banco de Dados atualizado para o plano ${planoAdquirido}.`);
+          } else {
+            console.warn("⚠️ API de confirmação retornou status:", resp.status);
+          }
+        } catch (e) {
+          console.warn("⚠️ Sincronização via API não concluída (usando estado retornado):", e.message);
+        }
+
+        // Atualiza chaves do localStorage com o plano pago
         localStorage.setItem("conectajoias_status_plano", "ATIVO");
+        localStorage.setItem("conectajoias_plano", planoAdquirido);
 
         const usuarioRaw = localStorage.getItem("conectajoias_usuario");
         if (usuarioRaw) {
           const user = JSON.parse(usuarioRaw);
           user.statusPlano = 'ATIVO';
           user.status = 'ATIVO';
+          user.planoLoja = planoAdquirido;
+          user.plano = planoAdquirido;
           localStorage.setItem("conectajoias_usuario", JSON.stringify(user));
         }
 
@@ -162,6 +221,8 @@
           const userGen = JSON.parse(usuarioGenerico);
           userGen.statusPlano = 'ATIVO';
           userGen.status = 'ATIVO';
+          userGen.planoLoja = planoAdquirido;
+          userGen.plano = planoAdquirido;
           localStorage.setItem("usuario", JSON.stringify(userGen));
         }
 
@@ -169,16 +230,17 @@
         if (lojaRaw) {
           const loja = JSON.parse(lojaRaw);
           loja.statusPlano = 'ATIVO';
+          loja.plano = planoAdquirido;
           localStorage.setItem("conectajoias_loja", JSON.stringify(loja));
         }
 
-        console.log("✅ [Checkout Sucesso] Status do plano atualizado para ATIVO no localStorage.");
+        console.log(`✅ [Checkout Sucesso] Plano ${planoAdquirido} ativado e salvo no localStorage.`);
       } catch (err) {
         console.warn("Aviso ao atualizar localStorage pós-pagamento:", err.message);
       }
     })();
 
-    // 2. Redireciona o usuário para superadmin.html em 4 segundos
+    // Redireciona o usuário para o painel em 4 segundos
     let segundos = 4;
     const countEl = document.getElementById("countdown");
 
@@ -187,7 +249,17 @@
       if (countEl) countEl.innerText = segundos;
       if (segundos <= 0) {
         clearInterval(timer);
-        window.location.href = "superadmin.html";
+        let targetPage = "/pages/superadmin.html";
+        const userRaw = localStorage.getItem("conectajoias_usuario") || localStorage.getItem("usuario");
+        if (userRaw) {
+          try {
+            const u = JSON.parse(userRaw);
+            if (u.role === "Consultant" || u.role === "Manager") {
+              targetPage = "/pages/manager.html";
+            }
+          } catch(e) {}
+        }
+        window.location.href = targetPage;
       }
     }, 1000);
   </script>

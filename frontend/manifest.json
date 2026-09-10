@@ -3,19 +3,19 @@
   "name": "Conecta Joias - Gestão Premium",
   "icons": [
     {
-      "src": "assets/favicon.png",
+      "src": "/assets/favicon.png",
       "type": "image/png",
       "sizes": "192x192",
       "purpose": "any"
     },
     {
-      "src": "assets/logo.png",
+      "src": "/assets/logo.png",
       "type": "image/png",
       "sizes": "512x512",
       "purpose": "maskable"
     }
   ],
-  "start_url": "./index.html",
+  "start_url": "/index.html",
   "background_color": "#0a0a0a",
   "theme_color": "#d4af37",
   "display": "standalone",

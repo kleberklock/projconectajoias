@@ -99,6 +99,8 @@ model Produto {
 
   @@unique([lojaId, codigo])
   @@index([lojaId])
+  @@index([lojaId, categoria])
+  @@index([lojaId, nome])
 }
 
 model ProdutoVariacao {
@@ -118,6 +120,7 @@ model ProdutoVariacao {
   @@unique([lojaId, sku])
   @@index([lojaId])
   @@index([produtoId])
+  @@index([lojaId, quantidade])
 }
 
 model Consignado {
@@ -135,6 +138,7 @@ model Consignado {
   @@unique([usuarioId, produtoVariacaoId])
   @@index([lojaId])
   @@index([usuarioId])
+  @@index([usuarioId, produtoVariacaoId])
 }
 
 model HistoricoAcerto {
@@ -246,6 +250,9 @@ model LogAcao {
   acao        String
   detalhes    String
   data        DateTime @default(now())
+
+  @@index([data])
+  @@index([usuarioId])
 }
 
 model Notificacao {
@@ -295,6 +302,9 @@ model FaixaComissao {
   valorMin   Float    @default(0.0)
   valorMax   Float
   percentual Float
+
+  @@index([usuarioId])
+  @@index([lojaId])
 }
 
 model RespostaOnboarding {
@@ -323,6 +333,9 @@ model LinkPagamento {
   asaasInvoiceUrl String? // URL do boleto ou fatura no ASAAS
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+
+  @@index([usuarioId])
+  @@index([status])
 }
 
 
@@ -334,6 +347,8 @@ model MensagemWhatsapp {
   tipo      String   // "BOAS_VINDAS" | "ACERTO" | "REINICIO_COMISSAO"
   status    String   @default("PENDENTE") // "PENDENTE" | "ENVIADO" | "ERRO"
   createdAt DateTime @default(now())
+
+  @@index([lojaId, status])
 }
 
 
@@ -345,6 +360,8 @@ model DocumentoUsuario {
   nomeArquivo String
   caminhoUrl  String
   createdAt   DateTime @default(now())
+
+  @@index([usuarioId])
 }
 
 model TermoConsignacao {
@@ -360,6 +377,8 @@ model TermoConsignacao {
   dataAssinatura DateTime?
   prazoDevolucao DateTime?
   createdAt      DateTime @default(now())
+
+  @@index([usuarioId, status])
 }
 
 model Treinamento {

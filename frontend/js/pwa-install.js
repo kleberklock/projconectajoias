@@ -10,9 +10,7 @@
   // Registrar Service Worker se suportado
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      // Ajusta o caminho do SW dependendo de se estamos em pages/ ou na raiz
-      const swPath = window.location.pathname.includes('/pages/') ? '../js/sw.js' : 'js/sw.js';
-      navigator.serviceWorker.register(swPath).catch(err => {
+      navigator.serviceWorker.register('/js/sw.js', { scope: '/' }).catch(err => {
         console.warn('Erro ao registrar ServiceWorker:', err);
       });
     });

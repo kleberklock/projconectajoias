@@ -188,16 +188,25 @@ body {
 }
 
 /* Classes de Travamento por Plano (Cadeado) */
-.nav-item.locked button {
+.nav-item.locked button,
+html[data-plano="BASICO"] .nav-item[data-target="notas-fiscais"] button,
+html[data-plano="BASICO"] .nav-item[data-target="planilhas"] button,
+html[data-plano="BRONZE"] .nav-item[data-target="notas-fiscais"] button {
   opacity: 0.55;
   cursor: pointer;
 }
-.nav-item.locked button:hover {
+.nav-item.locked button:hover,
+html[data-plano="BASICO"] .nav-item[data-target="notas-fiscais"] button:hover,
+html[data-plano="BASICO"] .nav-item[data-target="planilhas"] button:hover,
+html[data-plano="BRONZE"] .nav-item[data-target="notas-fiscais"] button:hover {
   transform: none;
   background-color: rgba(255, 255, 255, 0.01) !important;
   border-color: transparent !important;
 }
-.nav-item.locked button::after {
+.nav-item.locked button::after,
+html[data-plano="BASICO"] .nav-item[data-target="notas-fiscais"] button::after,
+html[data-plano="BASICO"] .nav-item[data-target="planilhas"] button::after,
+html[data-plano="BRONZE"] .nav-item[data-target="notas-fiscais"] button::after {
   content: "\f023"; /* Ícone de cadeado do Font Awesome */
   font-family: "Font Awesome 6 Free";
   font-weight: 900;
