@@ -525,7 +525,16 @@ const identificarLoja = async (req, res, next) => {
   }
 
   // Bloqueio de Lojas Suspensas para Manager e Consultant
-  if (lojaId && lojaId !== 'default-loja') {
+  // Exceção: rotas de pagamento/ativação de plano PRECISAM passar mesmo com loja suspensa
+  // (paradoxo: para ativar o plano, a loja precisa poder chamar a rota de confirmação)
+  const ROTAS_LIVRE_SUSPENSAO = [
+    '/api/saas/confirmar-retorno-pagamento',
+    '/api/criar-pagamento'
+  ];
+  const rotaAtual = req.path || req.url || '';
+  const rotaEhLivre = ROTAS_LIVRE_SUSPENSAO.some(r => rotaAtual.includes(r));
+
+  if (lojaId && lojaId !== 'default-loja' && !rotaEhLivre) {
     try {
       const lojaObj = await prisma.loja.findUnique({
         where: { id: lojaId },
@@ -4244,8 +4253,13 @@ app.post('/api/criar-pagamento', async (req, res) => {
       try { originUrl = new URL(req.headers.referer).origin; } catch (e) {}
     }
     const frontendUrl = originUrl || process.env.FRONTEND_URL || 'http://localhost:8080';
-    // Public URL / Ngrok para recebimento de webhooks do servidor do Mercado Pago
-    const publicUrl = process.env.PUBLIC_URL || 'http://localhost:5000';
+    // Public URL para recebimento de webhooks do Mercado Pago.
+    // Prioridade: variável de ambiente > autodetecção pelo header host da requisição > fallback local
+    const publicUrl = process.env.PUBLIC_URL
+      || (req.headers.host && !req.headers.host.includes('localhost') && !req.headers.host.includes('127.0.0.1')
+          ? `https://${req.headers.host}`
+          : null)
+      || 'http://localhost:5000';
 
     const isSandbox = (process.env.MP_ACCESS_TOKEN || '').startsWith('TEST-');
 
@@ -4316,8 +4330,18 @@ app.post('/api/webhook/mercadopago', async (req, res) => {
   // Retorno imediato 200 OK exigido pelo Mercado Pago
   res.status(200).send('OK');
 
-  const { type } = req.query;
-  const paymentId = req.query['data.id'] || req.query.id;
+  // O MP envia o paymentId de duas formas diferentes dependendo da versão da API:
+  // - Formato legado (IPN): query string ?data.id=123 ou ?id=123
+  // - Formato atual (Webhooks v2): body JSON { action: 'payment.updated', data: { id: '123' } }
+  const paymentId = req.query['data.id']
+    || req.query.id
+    || req.body?.data?.id
+    || req.body?.id
+    || null;
+
+  if (!paymentId) {
+    console.warn('⚠️ [Webhook MP] Notificação recebida sem paymentId identificável. Body:', JSON.stringify(req.body), '| Query:', JSON.stringify(req.query));
+  }
 
   if (paymentId) {
     try {
@@ -5099,10 +5123,11 @@ app.post('/api/saas/confirmar-retorno-pagamento', autenticarJWTOpcional, identif
       if (parts[1]) planoExt = parts[1].toUpperCase();
     }
 
-    let lojaTargetId = req.lojaId || 'default-loja';
+    // Inicia sem loja identificada (sem fallback perigoso para 'default-loja')
+    let lojaTargetId = null;
     let downgradePendente = null;
 
-    // 1. Tenta identificar a loja via usuário autenticado (JWT)
+    // 1. Tenta identificar a loja via usuário autenticado (JWT) — caminho principal
     if (req.user && req.user.id) {
       const usuario = await prisma.usuario.findUnique({
         where: { id: req.user.id },
@@ -5111,41 +5136,64 @@ app.post('/api/saas/confirmar-retorno-pagamento', autenticarJWTOpcional, identif
       if (usuario && usuario.lojaId) {
         lojaTargetId = usuario.lojaId;
         downgradePendente = usuario.loja?.downgradePendente;
+        console.log(`[ConfirmarRetorno] Loja identificada via JWT: ${lojaTargetId}`);
       }
     }
 
     // 2. Fallback: Tenta identificar a loja via refId da externalReference
-    if (refId) {
+    if (!lojaTargetId && refId) {
       const usuarioRef = await prisma.usuario.findUnique({ where: { id: refId } });
       if (usuarioRef && usuarioRef.lojaId) {
         lojaTargetId = usuarioRef.lojaId;
+        console.log(`[ConfirmarRetorno] Loja identificada via externalReference (usuário): ${lojaTargetId}`);
       } else {
         const lojaRef = await prisma.loja.findUnique({ where: { id: refId } });
         if (lojaRef) {
           lojaTargetId = lojaRef.id;
           downgradePendente = lojaRef.downgradePendente;
+          console.log(`[ConfirmarRetorno] Loja identificada via externalReference (loja direta): ${lojaTargetId}`);
         }
       }
     }
 
+    // 3. Segurança: Se nenhum método identificou a loja, aborta com erro claro
+    if (!lojaTargetId) {
+      console.error(`[ConfirmarRetorno] ERRO: Não foi possível identificar a loja. user=${JSON.stringify(req.user)}, refId=${refId}, lojaId=${req.lojaId}`);
+      return res.status(400).json({
+        error: 'Não foi possível identificar sua loja para ativar o plano. Faça login novamente e tente outra vez.'
+      });
+    }
+
     let statusAprovado = false;
     const statusClean = String(status || '').toLowerCase();
-    if (['approved', 'aprovado', 'active', 'pago', 'paid'].includes(statusClean)) {
-      statusAprovado = true;
-    } else if (paymentId && clientMercadoPago) {
+
+    // Verifica o status na seguinte ordem de confiabilidade:
+    // 1. Consulta direta à API do MP com o paymentId (mais confiável)
+    // 2. Status passado por parâmetro na URL de retorno
+    // 3. Nunca aprova automaticamente sem evidência
+    if (paymentId && clientMercadoPago) {
       try {
         const payment = new Payment(clientMercadoPago);
         const pagamentoMP = await payment.get({ id: paymentId });
         if (pagamentoMP && pagamentoMP.status === 'approved') {
           statusAprovado = true;
+          console.log(`[ConfirmarRetorno] Pagamento ${paymentId} confirmado via API do Mercado Pago.`);
+        } else {
+          console.warn(`[ConfirmarRetorno] API do MP retornou status '${pagamentoMP?.status}' para o paymentId ${paymentId}.`);
         }
       } catch (mpErr) {
-        console.warn('⚠️ Não foi possível consultar a API do MP no retorno (usando validação por parâmetro):', mpErr.message);
-        if (statusClean === 'approved' || statusClean === 'aprovado') statusAprovado = true;
+        console.warn('⚠️ [ConfirmarRetorno] Falha ao consultar API do MP. Usando status da URL como fallback:', mpErr.message);
+        // Fallback: usa o status recebido na URL de redirecionamento
+        if (['approved', 'aprovado', 'active', 'pago', 'paid'].includes(statusClean)) {
+          statusAprovado = true;
+        }
       }
-    } else {
-      // Se chamado sem paymentId (ex: sandbox/retorno direto com status na URL)
+    } else if (['approved', 'aprovado', 'active', 'pago', 'paid'].includes(statusClean)) {
+      // Sem paymentId mas status explícito de aprovado na URL (ex: sandbox sem paymentId)
       statusAprovado = true;
+      console.log(`[ConfirmarRetorno] Status aprovado via parâmetro de URL (sem paymentId): ${statusClean}`);
+    } else {
+      console.warn(`[ConfirmarRetorno] Chamada sem paymentId e sem status aprovado. Status recebido: '${statusClean}'. Negando ativação.`);
     }
 
     if (statusAprovado) {

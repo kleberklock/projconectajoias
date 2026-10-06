@@ -196,7 +196,25 @@
             if (resData.plano) planoAdquirido = resData.plano.toUpperCase();
             console.log(`✅ [API Sync Sucesso] Banco de Dados atualizado para o plano ${planoAdquirido}.`);
           } else {
-            console.warn("⚠️ API de confirmação retornou status:", resp.status);
+            // Loga o erro detalhado para diagnóstico
+            let errorBody = {};
+            try { errorBody = await resp.json(); } catch(_) {}
+            console.error(`❌ [API Sync Falha] Status HTTP ${resp.status}. Erro:`, errorBody);
+
+            if (resp.status === 400 && errorBody.error && errorBody.error.includes('identificar sua loja')) {
+              // Loja não identificada: orienta o usuário
+              const redirectEl = document.querySelector('.redirect-box p');
+              if (redirectEl) {
+                redirectEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="color: #FFB300;"></i>
+                  <span style="color: #FFB300; font-size: 0.85rem;">
+                    Seu pagamento foi aprovado! Para ativar o plano, faça <strong>login</strong> e vá em <strong>Configurações → Plano</strong>.
+                  </span>`;
+              }
+            } else if (resp.status === 403) {
+              console.warn('⚠️ [API Sync] Acesso negado (403). Verifique se o token JWT é válido e se a loja tem permissão.');
+            } else {
+              console.warn(`⚠️ [API Sync] Erro ${resp.status} ao sincronizar plano. O localStorage será atualizado localmente.`);
+            }
           }
         } catch (e) {
           console.warn("⚠️ Sincronização via API não concluída (usando estado retornado):", e.message);
