@@ -3,19 +3,21 @@
  */
 
 function getApiBaseUrl() {
+  const hostname = window.location.hostname;
+  const port = window.location.port;
+  const isDevPort = ["5500", "8080", "3000", "5501", "5000"].includes(port);
+  const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1" || /^192\.168\./.test(hostname) || /^10\./.test(hostname);
+
+  if (isDevPort || isLocalHost) {
+    return `${window.location.protocol}//${hostname}:5000/api`;
+  }
+
   if (typeof app !== "undefined" && app.state && app.state.apiUrl) {
     return app.state.apiUrl;
   }
   const savedUrl = localStorage.getItem("conectajoias_api_url");
   if (savedUrl) return savedUrl;
 
-  const port = window.location.port;
-  const hostname = window.location.hostname;
-  const isDevPort = ["5500", "8080", "3000", "5501", "5000"].includes(port);
-  const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1" || /^192\.168\./.test(hostname) || /^10\./.test(hostname);
-  if (isDevPort || isLocalHost) {
-    return `${window.location.protocol}//${hostname}:5000/api`;
-  }
   return `${window.location.origin}/api`;
 }
 

@@ -8,15 +8,15 @@ const app = {
   // 1. Estado da Aplicação
   state: {
     apiUrl: (function() {
-      const saved = localStorage.getItem("conectajoias_api_url");
-      if (saved) return saved;
-      const port = window.location.port;
       const hostname = window.location.hostname;
+      const port = window.location.port;
       const isDevPort = ["5500", "8080", "3000", "5501", "5000"].includes(port);
       const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1" || /^192\.168\./.test(hostname) || /^10\./.test(hostname);
       if (isDevPort || isLocalHost) {
         return `${window.location.protocol}//${hostname}:5000/api`;
       }
+      const saved = localStorage.getItem("conectajoias_api_url");
+      if (saved) return saved;
       return `${window.location.origin}/api`;
     })(),
     token: null,
