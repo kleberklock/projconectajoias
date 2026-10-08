@@ -717,11 +717,102 @@ async function exibirModalUpgradeProRata(novoPlano, usuarioId) {
   }
 }
 
+/**
+ * Atualiza dinamicamente os cards de planos com o valor exato do Upgrade Pro-Rata antes do clique
+ */
+async function atualizarBadgesUpgradeProRata() {
+  try {
+    let usuarioId = null;
+    const usuarioRaw = localStorage.getItem("conectajoias_usuario") || localStorage.getItem("usuario");
+    if (usuarioRaw) {
+      try {
+        const u = JSON.parse(usuarioRaw);
+        usuarioId = u.id || u._id || u.usuarioId;
+      } catch (e) {}
+    }
+    if (!usuarioId) usuarioId = localStorage.getItem("conectajoias_usuario_id") || localStorage.getItem("usuario_id");
+    if (!usuarioId) {
+      const token = localStorage.getItem("conectajoias_token");
+      if (token && token.includes(".")) {
+        try {
+          const payloadBase64 = token.split(".")[1];
+          const payloadDecoded = JSON.parse(atob(payloadBase64));
+          if (payloadDecoded && payloadDecoded.id) usuarioId = payloadDecoded.id;
+        } catch (e) {}
+      }
+    }
+
+    const planos = ["BRONZE", "GOLD", "PLATINUM"];
+
+    for (const p of planos) {
+      try {
+        const res = await fetch(`${getApiBaseUrl()}/saas/calcular-upgrade`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ usuarioId, novoPlano: p })
+        });
+        if (!res.ok) continue;
+        const data = await res.json();
+
+        // Seleciona botões dos planos nas telas
+        const btnBronze = document.querySelector("button[onclick*='Bronze']");
+        const btnGold = document.querySelector("button[onclick*='Gold']");
+        const btnPlatinum = document.querySelector("button[onclick*='Platinum']");
+
+        let targetBtn = null;
+        if (p === 'BRONZE') targetBtn = btnBronze;
+        if (p === 'GOLD') targetBtn = btnGold;
+        if (p === 'PLATINUM') targetBtn = btnPlatinum;
+
+        if (!targetBtn) continue;
+
+        const cardContainer = targetBtn.closest(".dashboard-panel") || targetBtn.closest("div[style*='border']");
+        if (!cardContainer) continue;
+
+        // Limpa badge anterior se houver
+        const oldBadge = cardContainer.querySelector(".badge-prorata-live");
+        if (oldBadge) oldBadge.remove();
+
+        const priceEl = cardContainer.querySelector("div[style*='font-size: 1.8rem']") || cardContainer.querySelector("div[style*='font-size: 1.5rem']");
+
+        if (data.planoAtual === p) {
+          // É o plano atual
+          const badge = document.createElement("div");
+          badge.className = "badge-prorata-live";
+          badge.style.cssText = "background: rgba(129, 199, 132, 0.15); border: 1px solid #81c784; color: #81c784; font-size: 0.75rem; font-weight: bold; padding: 4px 10px; border-radius: 8px; margin-bottom: 0.8rem; text-align: center;";
+          badge.innerHTML = '<i class="fa-solid fa-check-circle"></i> Seu Plano Atual (Ativo)';
+          if (priceEl) priceEl.after(badge);
+          targetBtn.innerHTML = '<i class="fa-solid fa-check"></i> Plano Atual Ativo';
+          targetBtn.style.opacity = '0.7';
+        } else if (data.planoAtual !== 'BASICO' && data.diasRestantes > 0 && data.creditoPlanoAtual > 0 && data.valorUpgrade < data.precoNovoPlano) {
+          // É um upgrade proporcional
+          const badge = document.createElement("div");
+          badge.className = "badge-prorata-live";
+          badge.style.cssText = "background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.1) 100%); border: 1px solid #10b981; color: #34d399; font-size: 0.8rem; font-weight: 700; padding: 6px 10px; border-radius: 8px; margin-bottom: 0.8rem; text-align: center; box-shadow: 0 2px 10px rgba(16, 185, 129, 0.15);";
+          badge.innerHTML = `<i class="fa-solid fa-bolt" style="color: #f59e0b;"></i> Upgrade hoje por apenas <strong>R$ ${data.valorUpgrade.toFixed(2).replace('.', ',')}</strong> <div style="font-size: 0.7rem; opacity: 0.85; font-weight: normal; margin-top: 2px;">(-R$ ${data.creditoPlanoAtual.toFixed(2).replace('.', ',')} de crédito dos seus ${data.diasRestantes} dias restantes)</div>`;
+          if (priceEl) priceEl.after(badge);
+          targetBtn.innerHTML = `<i class="fa-solid fa-bolt"></i> Upgrade por R$ ${data.valorUpgrade.toFixed(2).replace('.', ',')} (Cakto Pay)`;
+        } else {
+          targetBtn.innerHTML = `<i class="fa-solid fa-crown"></i> Assinar Plano ${p.charAt(0) + p.slice(1).toLowerCase()} (Cakto Pay)`;
+        }
+      } catch (e) {
+        console.warn(`Erro ao calcular badge de upgrade para ${p}:`, e);
+      }
+    }
+  } catch (err) {
+    console.warn("Erro ao atualizar badges pro-rata:", err);
+  }
+}
+
 // Exporta globalmente as funções
 window.assinarPlano = assinarPlano;
 window.exibirModalUpgradeProRata = exibirModalUpgradeProRata;
+window.atualizarBadgesUpgradeProRata = atualizarBadgesUpgradeProRata;
 
 // Inicializar na carga da página
 document.addEventListener("DOMContentLoaded", () => {
   checkout.init();
+  setTimeout(() => {
+    atualizarBadgesUpgradeProRata();
+  }, 600);
 });

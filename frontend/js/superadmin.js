@@ -7618,6 +7618,7 @@ const app = {
     }
 
     this.atualizarCadeadosUI();
+    if (typeof window.atualizarBadgesUpgradeProRata === "function") window.atualizarBadgesUpgradeProRata();
 
     // 2. Tenta sincronizar com a API em segundo plano
     try {
