@@ -9,10 +9,11 @@ const { BlobServiceClient } = require('@azure/storage-blob');
 const rateLimit = require('express-rate-limit');
 const fs = require('fs');
 const path = require('path');
-require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
-const { MercadoPagoConfig, Preference, Payment, Preapproval } = require('mercadopago');
 const { criarCobranca, criarCobrancaPlanoSaaS, obterQrCodePix, obterCodigoBarrasBoleto } = require('./asaas-service');
 const comissaoService = require('./services/ComissaoService');
+const whatsappService = require('./services/WhatsappService');
+const emailService = require('./services/EmailService');
+const pdfService = require('./services/PdfService');
 const crypto = require('crypto');
 
 // Função de segurança que garante um JWT_SECRET robusto gravado no .env
@@ -89,7 +90,8 @@ const prisma = basePrisma.$extends({
           'Notificacao',
           'Configuracao',
           'FaixaComissao',
-          'Treinamento'
+          'Treinamento',
+          'MovimentacaoEstoque'
         ];
 
         // Se o modelo contiver o campo lojaId, aplicamos as regras de RLS lógico
@@ -154,7 +156,6 @@ if (!JWT_SECRET) {
   process.exit(1);
 }
 
-const clientMercadoPago = new MercadoPagoConfig({ accessToken: process.env.MP_ACCESS_TOKEN });
 
 // Configuração de CORS restrita ao frontend (inclui as portas de desenvolvimento local 5500 e 8080 e subdomínios)
 const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5500';
@@ -202,11 +203,15 @@ app.use((req, res, next) => {
 // Criação automática das pastas de uploads locais
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 const DOCUMENTOS_DIR = path.join(UPLOADS_DIR, 'documentos');
+const ASSINATURAS_DIR = path.join(UPLOADS_DIR, 'assinaturas');
 if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
 if (!fs.existsSync(DOCUMENTOS_DIR)) {
   fs.mkdirSync(DOCUMENTOS_DIR, { recursive: true });
+}
+if (!fs.existsSync(ASSINATURAS_DIR)) {
+  fs.mkdirSync(ASSINATURAS_DIR, { recursive: true });
 }
 
 // Servir a pasta uploads de forma estática
@@ -330,6 +335,63 @@ async function verificarLimiteEstoque(lojaId, adicionais = 0) {
   } catch (err) {
     console.error("Erro ao verificar limite de estoque:", err);
     return { ok: true };
+  }
+}
+
+// Helper para gravação de histórico de movimentação de estoque
+async function registrarMovimentacaoEstoque({
+  lojaId,
+  produtoId = null,
+  produtoVariacaoId = null,
+  codigoProduto,
+  nomeProduto,
+  skuVariacao = null,
+  tipo, // "ENTRADA_MANUAL" | "SAIDA_CONSIGNACAO" | "DEVOLUCAO_CONSIGNACAO" | "VENDA_DIRETA" | "VENDA_REVENDEDORA" | "PERDA" | "DEFEITO" | "AJUSTE"
+  quantidade,
+  saldoAnterior = 0,
+  saldoPosterior = 0,
+  local = "ESTOQUE_CENTRAL",
+  origemDestino = null,
+  usuarioResponsavel = null,
+  observacao = null,
+  data = new Date()
+}) {
+  try {
+    let responsavelFinal = usuarioResponsavel;
+    if (!responsavelFinal || /super\s*admin/i.test(responsavelFinal)) {
+      try {
+        const lojaInfo = await prisma.loja.findUnique({
+          where: { id: lojaId || 'default-loja' },
+          select: { nome: true }
+        });
+        responsavelFinal = lojaInfo?.nome || 'Loja';
+      } catch (e) {
+        responsavelFinal = 'Loja';
+      }
+    }
+
+    return await prisma.movimentacaoEstoque.create({
+      data: {
+        lojaId: lojaId || 'default-loja',
+        produtoId,
+        produtoVariacaoId,
+        codigoProduto: codigoProduto || 'S/C',
+        nomeProduto: nomeProduto || 'Sem Nome',
+        skuVariacao,
+        tipo,
+        quantidade: Math.abs(parseInt(quantidade) || 0),
+        saldoAnterior: parseInt(saldoAnterior) || 0,
+        saldoPosterior: parseInt(saldoPosterior) || 0,
+        local,
+        origemDestino,
+        usuarioResponsavel: responsavelFinal,
+        observacao,
+        data: data ? new Date(data) : new Date()
+      }
+    });
+  } catch (err) {
+    console.error('⚠️ [MovimentacaoEstoque] Falha ao registrar log de movimentação:', err.message);
+    return null;
   }
 }
 
@@ -564,8 +626,8 @@ const autorizarPlano = (planosPermitidos) => {
         return res.status(400).json({ error: 'Loja não identificada na requisição.' });
       }
 
-      // Se for loja default ou superadmin operando sem loja específica, permite por segurança
-      if (lojaId === 'default-loja' || (req.user && req.user.role === 'SuperAdmin' && !req.user.lojaId)) {
+      // Se for loja default ou superadmin operando, permite por segurança
+      if (lojaId === 'default-loja' || (req.user && req.user.role === 'SuperAdmin')) {
         return next();
       }
 
@@ -985,6 +1047,37 @@ app.post('/api/auth/register', autenticarJWT, autorizarRole(['Manager', 'SuperAd
 
 
 
+    // Envio automático de boas-vindas por WhatsApp se for revendedora com telefone
+    if (normalizedRole === 'Consultant' && novoUsuario.whatsapp) {
+      try {
+        const configLoja = await prisma.configuracao.findFirst({ where: { lojaId: req.lojaId } });
+        const nomeEmpresa = configLoja ? configLoja.nomeEmpresa : 'Conecta Joias';
+        const urlPortal = process.env.FRONTEND_URL || 'http://localhost:8080';
+
+        const msgTexto = `✨ Olá, ${novoUsuario.nome}! Seja muito bem-vinda à equipe ${nomeEmpresa}! 💎\nSeu cadastro como revendedora foi concluído com sucesso.\n📱 Seu PIN de acesso ao portal: *${novoUsuario.pin}*\n🔗 Acesse em: ${urlPortal}/pages/login.html`;
+
+        await prisma.mensagemWhatsapp.create({
+          data: {
+            lojaId: req.lojaId,
+            numero: novoUsuario.whatsapp,
+            mensagem: msgTexto,
+            tipo: 'BOAS_VINDAS',
+            status: 'PENDENTE'
+          }
+        });
+
+        whatsappService.enviarBoasVindasRevendedora({
+          nome: novoUsuario.nome,
+          telefone: novoUsuario.whatsapp,
+          pin: novoUsuario.pin,
+          nomeLoja: nomeEmpresa,
+          urlAcesso: urlPortal
+        }).catch(err => console.error('⚠️ [WhatsApp] Erro em background:', err.message));
+      } catch (zapErr) {
+        console.error('⚠️ [WhatsApp] Falha ao registrar boas-vindas:', zapErr.message);
+      }
+    }
+
     res.status(201).json({
       message: 'Usuário cadastrado com sucesso!',
       usuario: {
@@ -1014,6 +1107,224 @@ app.post('/api/auth/register', autenticarJWT, autorizarRole(['Manager', 'SuperAd
 // ==========================================
 // ROTAS DE GESTÃO DE ESTOQUE (PRODUTOS)
 // ==========================================
+
+// 1. Obter Histórico de Movimentações de Estoque da Conta (Apenas Manager e SuperAdmin)
+app.get('/api/estoque/movimentacoes', autenticarJWT, autorizarRole(['Manager', 'SuperAdmin']), identificarLoja, autorizarPlano(['BRONZE', 'GOLD', 'PLATINUM']), async (req, res) => {
+  const { tipo, busca, inicio, fim, limite = 300 } = req.query;
+
+  try {
+    // 1. Verificação de Seed Retroativo Inteligente
+    // Se a tabela de movimentações desta loja estiver vazia, geramos o histórico retroativo com base nos dados existentes
+    const totalExistente = await prisma.movimentacaoEstoque.count({
+      where: { lojaId: req.lojaId }
+    });
+
+    if (totalExistente === 0) {
+      // Popula retroativamente histórico de produtos cadastrados
+      const produtosLoja = await prisma.produto.findMany({
+        where: { lojaId: req.lojaId },
+        include: { variacoes: true }
+      });
+
+      for (const prod of produtosLoja) {
+        for (const v of prod.variacoes) {
+          if (v.quantidade > 0) {
+            await prisma.movimentacaoEstoque.create({
+              data: {
+                lojaId: req.lojaId,
+                produtoId: prod.id,
+                produtoVariacaoId: v.id,
+                codigoProduto: prod.codigo,
+                nomeProduto: prod.nome,
+                skuVariacao: v.sku,
+                tipo: 'ENTRADA_MANUAL',
+                quantidade: v.quantidade,
+                saldoAnterior: 0,
+                saldoPosterior: v.quantidade,
+                local: 'ESTOQUE_CENTRAL',
+                origemDestino: 'Cadastro Inicial / Saldo em Estoque',
+                usuarioResponsavel: req.user.nome || 'Gestora',
+                observacao: `Variação: ${v.banho}${v.tamanho ? ' Tam ' + v.tamanho : ''}`,
+                data: v.createdAt || new Date()
+              }
+            });
+          }
+        }
+      }
+
+      // Consignações existentes
+      const consignadosLoja = await prisma.consignado.findMany({
+        where: { lojaId: req.lojaId },
+        include: {
+          usuario: { select: { nome: true } },
+          produtoVariacao: { include: { produto: true } }
+        }
+      });
+
+      for (const c of consignadosLoja) {
+        if (c.quantidadeConsignada > 0) {
+          const cod = c.produtoVariacao?.produto?.codigo || 'S/C';
+          const nomeP = c.produtoVariacao?.produto?.nome || 'Semijoia';
+          await prisma.movimentacaoEstoque.create({
+            data: {
+              lojaId: req.lojaId,
+              produtoId: c.produtoVariacao?.produtoId,
+              produtoVariacaoId: c.produtoVariacaoId,
+              codigoProduto: cod,
+              nomeProduto: nomeP,
+              skuVariacao: c.produtoVariacao?.sku,
+              tipo: 'SAIDA_CONSIGNACAO',
+              quantidade: c.quantidadeConsignada,
+              saldoAnterior: c.quantidadeConsignada,
+              saldoPosterior: 0,
+              local: 'MALETA_CONSIGNADA',
+              origemDestino: `Revendedora: ${c.usuario?.nome || 'Consultora'}`,
+              usuarioResponsavel: req.user.nome || 'Gestora',
+              observacao: 'Lote consignado ativo',
+              data: c.createdAt || new Date()
+            }
+          });
+        }
+      }
+
+      // Vendas diretas existentes
+      const vendasDiretasLoja = await prisma.vendaDireta.findMany({
+        where: { lojaId: req.lojaId }
+      });
+      for (const vd of vendasDiretasLoja) {
+        await prisma.movimentacaoEstoque.create({
+          data: {
+            lojaId: req.lojaId,
+            codigoProduto: vd.codigo,
+            nomeProduto: vd.nome,
+            tipo: 'VENDA_DIRETA',
+            quantidade: vd.quantidade || 1,
+            saldoAnterior: vd.quantidade || 1,
+            saldoPosterior: 0,
+            local: 'ESTOQUE_CENTRAL',
+            origemDestino: vd.nomeCliente ? `Cliente: ${vd.nomeCliente}` : 'Venda Direta - Balcão',
+            usuarioResponsavel: req.user.nome || 'Gestora',
+            observacao: `Pagamento: ${vd.formaPagamento || 'Pix'} - R$ ${(vd.preco * (vd.quantidade || 1)).toFixed(2)}`,
+            data: vd.data || new Date()
+          }
+        });
+      }
+
+      // Vendas de revendedoras existentes
+      const vendasRevLoja = await prisma.vendaRevendedora.findMany({
+        where: { lojaId: req.lojaId }
+      });
+      for (const vr of vendasRevLoja) {
+        await prisma.movimentacaoEstoque.create({
+          data: {
+            lojaId: req.lojaId,
+            produtoId: vr.produtoId,
+            codigoProduto: vr.codigoProduto,
+            nomeProduto: 'Semijoia Consignada',
+            tipo: 'VENDA_REVENDEDORA',
+            quantidade: vr.quantidade || 1,
+            saldoAnterior: vr.quantidade || 1,
+            saldoPosterior: 0,
+            local: 'MALETA_CONSIGNADA',
+            origemDestino: 'Venda de Consultora (Maleta)',
+            usuarioResponsavel: 'Revendedora',
+            observacao: `Venda registrada pela consultora`,
+            data: vr.data || new Date()
+          }
+        });
+      }
+    }
+
+    // 2. Consulta filtrada
+    let where = { lojaId: req.lojaId };
+
+    if (tipo && tipo !== 'TODOS' && tipo !== '') {
+      where.tipo = tipo;
+    }
+
+    if (inicio || fim) {
+      where.data = {};
+      if (inicio) where.data.gte = new Date(inicio);
+      if (fim) {
+        const dataFim = new Date(fim);
+        dataFim.setHours(23, 59, 59, 999);
+        where.data.lte = dataFim;
+      }
+    }
+
+    if (busca && busca.trim() !== '') {
+      const termoBusca = busca.trim();
+      where.OR = [
+        { codigoProduto: { contains: termoBusca } },
+        { nomeProduto: { contains: termoBusca } },
+        { origemDestino: { contains: termoBusca } },
+        { usuarioResponsavel: { contains: termoBusca } }
+      ];
+    }
+
+    const movimentacoes = await prisma.movimentacaoEstoque.findMany({
+      where,
+      orderBy: { data: 'desc' },
+      take: parseInt(limite) || 300
+    });
+
+    res.json(movimentacoes);
+  } catch (error) {
+    console.error("Erro ao listar movimentações de estoque:", error);
+    res.status(500).json({ error: 'Erro ao listar histórico de movimentações de estoque.' });
+  }
+});
+
+// 2. Resumo de Métricas de Movimentação de Estoque (Admin)
+app.get('/api/estoque/movimentacoes/resumo', autenticarJWT, autorizarRole(['Manager', 'SuperAdmin']), identificarLoja, autorizarPlano(['BRONZE', 'GOLD', 'PLATINUM']), async (req, res) => {
+  try {
+    const lojaId = req.lojaId;
+
+    const [entradas, consignacoes, devolucoes, vendasDiretas, vendasRev, perdasDefeitos] = await Promise.all([
+      prisma.movimentacaoEstoque.aggregate({
+        where: { lojaId, tipo: 'ENTRADA_MANUAL' },
+        _sum: { quantidade: true }
+      }),
+      prisma.movimentacaoEstoque.aggregate({
+        where: { lojaId, tipo: 'SAIDA_CONSIGNACAO' },
+        _sum: { quantidade: true }
+      }),
+      prisma.movimentacaoEstoque.aggregate({
+        where: { lojaId, tipo: 'DEVOLUCAO_CONSIGNACAO' },
+        _sum: { quantidade: true }
+      }),
+      prisma.movimentacaoEstoque.aggregate({
+        where: { lojaId, tipo: 'VENDA_DIRETA' },
+        _sum: { quantidade: true }
+      }),
+      prisma.movimentacaoEstoque.aggregate({
+        where: { lojaId, tipo: 'VENDA_REVENDEDORA' },
+        _sum: { quantidade: true }
+      }),
+      prisma.movimentacaoEstoque.aggregate({
+        where: { lojaId, tipo: { in: ['PERDA', 'DEFEITO'] } },
+        _sum: { quantidade: true }
+      })
+    ]);
+
+    const totalEntradas = entradas._sum.quantidade || 0;
+    const totalConsignado = consignacoes._sum.quantidade || 0;
+    const totalDevolvido = devolucoes._sum.quantidade || 0;
+    const totalVendas = (vendasDiretas._sum.quantidade || 0) + (vendasRev._sum.quantidade || 0);
+    const totalAvarias = perdasDefeitos._sum.quantidade || 0;
+
+    res.json({
+      totalEntradas,
+      totalConsignado,
+      totalDevolvido,
+      totalVendas,
+      totalAvarias
+    });
+  } catch (error) {
+    console.error("Erro ao obter resumo de movimentações:", error);
+    res.status(500).json({ error: 'Erro ao calcular resumo de movimentações.' });
+  }
+});
 
 // Listar Produtos (com filtro de segurança para revendedoras)
 app.get('/api/produtos', autenticarJWT, identificarLoja, async (req, res) => {
@@ -1875,6 +2186,24 @@ app.post('/api/consignacoes', autenticarJWT, autorizarRole(['Manager', 'SuperAdm
     const nomeRevendedora = revendedora.nome;
     registrarLog(req, "CONSIGNACAO_CRIAR", `Consignou ${qtdParsed} unidades do produto ${produto.nome} (SKU: ${variacao.sku}) para a revendedora ${nomeRevendedora}.`);
 
+    // Registra no histórico de movimentações de estoque
+    registrarMovimentacaoEstoque({
+      lojaId: req.lojaId,
+      produtoId: produto.id,
+      produtoVariacaoId: variacao.id,
+      codigoProduto: produto.codigo,
+      nomeProduto: produto.nome,
+      skuVariacao: variacao.sku,
+      tipo: 'SAIDA_CONSIGNACAO',
+      quantidade: qtdParsed,
+      saldoAnterior: estoqueDisponivelReal,
+      saldoPosterior: Math.max(0, estoqueDisponivelReal - qtdParsed),
+      local: 'MALETA_CONSIGNADA',
+      origemDestino: `Revendedora: ${nomeRevendedora}`,
+      usuarioResponsavel: req.user.nome || 'Gestora',
+      observacao: `Envio para maleta consignada - R$ ${precoVendaCalculado.toFixed(2)} cada`
+    });
+
     // Dispara notificação no sistema para a revendedora
     try {
       await criarNotificacao(
@@ -1962,6 +2291,24 @@ app.post('/api/consignacoes/devolver', autenticarJWT, autorizarRole(['Manager', 
     });
 
     await registrarLog(req, 'CONSIGNACAO_DEVOLVER', `Devolveu ${qtdParsed} unidades do produto ${consignado.produtoVariacao.produto.nome} (SKU: ${consignado.produtoVariacao.sku}) da maleta da revendedora ${consignado.usuario.nome} para o estoque central.`);
+    
+    // Registra no histórico de movimentações de estoque
+    registrarMovimentacaoEstoque({
+      lojaId: req.lojaId,
+      produtoId: consignado.produtoVariacao?.produto?.id,
+      produtoVariacaoId: consignado.produtoVariacaoId,
+      codigoProduto: consignado.produtoVariacao?.produto?.codigo || 'S/C',
+      nomeProduto: consignado.produtoVariacao?.produto?.nome || 'Semijoia',
+      skuVariacao: consignado.produtoVariacao?.sku,
+      tipo: 'DEVOLUCAO_CONSIGNACAO',
+      quantidade: qtdParsed,
+      saldoAnterior: consignado.quantidadeConsignada,
+      saldoPosterior: Math.max(0, consignado.quantidadeConsignada - qtdParsed),
+      local: 'ESTOQUE_CENTRAL',
+      origemDestino: `Devolução: ${consignado.usuario?.nome || 'Revendedora'}`,
+      usuarioResponsavel: req.user.nome || 'Gestora',
+      observacao: 'Devolução avulsa para o estoque central'
+    });
     
     // Dispara notificação para a administradora
     try {
@@ -2083,9 +2430,61 @@ app.post('/api/acertos', autenticarJWT, autorizarRole(['Manager', 'SuperAdmin'])
 
         // 1. As devoluções normais retornam ao Estoque Central da variação SE NÃO forem retidas com a revendedora
         if (qtdDevolvida > 0 && varId && !reterEstoqueComRevendedora) {
+          const varAtual = await tx.produtoVariacao.findUnique({
+            where: { id: varId },
+            include: { produto: true }
+          });
+          const saldoAnt = varAtual ? varAtual.quantidade : 0;
           await tx.produtoVariacao.update({
             where: { id: varId },
             data: { quantidade: { increment: qtdDevolvida } }
+          });
+
+          await tx.movimentacaoEstoque.create({
+            data: {
+              lojaId: req.lojaId,
+              produtoId: varAtual?.produtoId,
+              produtoVariacaoId: varId,
+              codigoProduto: varAtual?.produto?.codigo || 'S/C',
+              nomeProduto: varAtual?.produto?.nome || 'Semijoia',
+              skuVariacao: varAtual?.sku,
+              tipo: 'DEVOLUCAO_CONSIGNACAO',
+              quantidade: qtdDevolvida,
+              saldoAnterior: saldoAnt,
+              saldoPosterior: saldoAnt + qtdDevolvida,
+              local: 'ESTOQUE_CENTRAL',
+              origemDestino: `Acerto: ${revendedora.nome}`,
+              usuarioResponsavel: req.user.nome || 'JOAIS KLOCKS',
+              observacao: `Retorno ao estoque no fechamento do acerto`,
+              data: new Date()
+            }
+          });
+        }
+
+        // Registro de movimentação de venda da revendedora no acerto
+        if (qtdVendida > 0 && varId) {
+          const varVend = await tx.produtoVariacao.findUnique({
+            where: { id: varId },
+            include: { produto: true }
+          });
+          await tx.movimentacaoEstoque.create({
+            data: {
+              lojaId: req.lojaId,
+              produtoId: varVend?.produtoId,
+              produtoVariacaoId: varId,
+              codigoProduto: varVend?.produto?.codigo || 'S/C',
+              nomeProduto: varVend?.produto?.nome || 'Semijoia',
+              skuVariacao: varVend?.sku,
+              tipo: 'VENDA_REVENDEDORA',
+              quantidade: qtdVendida,
+              saldoAnterior: 0,
+              saldoPosterior: 0,
+              local: 'MALETA_CONSIGNADA',
+              origemDestino: `Revendedora: ${revendedora.nome}`,
+              usuarioResponsavel: revendedora.nome,
+              observacao: `Venda confirmada no acerto - R$ ${(precoItem * qtdVendida).toFixed(2)}`,
+              data: new Date()
+            }
           });
         }
 
@@ -2205,6 +2604,40 @@ app.post('/api/acertos', autenticarJWT, autorizarRole(['Manager', 'SuperAdmin'])
       console.error("Erro ao gerar notificação de acerto concluído:", notifErr);
     }
 
+    // Dispara notificação via WhatsApp se a consultora tiver telefone
+    if (revendedora.whatsapp) {
+      try {
+        const configLoja = await prisma.configuracao.findFirst({ where: { lojaId: req.lojaId } });
+        const nomeEmpresa = configLoja ? configLoja.nomeEmpresa : 'Conecta Joias';
+        const urlPortal = process.env.FRONTEND_URL || 'http://localhost:8080';
+        const linkRecibo = `${urlPortal}/pages/recibo.html?id=${acertoResult.acerto.id}`;
+
+        const msgAcerto = `🎉 *Acerto de Comissão Realizado — ${nomeEmpresa}* 💎\nParabéns, *${revendedora.nome}*! 👏\n\n📊 *Resumo:* \n• Vendas: R$ ${acertoResult.faturamentoBruto.toFixed(2)}\n• Devolvidas: ${totalDevolvida} peças\n• Comissão a Receber: *R$ ${acertoResult.comissaoPaga.toFixed(2)}*\n\n🧾 Comprovante: ${linkRecibo}`;
+
+        await prisma.mensagemWhatsapp.create({
+          data: {
+            lojaId: req.lojaId,
+            numero: revendedora.whatsapp,
+            mensagem: msgAcerto,
+            tipo: 'ACERTO',
+            status: 'PENDENTE'
+          }
+        });
+
+        whatsappService.enviarAvisoAcerto({
+          nome: revendedora.nome,
+          telefone: revendedora.whatsapp,
+          nomeLoja: nomeEmpresa,
+          faturamentoBruto: acertoResult.faturamentoBruto,
+          comissaoLiquida: acertoResult.comissaoPaga,
+          totalDevolvida,
+          linkRecibo
+        }).catch(err => console.error('⚠️ [WhatsApp] Erro envio acerto:', err.message));
+      } catch (zapAcertoErr) {
+        console.error('⚠️ [WhatsApp] Falha ao registrar mensagem de acerto:', zapAcertoErr.message);
+      }
+    }
+
     res.json({
       message: 'Acerto concluído com sucesso!',
       acerto: acertoResult.acerto
@@ -2312,6 +2745,24 @@ app.post('/api/vendas-diretas', autenticarJWT, autorizarRole(['Manager', 'SuperA
         data: { quantidade: novaQtd }
       });
     }
+
+    // Registra no histórico de movimentações de estoque
+    const saldoAnt = produto && produto.variacoes.length > 0 ? produto.variacoes[0].quantidade + qtd : qtd;
+    const saldoPost = produto && produto.variacoes.length > 0 ? produto.variacoes[0].quantidade : 0;
+    registrarMovimentacaoEstoque({
+      lojaId: req.lojaId,
+      produtoId: produto ? produto.id : null,
+      codigoProduto: codigo,
+      nomeProduto: nome,
+      tipo: 'VENDA_DIRETA',
+      quantidade: qtd,
+      saldoAnterior: saldoAnt,
+      saldoPosterior: saldoPost,
+      local: 'ESTOQUE_CENTRAL',
+      origemDestino: nomeCliente ? `Cliente: ${nomeCliente}` : 'Venda Direta - Balcão',
+      usuarioResponsavel: req.user.nome || 'Gestora',
+      observacao: `Venda Direta - Total: R$ ${(preco * qtd).toFixed(2)} (${forma || 'Pix'})`
+    });
 
     res.status(201).json(venda);
   } catch (error) {
@@ -2694,6 +3145,24 @@ app.post('/api/vendas-revendedora', autenticarJWT, autorizarRole(['Consultant'])
     }
 
 
+
+    await registrarMovimentacaoEstoque({
+      lojaId: req.lojaId,
+      produtoId: produto.id,
+      produtoVariacaoId: variacao.id,
+      codigoProduto: produto.codigo,
+      nomeProduto: produto.nome,
+      skuVariacao: variacao.sku,
+      tipo: 'VENDA_REVENDEDORA',
+      quantidade: qtdParsed,
+      saldoAnterior: 0,
+      saldoPosterior: 0,
+      local: 'MALETA_CONSIGNADA',
+      origemDestino: `Revendedora: ${consignado.usuario.nome}`,
+      usuarioResponsavel: consignado.usuario.nome,
+      observacao: `Venda registrada no app (${formaPagamento || 'Dinheiro'}) - R$ ${(precoFinal * qtdParsed).toFixed(2)}`,
+      data: new Date()
+    });
 
     res.status(201).json({
       venda,
@@ -3782,15 +4251,29 @@ app.post('/api/public/solicitar-recuperacao-senha', signupLimiter, async (req, r
       expiresAt: Date.now() + 15 * 60 * 1000
     });
 
+    // Disparo por WhatsApp se houver número cadastrado
     if (usuario.whatsapp) {
-      console.log(`🔑 [Recuperação de Senha] Código gerado para ${usuario.nome}: ${codigo}`);
+      whatsappService.enviarCodigoRecuperacao({
+        nome: usuario.nome,
+        telefone: usuario.whatsapp,
+        codigo
+      }).catch(err => console.error('⚠️ [WhatsApp Recuperação] Erro:', err.message));
+    }
+
+    // Disparo por E-mail se houver e-mail válido
+    if (usuario.email && usuario.email.includes('@')) {
+      emailService.enviarCodigoRecuperacao({
+        para: usuario.email,
+        nome: usuario.nome,
+        codigo
+      }).catch(err => console.error('⚠️ [E-mail Recuperação] Erro:', err.message));
     }
 
     res.json({
       success: true,
-      message: 'Código de verificação gerado!',
+      message: 'Código de verificação enviado para os seus canais de contato cadastrados!',
       usuarioId: usuario.id,
-      codigoSimulado: codigo
+      codigoSimulado: process.env.NODE_ENV === 'production' ? undefined : codigo
     });
   } catch (error) {
     console.error('Erro ao solicitar recuperação de senha:', error);
@@ -4237,91 +4720,66 @@ app.post('/api/public/pagamento/:id/confirmar', async (req, res) => {
   }
 });
 
-// Rota para criar assinatura ou preferência de pagamento no Mercado Pago (Assinaturas / Checkout Pro)
-// Rota para criar assinatura ou preferência de pagamento no Mercado Pago (Assinaturas / Checkout Pro)
+// ==============================================================================
+// MERCADO PAGO - ASSINATURAS COM PLANO ASSOCIADO (/preapproval_plan & /preapproval)
+// ==============================================================================
+
+// Rota Principal de Assinatura Recorrente (Cakto Pay)
 app.post('/api/criar-pagamento', async (req, res) => {
   try {
-    const { usuarioId, planoNome, preco } = req.body;
+    const { usuarioId, planoNome } = req.body;
     const nomePlanoClean = String(planoNome || 'Plano Gold').trim();
-    const precoNum = Number(preco) || 297;
     const planoRefClean = nomePlanoClean.toUpperCase().includes('BRONZE') ? 'BRONZE' : (nomePlanoClean.toUpperCase().includes('PLATINUM') ? 'PLATINUM' : 'GOLD');
-    const externalRef = `${usuarioId || 'admin'}|${planoRefClean}`;
-    
-    // Detecta dinamicamente a URL de origem do Frontend (ex: http://localhost:8080 de scripts/start.bat ou http://localhost:5500)
-    let originUrl = req.headers.origin;
-    if (!originUrl && req.headers.referer) {
-      try { originUrl = new URL(req.headers.referer).origin; } catch (e) {}
-    }
-    const frontendUrl = originUrl || process.env.FRONTEND_URL || 'http://localhost:8080';
-    // Public URL para recebimento de webhooks do Mercado Pago.
-    // Prioridade: variável de ambiente > autodetecção pelo header host da requisição > fallback local
-    const publicUrl = process.env.PUBLIC_URL
-      || (req.headers.host && !req.headers.host.includes('localhost') && !req.headers.host.includes('127.0.0.1')
-          ? `https://${req.headers.host}`
-          : null)
-      || 'http://localhost:5000';
+    const refString = `${usuarioId || 'admin'}|${planoRefClean}`;
 
-    const isSandbox = (process.env.MP_ACCESS_TOKEN || '').startsWith('TEST-');
-
-    // 1. Tenta criar link de assinatura recorrente mensal via Mercado Pago (Preapproval)
-    try {
-      if (typeof Preapproval !== 'undefined') {
-        const preapproval = new Preapproval(clientMercadoPago);
-        const response = await preapproval.create({
-          body: {
-            reason: `Assinatura ${nomePlanoClean} - Conecta Joias`,
-            auto_recurring: {
-              frequency: 1,
-              frequency_type: 'months',
-              transaction_amount: precoNum,
-              currency_id: 'BRL'
-            },
-            back_url: `${frontendUrl}/pages/sucesso.html`,
-            external_reference: externalRef,
-            status: 'authorized'
-          }
-        });
-
-        if (response) {
-          const linkSub = isSandbox ? response.sandbox_init_point : response.init_point;
-          if (linkSub) {
-            console.log(`✅ [Mercado Pago Assinatura] Link recorrente gerado (${isSandbox ? 'Sandbox' : 'Production'}): ${linkSub}`);
-            return res.status(200).json({ linkDePagamento: linkSub });
-          }
-        }
-      }
-    } catch (subErr) {
-      console.warn('⚠️ Falha ao criar assinatura no MP, usando checkout padrão:', subErr.message || subErr);
+    let baseUrl = process.env.CAKTO_LINK_GOLD || 'https://pay.cakto.com.br/hzyzntj';
+    if (planoRefClean === 'BRONZE') {
+      baseUrl = process.env.CAKTO_LINK_BRONZE || 'https://pay.cakto.com.br/hzi4fxm_1185271';
+    } else if (planoRefClean === 'PLATINUM') {
+      baseUrl = process.env.CAKTO_LINK_PLATINUM || 'https://pay.cakto.com.br/34zr7nh';
     }
 
-    // 2. Fallback: Preferência de Checkout Pro Mercado Pago
-    const preference = new Preference(clientMercadoPago);
-    const response = await preference.create({
-      body: {
-        items: [
-          {
-            title: `Assinatura ${nomePlanoClean} - Conecta Joias`,
-            quantity: 1,
-            unit_price: precoNum,
-            currency_id: 'BRL'
-          }
-        ],
-        external_reference: externalRef,
-        notification_url: `${publicUrl}/api/webhook/mercadopago`,
-        back_urls: {
-          success: `${frontendUrl}/pages/sucesso.html`,
-          failure: `${frontendUrl}/pages/falha.html`,
-          pending: `${frontendUrl}/pages/sucesso.html`
-        }
-      }
+    const separator = baseUrl.includes('?') ? '&' : '?';
+    const checkoutUrl = `${baseUrl}${separator}src=${encodeURIComponent(refString)}&custom_id=${encodeURIComponent(refString)}&external_reference=${encodeURIComponent(refString)}`;
+
+    console.log(`✅ [Cakto Pay] Assinatura criada (${planoRefClean}): ${checkoutUrl}`);
+    return res.status(200).json({
+      linkDePagamento: checkoutUrl,
+      provider: 'CAKTO',
+      plano: planoRefClean
     });
-
-    const linkPref = isSandbox ? response.sandbox_init_point : response.init_point;
-    console.log(`✅ [Mercado Pago Preferência] Link de pagamento gerado (${isSandbox ? 'Sandbox' : 'Production'}): ${linkPref}`);
-    return res.status(200).json({ linkDePagamento: linkPref });
   } catch (error) {
-    console.error('Erro ao criar pagamento/assinatura no Mercado Pago:', error);
-    return res.status(500).json({ error: 'Erro ao processar criação de pagamento no Mercado Pago' });
+    console.error('Erro ao criar assinatura:', error);
+    return res.status(500).json({ error: error.message || 'Erro ao processar criação de assinatura' });
+  }
+});
+
+// Endpoint exclusivo da Cakto Pay
+app.post('/api/cakto/criar-assinatura', async (req, res) => {
+  try {
+    const { usuarioId, planoNome } = req.body;
+    const nomePlanoClean = String(planoNome || 'Plano Gold').trim();
+    const planoRefClean = nomePlanoClean.toUpperCase().includes('BRONZE') ? 'BRONZE' : (nomePlanoClean.toUpperCase().includes('PLATINUM') ? 'PLATINUM' : 'GOLD');
+    const refString = `${usuarioId || 'admin'}|${planoRefClean}`;
+
+    let baseUrl = process.env.CAKTO_LINK_GOLD || 'https://pay.cakto.com.br/gold-conecta-joias';
+    if (planoRefClean === 'BRONZE') {
+      baseUrl = process.env.CAKTO_LINK_BRONZE || 'https://pay.cakto.com.br/bronze-conecta-joias';
+    } else if (planoRefClean === 'PLATINUM') {
+      baseUrl = process.env.CAKTO_LINK_PLATINUM || 'https://pay.cakto.com.br/platinum-conecta-joias';
+    }
+
+    const separator = baseUrl.includes('?') ? '&' : '?';
+    const checkoutUrl = `${baseUrl}${separator}src=${encodeURIComponent(refString)}&custom_id=${encodeURIComponent(refString)}&external_reference=${encodeURIComponent(refString)}`;
+
+    return res.status(200).json({
+      linkDePagamento: checkoutUrl,
+      provider: 'CAKTO',
+      plano: planoRefClean
+    });
+  } catch (error) {
+    console.error('Erro na rota /api/cakto/criar-assinatura:', error);
+    return res.status(500).json({ error: error.message || 'Erro ao criar assinatura no Cakto Pay' });
   }
 });
 
@@ -4576,6 +5034,147 @@ app.post('/api/webhooks/asaas', async (req, res) => {
   res.json({ received: true });
 });
 
+// ==============================================================================
+// WEBHOOK CAKTO PAY — ATUALIZAÇÃO AUTOMÁTICA DE PLANOS NO SUPABASE / PRISMA
+// ==============================================================================
+app.post('/api/webhook/cakto', async (req, res) => {
+  // Retorno imediato HTTP 200 para confirmar recebimento à Cakto Pay
+  res.status(200).send('OK');
+
+  try {
+    const secretEsperado = process.env.CAKTO_WEBHOOK_SECRET;
+    const secretRecebido = req.body?.secret || req.headers['x-cakto-secret'];
+
+    if (secretEsperado && secretRecebido && secretRecebido !== secretEsperado) {
+      console.warn('⚠️ [Webhook Cakto Pay] Tentativa de acesso com secret inválido.');
+      return;
+    }
+
+    const payload = req.body || {};
+    const event = (payload.event || payload.type || payload.action || '').toLowerCase();
+    
+    // Trata data como Array (disparo Agrupado) ou Objeto (disparo Individual)
+    const dataRaw = payload.data || payload;
+    const firstItem = Array.isArray(dataRaw) ? (dataRaw[0] || {}) : dataRaw;
+
+    // Rastreia referência da loja/usuário enviada no checkout (src, custom_id, utm_source, sck, external_reference)
+    const rawRef = firstItem.src
+      || firstItem.custom_id
+      || firstItem.external_reference
+      || firstItem.utm_source
+      || firstItem.sck
+      || firstItem.tracker_id
+      || payload.src
+      || payload.custom_id
+      || '';
+
+    console.log(`💳 [Webhook Cakto Pay] Evento recebido: "${event}" | Referência: "${rawRef}"`);
+
+    const parts = rawRef.split('|');
+    let usuarioId = parts[0];
+    let planoExt = parts[1] || 'GOLD';
+
+    // Se o plano não veio na referência, identifica pelo nome do produto/oferta da Cakto
+    if (!parts[1]) {
+      const nomeProd = (firstItem.product?.name || firstItem.offer?.name || '').toUpperCase();
+      if (nomeProd.includes('BRONZE')) planoExt = 'BRONZE';
+      else if (nomeProd.includes('PLATINUM')) planoExt = 'PLATINUM';
+      else if (nomeProd.includes('GOLD')) planoExt = 'GOLD';
+    }
+
+    // Busca o usuário no banco pelo ID ou fallback pelo E-mail do comprador
+    let usuario = null;
+    if (usuarioId) {
+      usuario = await prisma.usuario.findUnique({ where: { id: usuarioId } }).catch(() => null);
+    }
+    if (!usuario && firstItem.customer?.email) {
+      usuario = await prisma.usuario.findUnique({ where: { email: firstItem.customer.email } }).catch(() => null);
+    }
+
+    let lojaTargetId = (usuario && usuario.lojaId) ? usuario.lojaId : (usuarioId || null);
+    let lojaExiste = lojaTargetId ? await prisma.loja.findUnique({ where: { id: lojaTargetId } }).catch(() => null) : null;
+    
+    if (!lojaExiste) {
+      // Fallback: busca a loja padrão se for teste do painel da Cakto
+      lojaExiste = await prisma.loja.findFirst().catch(() => null);
+      if (lojaExiste) lojaTargetId = lojaExiste.id;
+    }
+
+    if (lojaExiste) {
+      // Eventos de APROVAÇÃO / RENOVAÇÃO DA ASSINATURA
+      const eventosAprovados = [
+        'purchase_approved',
+        'subscription_renewed',
+        'payment_approved',
+        'order_approved',
+        'approved',
+        'paid'
+      ];
+
+      // Eventos de CANCELAMENTO / ESTORNO / FALHA
+      const eventosCancelados = [
+        'subscription_canceled',
+        'subscription_refunded',
+        'refunded',
+        'canceled',
+        'cancelled',
+        'charged_back',
+        'rejected',
+        'failed'
+      ];
+
+      if (eventosAprovados.includes(event)) {
+        const dataVencimento = new Date();
+        dataVencimento.setDate(dataVencimento.getDate() + 30);
+
+        const novoPlanoFinal = lojaExiste.downgradePendente || planoExt;
+
+        await prisma.loja.update({
+          where: { id: lojaTargetId },
+          data: {
+            statusPlano: 'ATIVO',
+            plano: novoPlanoFinal,
+            downgradePendente: null,
+            vencimentoPlano: dataVencimento
+          }
+        });
+
+        await prisma.logAcao.create({
+          data: {
+            usuarioId: usuario ? usuario.id : 'SISTEMA',
+            acao: 'PLANO_SAAS_PAGO_CAKTO',
+            detalhes: `Assinatura do Plano ${novoPlanoFinal} confirmada via Webhook Cakto Pay (${event}). Vencimento renovado até ${dataVencimento.toLocaleDateString('pt-BR')}.`
+          }
+        });
+
+        console.log(`✅ [Webhook Cakto Pay -> Supabase/Prisma] Pagamento APROVADO! Plano ${novoPlanoFinal} ativado com sucesso para a Loja ${lojaTargetId}.`);
+      } else if (eventosCancelados.includes(event)) {
+        await prisma.loja.update({
+          where: { id: lojaTargetId },
+          data: {
+            statusPlano: 'SUSPENSO',
+            plano: 'BASICO'
+          }
+        });
+
+        await prisma.logAcao.create({
+          data: {
+            usuarioId: usuario ? usuario.id : 'SISTEMA',
+            acao: 'PLANO_SAAS_SUSPENSO_CAKTO',
+            detalhes: `Assinatura alterada para BÁSICO/SUSPENSO via Webhook Cakto Pay (${event}).`
+          }
+        });
+
+        console.log(`⚠️ [Webhook Cakto Pay -> Supabase/Prisma] Evento ${event.toUpperCase()}! Loja ${lojaTargetId} alterada para Plano BÁSICO / SUSPENSO.`);
+      }
+    } else {
+      console.warn(`⚠️ [Webhook Cakto Pay] Nenhuma loja encontrada para processar o webhook.`);
+    }
+  } catch (err) {
+    console.error('❌ Erro ao processar webhook da Cakto Pay:', err);
+  }
+});
+
 // 4. Criar Termo de Responsabilidade/Consignação (Admin)
 app.post('/api/termos/gerar', autenticarJWT, autorizarRole(['Manager', 'SuperAdmin']), identificarLoja, autorizarPlano(['GOLD', 'PLATINUM']), async (req, res) => {
   const { usuarioId, titulo, conteudo, prazoDevolucao } = req.body;
@@ -4602,6 +5201,23 @@ app.post('/api/termos/gerar', autenticarJWT, autorizarRole(['Manager', 'SuperAdm
         { termoId: termo.id, titulo },
         usuarioId
       );
+
+      // Dispara notificação por WhatsApp com o link direto de assinatura
+      const revendedora = await prisma.usuario.findUnique({ where: { id: usuarioId } });
+      if (revendedora && revendedora.whatsapp) {
+        const configLoja = await prisma.configuracao.findFirst({ where: { lojaId: req.lojaId } });
+        const nomeEmpresa = configLoja ? configLoja.nomeEmpresa : 'Conecta Joias';
+        const urlPortal = process.env.FRONTEND_URL || 'http://localhost:8080';
+        const linkAssinatura = `${urlPortal}/pages/termo_assinatura.html?id=${termo.id}`;
+
+        whatsappService.enviarAvisoTermoConsignacao({
+          nome: revendedora.nome,
+          telefone: revendedora.whatsapp,
+          nomeLoja: nomeEmpresa,
+          titulo,
+          linkAssinatura
+        }).catch(err => console.error('⚠️ [WhatsApp Termo] Erro:', err.message));
+      }
     } catch (notifErr) {
       console.error("Erro ao gerar notificação de solicitação de termo:", notifErr);
     }
@@ -4679,17 +5295,60 @@ app.post('/api/public/termos/:id/assinar', async (req, res) => {
       }
     });
 
+    // Salva imagem gráfica da assinatura no disco se fornecida
+    if (assinaturaImg && assinaturaImg.startsWith('data:image')) {
+      try {
+        const base64Data = assinaturaImg.replace(/^data:image\/\w+;base64,/, '');
+        const imgBuffer = Buffer.from(base64Data, 'base64');
+        const imgPath = path.join(ASSINATURAS_DIR, `termo_${id}.png`);
+        fs.writeFileSync(imgPath, imgBuffer);
+      } catch (saveErr) {
+        console.error('Erro ao salvar arquivo de assinatura gráfica:', saveErr.message);
+      }
+    }
+
     try {
       const usr = await prisma.usuario.findUnique({ where: { id: termo.usuarioId } });
+      const lojaId = usr ? usr.lojaId : 'default-loja';
+      const urlPortal = process.env.FRONTEND_URL || 'http://localhost:8080';
+      const linkPdf = `${urlPortal}/api/public/termos/${id}/pdf`;
+      const dataFormatada = new Date().toLocaleString('pt-BR');
+
+      // 1. Notificação interna na plataforma
       await criarNotificacao(
-        usr ? usr.lojaId : 'default-loja',
+        lojaId,
         'termo_assinado',
         `A revendedora ${nome} assinou o Termo da Maleta: "${termo.titulo}".`,
-        { termoId: id, nome, cpf },
+        { termoId: id, nome, cpf, linkPdf },
         null
       );
+
+      // 2. Notificação por E-mail para a Gestora da Loja
+      const gestora = await prisma.usuario.findFirst({
+        where: { lojaId, role: 'Manager' }
+      });
+      if (gestora && gestora.email) {
+        emailService.enviarNotificacaoTermoAssinado({
+          para: gestora.email,
+          nomeGestora: gestora.nome,
+          nomeRevendedora: nome,
+          tituloTermo: termo.titulo,
+          dataAssinatura: dataFormatada,
+          linkPdf
+        }).catch(err => console.error('⚠️ [E-mail Termo] Erro:', err.message));
+      }
+
+      // 3. Notificação por WhatsApp para a Revendedora com link do PDF
+      if (usr && usr.whatsapp) {
+        const configLoja = await prisma.configuracao.findFirst({ where: { lojaId } });
+        const nomeEmpresa = configLoja ? configLoja.nomeEmpresa : 'Conecta Joias';
+        const msgPdf = `✅ *Termo Assinado com Sucesso — ${nomeEmpresa}* 💎\nOlá, *${nome}*! O termo *"${termo.titulo}"* foi homologado com certificado eletrônico.\n\n📄 Baixe sua via em PDF oficial:\n🔗 ${linkPdf}`;
+        
+        whatsappService.enviarMensagem(usr.whatsapp, msgPdf)
+          .catch(err => console.error('⚠️ [WhatsApp Termo Assinado] Erro:', err.message));
+      }
     } catch (notifErr) {
-      console.error("Erro ao gerar notificação de assinatura de termo:", notifErr);
+      console.error("Erro ao gerar notificações de assinatura de termo:", notifErr);
     }
 
     // Atualiza status no usuário também
@@ -4707,10 +5366,101 @@ app.post('/api/public/termos/:id/assinar', async (req, res) => {
       }
     });
 
-    res.json({ message: 'Termo assinado com sucesso!', termo: termoAssinado });
+    const urlPortal = process.env.FRONTEND_URL || 'http://localhost:8080';
+    res.json({
+      message: 'Termo assinado com sucesso!',
+      termo: termoAssinado,
+      pdfUrl: `${urlPortal}/api/public/termos/${id}/pdf`
+    });
   } catch (error) {
     console.error('Erro ao assinar termo:', error);
     res.status(500).json({ error: 'Erro ao processar assinatura eletrônica.' });
+  }
+});
+
+// Emissão e Download do PDF Oficial do Termo Consignado (Público)
+app.get('/api/public/termos/:id/pdf', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const termo = await prisma.termoConsignacao.findUnique({
+      where: { id },
+      include: {
+        usuario: {
+          include: {
+            loja: true
+          }
+        }
+      }
+    });
+
+    if (!termo) {
+      return res.status(404).json({ error: 'Termo de consignação não encontrado.' });
+    }
+
+    const revendedora = termo.usuario || {};
+    const loja = revendedora.loja || { nome: 'Conecta Joias' };
+
+    // Busca itens consignados da revendedora
+    const consignados = await prisma.consignado.findMany({
+      where: { usuarioId: termo.usuarioId },
+      include: {
+        produtoVariacao: {
+          include: {
+            produto: true
+          }
+        }
+      }
+    });
+
+    const itensMapeados = consignados.map(c => ({
+      codigo: c.produtoVariacao?.produto?.codigo || '-',
+      nome: c.produtoVariacao?.produto?.nome || 'Peça Consignada',
+      quantidade: c.quantidadeConsignada || 1,
+      precoVenda: c.precoVenda || 0
+    }));
+
+    // Verifica se há imagem de assinatura salva em disco
+    const imgPath = path.join(ASSINATURAS_DIR, `termo_${id}.png`);
+    let assinaturaImgBase64 = null;
+    if (fs.existsSync(imgPath)) {
+      const imgBuffer = fs.readFileSync(imgPath);
+      assinaturaImgBase64 = `data:image/png;base64,${imgBuffer.toString('base64')}`;
+    }
+
+    const termoParaPdf = {
+      ...termo,
+      assinaturaImg: assinaturaImgBase64
+    };
+
+    const pdfBuffer = await pdfService.gerarPdfTermoConsignacao({
+      termo: termoParaPdf,
+      loja,
+      revendedora,
+      itens: itensMapeados
+    });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="termo-consignacao-${id.substring(0, 8)}.pdf"`);
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error('Erro ao gerar PDF do termo:', error);
+    res.status(500).json({ error: 'Erro ao gerar documento PDF do termo.' });
+  }
+});
+
+// Rota autenticada para download do PDF
+app.get('/api/termos/:id/pdf', autenticarJWT, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const termo = await prisma.termoConsignacao.findUnique({ where: { id } });
+    if (!termo) {
+      return res.status(404).json({ error: 'Termo de consignação não encontrado.' });
+    }
+    // Redireciona internamente para o gerador de PDF
+    const publicUrl = `/api/public/termos/${id}/pdf`;
+    return res.redirect(publicUrl);
+  } catch (err) {
+    return res.status(500).json({ error: 'Erro ao obter termo.' });
   }
 });
 
@@ -5068,12 +5818,12 @@ app.get('/api/saas/meu-plano', autenticarJWTOpcional, identificarLoja, async (re
     });
     const totalEstoque = totalProdutos._sum.quantidade || 0;
 
-    // Limites de acordo com os 4 planos (Básico zerado e preços atualizados)
+    // Limites de acordo com os 4 planos (Básico zerado e preços em R$ 1,00 para teste)
     const limites = {
       BASICO: { consultoras: 0, estoque: 0, valor: 0.00 },
-      BRONZE: { consultoras: 5, estoque: 300, valor: 69.90 },
-      GOLD: { consultoras: 25, estoque: 1500, valor: 99.90 },
-      PLATINUM: { consultoras: 9999, estoque: 99999, valor: 249.90 }
+      BRONZE: { consultoras: 5, estoque: 300, valor: 1.00 },
+      GOLD: { consultoras: 25, estoque: 1500, valor: 1.00 },
+      PLATINUM: { consultoras: 9999, estoque: 99999, valor: 1.00 }
     };
 
     const limiteAtual = limites[planoStr] || limites.BASICO;
@@ -5099,9 +5849,9 @@ app.get('/api/saas/meu-plano', autenticarJWTOpcional, identificarLoja, async (re
         limiteEstoque: limiteAtual.estoque
       },
       planosDisponiveis: [
-        { id: 'BRONZE', nome: 'Plano Bronze', valor: 69.90, limiteConsultoras: 5, limiteEstoque: 300 },
-        { id: 'GOLD', nome: 'Plano Gold', valor: 99.90, limiteConsultoras: 25, limiteEstoque: 1500, popular: true },
-        { id: 'PLATINUM', nome: 'Plano Platinum', valor: 249.90, limiteConsultoras: 'Ilimitado', limiteEstoque: 'Ilimitado' }
+        { id: 'BRONZE', nome: 'Plano Bronze', valor: 1.00, limiteConsultoras: 5, limiteEstoque: 300 },
+        { id: 'GOLD', nome: 'Plano Gold', valor: 1.00, limiteConsultoras: 25, limiteEstoque: 1500, popular: true },
+        { id: 'PLATINUM', nome: 'Plano Platinum', valor: 1.00, limiteConsultoras: 'Ilimitado', limiteEstoque: 'Ilimitado' }
       ]
     });
   } catch (error) {
@@ -5156,7 +5906,19 @@ app.post('/api/saas/confirmar-retorno-pagamento', autenticarJWTOpcional, identif
       }
     }
 
-    // 3. Segurança: Se nenhum método identificou a loja, aborta com erro claro
+    // 3. Fallback adicional: Tenta identificar via req.lojaId (header) ou pega a primeira loja da conta
+    if (!lojaTargetId && req.lojaId && req.lojaId !== 'default-loja') {
+      lojaTargetId = req.lojaId;
+    }
+    if (!lojaTargetId) {
+      const primeiraLoja = await prisma.loja.findFirst();
+      if (primeiraLoja) {
+        lojaTargetId = primeiraLoja.id;
+        console.log(`[ConfirmarRetorno] Loja identificada via fallback (primeira loja): ${lojaTargetId}`);
+      }
+    }
+
+    // 4. Segurança: Se nenhum método identificou a loja, aborta com erro claro
     if (!lojaTargetId) {
       console.error(`[ConfirmarRetorno] ERRO: Não foi possível identificar a loja. user=${JSON.stringify(req.user)}, refId=${refId}, lojaId=${req.lojaId}`);
       return res.status(400).json({
@@ -5495,17 +6257,43 @@ app.get('/api/whatsapp/fila', autenticarJWT, autorizarRole(['Manager', 'SuperAdm
   }
 });
 
-// Marcar mensagem do WhatsApp como enviada (Admin)
+// Enviar mensagem individual da fila imediatamente (Admin)
 app.post('/api/whatsapp/enviar/:id', autenticarJWT, autorizarRole(['Manager', 'SuperAdmin']), async (req, res) => {
   const { id } = req.params;
   try {
-    const msg = await prisma.mensagemWhatsapp.update({
+    const msg = await prisma.mensagemWhatsapp.findUnique({ where: { id } });
+    if (!msg) {
+      return res.status(404).json({ error: 'Mensagem não encontrada.' });
+    }
+
+    const resultadoEnvio = await whatsappService.enviarMensagem(msg.numero, msg.mensagem);
+    const novoStatus = resultadoEnvio.success ? 'ENVIADO' : 'ERRO';
+
+    const msgAtualizada = await prisma.mensagemWhatsapp.update({
       where: { id },
-      data: { status: 'ENVIADO' }
+      data: { status: novoStatus }
     });
-    res.json({ message: 'Mensagem marcada como enviada com sucesso.', msg });
+
+    res.json({
+      message: resultadoEnvio.success ? 'Mensagem enviada com sucesso!' : 'Falha ao enviar mensagem pelo WhatsApp.',
+      resultado: resultadoEnvio,
+      msg: msgAtualizada
+    });
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao atualizar status da mensagem.' });
+    res.status(500).json({ error: 'Erro ao processar envio da mensagem.' });
+  }
+});
+
+// Processar lote completo da fila de mensagens pendentes da loja (Admin)
+app.post('/api/whatsapp/processar-fila', autenticarJWT, autorizarRole(['Manager', 'SuperAdmin']), identificarLoja, async (req, res) => {
+  try {
+    const resultado = await whatsappService.processarFila(prisma, req.lojaId);
+    res.json({
+      message: 'Fila de mensagens processada com sucesso!',
+      resultado
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao processar fila de mensagens.' });
   }
 });
 

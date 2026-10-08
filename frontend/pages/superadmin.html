@@ -98,6 +98,9 @@
           <li class="nav-item" data-target="estoque">
             <button id="btn-tab-estoque"><i class="fa-solid fa-boxes-stacked"></i>Estoque & Custos</button>
           </li>
+          <li class="nav-item" data-target="historico-movimentacoes" id="menu-historico-movimentacoes">
+            <button id="btn-tab-historico-movimentacoes"><i class="fa-solid fa-clock-rotate-left"></i>Movimentações</button>
+          </li>
           <li class="nav-item" data-target="revendedoras">
             <button id="btn-tab-revendedoras"><i class="fa-solid fa-users-line"></i>Revendedoras</button>
           </li>
@@ -574,6 +577,123 @@
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           ABA: HISTÓRICO DE MOVIMENTAÇÕES DE ESTOQUE (APENAS MANAGER)
+           ========================================== -->
+      <section id="historico-movimentacoes" class="app-section">
+        <div class="section-header">
+          <div class="section-title">
+            <h2>Histórico de Movimentações</h2>
+            <p>Acompanhe de forma simples e direta o fluxo de entradas, maletas e vendas do seu estoque.</p>
+          </div>
+          <div class="header-actions" style="display: flex; gap: 0.8rem; align-items: center;">
+            <button class="btn btn-secondary" onclick="app.abrirAjudaMovimentacoes()" title="Como funciona o fluxo de movimentações?">
+              <i class="fa-solid fa-circle-question"></i> Ajuda
+            </button>
+            <button class="btn btn-secondary" onclick="app.carregarHistoricoMovimentacoes()" title="Atualizar dados">
+              <i class="fa-solid fa-rotate"></i> Atualizar
+            </button>
+            <button class="btn-gold" onclick="app.exportarMovimentacoesExcel()" title="Exportar para Excel / CSV">
+              <i class="fa-solid fa-file-excel"></i> Exportar Excel
+            </button>
+          </div>
+        </div>
+
+        <!-- 4 Cards de Resumo no Padrão do Sistema -->
+        <div class="metrics-grid" style="margin-bottom: 2rem;">
+          <div class="metric-card">
+            <div class="metric-icon" style="color: #4caf50; background: rgba(76, 175, 80, 0.12);"><i class="fa-solid fa-arrow-down"></i></div>
+            <div class="metric-info">
+              <h3>Entradas de Peças</h3>
+              <div class="metric-value" id="kpi-mov-entradas" style="color: #4caf50;">0</div>
+            </div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-icon" style="color: #2196f3; background: rgba(33, 150, 243, 0.12);"><i class="fa-solid fa-briefcase"></i></div>
+            <div class="metric-info">
+              <h3>Em Maletas</h3>
+              <div class="metric-value" id="kpi-mov-consignados" style="color: #2196f3;">0</div>
+            </div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-icon" style="color: var(--gold-primary); background: var(--gold-translucent);"><i class="fa-solid fa-bag-shopping"></i></div>
+            <div class="metric-info">
+              <h3>Vendas / Baixas</h3>
+              <div class="metric-value" id="kpi-mov-vendas" style="color: var(--gold-primary);">0</div>
+            </div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-icon" style="color: #ff9800; background: rgba(255, 152, 0, 0.12);"><i class="fa-solid fa-rotate-left"></i></div>
+            <div class="metric-info">
+              <h3>Devoluções</h3>
+              <div class="metric-value" id="kpi-mov-devolucoes" style="color: #ff9800;">0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Painel Central Simplificado -->
+        <div class="dashboard-panel">
+          <!-- Filtro por Abas Rápidas (Pílulas Diretas sem Menus Complexos) -->
+          <div class="mkt-tabs" id="movimentacoes-tabs" style="margin-bottom: 1.5rem; display: flex; flex-wrap: wrap; gap: 0.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.6rem;">
+            <button class="mkt-tab-btn active" id="tab-mov-todos" onclick="app.filtrarAbaMovimentacoes('TODOS')">
+              <i class="fa-solid fa-list-ul"></i> Todas
+            </button>
+            <button class="mkt-tab-btn" id="tab-mov-entradas" onclick="app.filtrarAbaMovimentacoes('ENTRADA_MANUAL')">
+              <i class="fa-solid fa-arrow-down" style="color: #4caf50;"></i> Entradas
+            </button>
+            <button class="mkt-tab-btn" id="tab-mov-maletas" onclick="app.filtrarAbaMovimentacoes('SAIDA_CONSIGNACAO')">
+              <i class="fa-solid fa-briefcase" style="color: #2196f3;"></i> Em Maletas
+            </button>
+            <button class="mkt-tab-btn" id="tab-mov-vendas" onclick="app.filtrarAbaMovimentacoes('VENDAS')">
+              <i class="fa-solid fa-bag-shopping" style="color: var(--gold-primary);"></i> Vendas
+            </button>
+            <button class="mkt-tab-btn" id="tab-mov-devolucoes" onclick="app.filtrarAbaMovimentacoes('DEVOLUCAO_CONSIGNACAO')">
+              <i class="fa-solid fa-rotate-left" style="color: #ff9800;"></i> Devoluções
+            </button>
+            <button class="mkt-tab-btn" id="tab-mov-avarias" onclick="app.filtrarAbaMovimentacoes('AVARIAS')">
+              <i class="fa-solid fa-triangle-exclamation" style="color: #ef5350;"></i> Defeitos / Perdas
+            </button>
+          </div>
+
+          <!-- Busca Rápida e Contador -->
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 260px; max-width: 500px; position: relative;">
+              <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.9rem;"></i>
+              <input type="text" id="filtro-mov-busca" class="form-control" placeholder="Buscar por joia, código ou pessoa..." style="padding-left: 40px; height: 42px; border-radius: var(--radius-md);" oninput="app.filtrarMovimentacoesEstoque()">
+            </div>
+            <div>
+              <span id="badge-total-movimentacoes" class="badge" style="background: var(--gold-translucent); color: var(--gold-primary); font-weight: 600; padding: 6px 14px; border-radius: 20px; font-size: 0.85rem;">0 movimentações</span>
+            </div>
+          </div>
+
+          <!-- Tabela Arejada e Descomplicada -->
+          <div class="table-responsive">
+            <table class="premium-table" id="tabela-movimentacoes-estoque">
+              <thead>
+                <tr>
+                  <th style="width: 150px;">Quando</th>
+                  <th>Joia / Peça</th>
+                  <th style="width: 170px;">Tipo</th>
+                  <th style="text-align: center; width: 120px;">Movimentação</th>
+                  <th style="text-align: center; width: 130px;">Saldo Estoque</th>
+                  <th>Origem / Destino</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-movimentacoes-estoque">
+                <tr>
+                  <td colspan="6" style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+                    <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 1.6rem; color: var(--gold-primary);"></i><br><br>Carregando movimentações...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
@@ -1358,12 +1478,21 @@
                   <h2><i class="fa-solid fa-sparkles"></i> Ajuda & Onboarding</h2>
                 </div>
                 <div style="margin-top: 1.5rem; font-size: 0.9rem; line-height: 1.6;">
-                  <p>Precisa de ajuda para entender as seções e os botões da plataforma?</p>
-                  <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.82rem; line-height: 1.4;">Inicie o tutorial guiado para que o sistema a acompanhe passo a passo em cada aba principal.</p>
+                  <p>Precisa de ajuda para dominar todos os recursos da plataforma?</p>
+                  <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.82rem; line-height: 1.4;">
+                    Inicie o tutorial interativo guiado passo a passo ou consulte os guias das áreas vitais:
+                  </p>
+                  <div style="display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 0.8rem;">
+                    <span style="background: rgba(212,175,55,0.12); color: var(--gold-light); border: 1px solid rgba(212,175,55,0.25); border-radius: 4px; padding: 0.2rem 0.55rem; font-size: 0.75rem;"><i class="fa-solid fa-boxes-stacked"></i> Estoque</span>
+                    <span style="background: rgba(212,175,55,0.12); color: var(--gold-light); border: 1px solid rgba(212,175,55,0.25); border-radius: 4px; padding: 0.2rem 0.55rem; font-size: 0.75rem;"><i class="fa-solid fa-clock-rotate-left"></i> Movimentações</span>
+                    <span style="background: rgba(212,175,55,0.12); color: var(--gold-light); border: 1px solid rgba(212,175,55,0.25); border-radius: 4px; padding: 0.2rem 0.55rem; font-size: 0.75rem;"><i class="fa-solid fa-users"></i> Maletas & Revendedoras</span>
+                    <span style="background: rgba(212,175,55,0.12); color: var(--gold-light); border: 1px solid rgba(212,175,55,0.25); border-radius: 4px; padding: 0.2rem 0.55rem; font-size: 0.75rem;"><i class="fa-solid fa-chart-line"></i> DRE & Vendas</span>
+                  </div>
                 </div>
               </div>
-              <div style="margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
-                <button class="btn-gold" onclick="window.initOnboardingTour(true)" style="width: 100%; justify-content: center; padding: 0.65rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem;"><i class="fa-solid fa-play"></i> Iniciar Tutorial Interativo</button>
+              <div style="margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1rem; display: flex; flex-direction: column; gap: 0.6rem;">
+                <button class="btn-gold" onclick="window.initOnboardingTour(true)" style="width: 100%; justify-content: center; padding: 0.65rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem;"><i class="fa-solid fa-play"></i> Iniciar Tutorial Interativo (12 Passos)</button>
+                <button class="btn btn-secondary" onclick="app.abrirAjudaMovimentacoes()" style="width: 100%; justify-content: center; padding: 0.55rem; font-size: 0.82rem; display: flex; align-items: center; gap: 0.5rem; background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.1);"><i class="fa-solid fa-circle-question"></i> Guia Rápido de Movimentações</button>
               </div>
             </div>
           </div>
@@ -1510,6 +1639,22 @@
                 <div class="modulo-premium-footer">
                   <span class="aula-duration"><i class="fa-regular fa-clock"></i> 5 min</span>
                   <button class="btn-gold btn-assistir-aula" onclick="event.stopPropagation(); app.abrirVideoPlayer('Módulo 3: Revendedoras & Consignados', 'https://www.youtube.com/embed/dQw4w9WgXcQ')">
+                    <i class="fa-solid fa-play"></i> Assistir Aula
+                  </button>
+                </div>
+              </div>
+            <!-- Módulo 4 -->
+            <div class="modulo-premium-card" onclick="app.abrirVideoPlayer('Módulo 4: Movimentações & Rastreamento de Estoque', 'https://www.youtube.com/embed/dQw4w9WgXcQ')">
+              <div class="modulo-video-cover cover-1" style="background: linear-gradient(135deg, rgba(212,175,55,0.2) 0%, rgba(20,20,20,0.9) 100%);">
+                <div class="play-btn-glow"><i class="fa-solid fa-play"></i></div>
+                <span class="modulo-tag">Módulo 4</span>
+              </div>
+              <div class="modulo-premium-content">
+                <h4>Movimentações & Rastreamento</h4>
+                <p>Aprenda a rastrear o fluxo completo: entradas de peças, saídas em maletas, retornos de acertos e baixas de avarias.</p>
+                <div class="modulo-premium-footer">
+                  <span class="aula-duration"><i class="fa-regular fa-clock"></i> 4 min</span>
+                  <button class="btn-gold btn-assistir-aula" onclick="event.stopPropagation(); app.abrirVideoPlayer('Módulo 4: Movimentações & Rastreamento de Estoque', 'https://www.youtube.com/embed/dQw4w9WgXcQ')">
                     <i class="fa-solid fa-play"></i> Assistir Aula
                   </button>
                 </div>
@@ -1670,7 +1815,7 @@
               <ul style="list-style: none; padding: 0; font-size: 0.85rem; color: var(--text-secondary); line-height: 2;">
                 <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Até <strong>25 Consultoras</strong></li>
                 <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Até <strong>1.500 Peças</strong> em Estoque</li>
-                <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> <strong>Links de Pagamento Mercado Pago</strong></li>
+                <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> <strong>Cakto Pay (PIX & Cartão Recorrente)</strong></li>
                 <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Termos de Maleta Digital no WhatsApp</li>
                 <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Baixa Automática de Vendas</li>
               </ul>

@@ -3,9 +3,8 @@
 // BANCO DE DADOS EM PRODUÇÃO (Supabase PostgreSQL): alterar para provider = "postgresql"
 // =========================================================================
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
 }
 
 generator client {
@@ -35,6 +34,7 @@ model Loja {
   notificacoes Notificacao[]
   faixasComissao FaixaComissao[]
   reportesErros  ReporteErro[]
+  movimentacoesEstoque MovimentacaoEstoque[]
 }
 
 model Usuario {
@@ -414,5 +414,30 @@ model ReporteErro {
   @@index([lojaId])
   @@index([status])
   @@index([createdAt])
+}
+
+model MovimentacaoEstoque {
+  id                 String   @id @default(uuid())
+  lojaId             String   @default("default-loja")
+  loja               Loja     @relation(fields: [lojaId], references: [id], onDelete: Cascade)
+  produtoId          String?
+  produtoVariacaoId  String?
+  codigoProduto      String
+  nomeProduto        String
+  skuVariacao        String?
+  tipo               String   // "ENTRADA_MANUAL" | "SAIDA_CONSIGNACAO" | "DEVOLUCAO_CONSIGNACAO" | "VENDA_DIRETA" | "VENDA_REVENDEDORA" | "PERDA" | "DEFEITO" | "AJUSTE"
+  quantidade         Int      // Quantidade movimentada (positiva)
+  saldoAnterior      Int      @default(0)
+  saldoPosterior     Int      @default(0)
+  local              String   @default("ESTOQUE_CENTRAL") // "ESTOQUE_CENTRAL" | "MALETA_CONSIGNADA" | "ESTOQUE_DEFEITO"
+  origemDestino      String?  // Ex: "Revendedora: Camila Santos", "Venda Balcão", "Entrada Fornecedor"
+  usuarioResponsavel String?  // Nome de quem realizou a ação
+  observacao         String?
+  data               DateTime @default(now())
+
+  @@index([lojaId])
+  @@index([data])
+  @@index([tipo])
+  @@index([codigoProduto])
 }
 

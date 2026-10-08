@@ -1869,7 +1869,7 @@
                 <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Controle financeiro básico</li>
               </ul>
             </div>
-            <button class="btn-outline-gold" style="width: 100%; margin-top: 1.5rem;" onclick="app.abrirModalCheckoutPlano('BRONZE')">
+            <button class="btn-outline-gold" style="width: 100%; margin-top: 1.5rem;" onclick="assinarPlano('Plano Bronze', 69.90, event)">
               <i class="fa-solid fa-sync"></i> Alterar para Bronze
             </button>
           </div>
@@ -1887,12 +1887,12 @@
               <ul style="list-style: none; padding: 0; font-size: 0.85rem; color: var(--text-secondary); line-height: 2;">
                 <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Até <strong>25 Consultoras</strong></li>
                 <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Até <strong>1.500 Peças</strong> em Estoque</li>
-                <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> <strong>Links de Pagamento ASAAS</strong></li>
+                <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> <strong>Cakto Pay (PIX & Cartão Recorrente)</strong></li>
                 <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Termos de Maleta Digital no WhatsApp</li>
                 <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Baixa Automática de Vendas</li>
               </ul>
             </div>
-            <button class="btn-gold" style="width: 100%; margin-top: 1.5rem;" onclick="app.abrirModalCheckoutPlano('GOLD')">
+            <button class="btn-gold" style="width: 100%; margin-top: 1.5rem;" onclick="assinarPlano('Plano Gold', 99.90, event)">
               <i class="fa-solid fa-crown"></i> Fazer Upgrade Gold
             </button>
           </div>
@@ -1915,7 +1915,7 @@
                 <li><i class="fa-solid fa-check" style="color: #81c784; margin-right: 6px;"></i> Suporte prioritário 24/7</li>
               </ul>
             </div>
-            <button class="btn-outline-gold" style="width: 100%; margin-top: 1.5rem;" onclick="app.abrirModalCheckoutPlano('PLATINUM')">
+            <button class="btn-outline-gold" style="width: 100%; margin-top: 1.5rem;" onclick="assinarPlano('Plano Platinum', 249.90, event)">
               <i class="fa-solid fa-gem"></i> Fazer Upgrade Platinum
             </button>
           </div>
@@ -1944,10 +1944,10 @@
             </div>
           </div>
 
-          <!-- Checkout Pro Mercado Pago Direct -->
+          <!-- Checkout Cakto Pay Direct -->
           <div style="margin-bottom: 1rem;">
-            <button type="button" class="btn-gold" style="width: 100%; padding: 0.8rem; background: linear-gradient(135deg, #009ee3 0%, #007eb5 100%); color: #fff; border: none; font-weight: 700; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem;" onclick="assinarPlano(app.planoSaasSelecionado === 'BRONZE' ? 'Plano Bronze' : (app.planoSaasSelecionado === 'PLATINUM' ? 'Plano Platinum' : 'Plano Gold'), app.planoSaasSelecionado === 'BRONZE' ? 69.9 : (app.planoSaasSelecionado === 'PLATINUM' ? 249.9 : 99.9), event)">
-              <i class="fa-solid fa-hand-holding-dollar"></i> Assinar via Mercado Pago (Checkout Pro)
+            <button type="button" class="btn-gold" style="width: 100%; padding: 0.8rem; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; border: none; font-weight: 700; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem;" onclick="assinarPlano(app.planoSaasSelecionado === 'BRONZE' ? 'Plano Bronze' : (app.planoSaasSelecionado === 'PLATINUM' ? 'Plano Platinum' : 'Plano Gold'), app.planoSaasSelecionado === 'BRONZE' ? 69.9 : (app.planoSaasSelecionado === 'PLATINUM' ? 249.9 : 99.9), event)">
+              <i class="fa-solid fa-bolt"></i> Assinar via Cakto Pay (PIX & Cartão Recorrente)
             </button>
           </div>
 
@@ -2934,8 +2934,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" defer></script>
   <!-- 3. Funções de Manipulação do Excel/CSV -->
   <script src="/js/excel-handler.js" defer></script>
-  <!-- 4. Integração de Pagamento Mercado Pago -->
-  <script src="/js/pagamento.js" defer></script>
+  <!-- 4. Integração de Pagamento Cakto Pay -->
+  <script src="/js/pagamento.js?v=cakto_v2" defer></script>
   <!-- 5. Lógica do Aplicativo Principal -->
   <script src="/js/manager.js" defer></script>
 

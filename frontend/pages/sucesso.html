@@ -258,8 +258,8 @@
       }
     })();
 
-    // Redireciona o usuário para o painel em 4 segundos
-    let segundos = 4;
+    // Redireciona o usuário para o painel em 1 segundo
+    let segundos = 1;
     const countEl = document.getElementById("countdown");
 
     const timer = setInterval(() => {
@@ -267,13 +267,13 @@
       if (countEl) countEl.innerText = segundos;
       if (segundos <= 0) {
         clearInterval(timer);
-        let targetPage = "/pages/superadmin.html";
+        let targetPage = "/pages/superadmin.html?planoAtivado=1";
         const userRaw = localStorage.getItem("conectajoias_usuario") || localStorage.getItem("usuario");
         if (userRaw) {
           try {
             const u = JSON.parse(userRaw);
             if (u.role === "Consultant" || u.role === "Manager") {
-              targetPage = "/pages/manager.html";
+              targetPage = "/pages/superadmin.html?planoAtivado=1";
             }
           } catch(e) {}
         }

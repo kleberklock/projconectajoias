@@ -22,6 +22,11 @@
       description: 'Gerencie suas semijoias brutas. Cadastre peças, configure markups de banho, custos operacionais e defina automaticamente a margem de faturamento ideal de cada joia.'
     },
     {
+      elementSelector: '#btn-tab-historico-movimentacoes',
+      title: '🔄 Movimentações de Estoque',
+      description: 'Acompanhe todo o fluxo das suas semijoias: rastreie entradas de peças, saídas em consignação para maletas, retornos de acertos, vendas e baixas de avarias com histórico detalhado e filtros em tempo real.'
+    },
+    {
       elementSelector: '#btn-tab-revendedoras',
       title: '👥 Rede de Revendedoras',
       description: 'Controle toda a sua rede de vendedoras externas. Distribua maletas consignadas, gere termos de responsabilidade digital e faça conferências e acertos em menos de 5 minutos.'
@@ -293,7 +298,7 @@
       </div>
       <p id="tour-desc">Descrição explicativa...</p>
       <div class="tour-popover-footer">
-        <span class="tour-progress" id="tour-progress-lbl">1 de 11</span>
+        <span class="tour-progress" id="tour-progress-lbl">1 de 12</span>
         <div class="tour-buttons">
           <button class="tour-btn tour-btn-outline" id="tour-btn-prev"><i class="fa-solid fa-chevron-left"></i> Voltar</button>
           <button class="tour-btn tour-btn-gold" id="tour-btn-next">Próximo <i class="fa-solid fa-chevron-right"></i></button>

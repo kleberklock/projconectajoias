@@ -10,12 +10,18 @@ const app = {
     apiUrl: (function() {
       const saved = localStorage.getItem("conectajoias_api_url");
       if (saved) return saved;
-      const port = window.location.port;
+      const protocol = window.location.protocol;
       const hostname = window.location.hostname;
+      const port = window.location.port;
+
+      if (protocol === "file:" || !hostname) {
+        return "http://localhost:5000/api";
+      }
+
       const isDevPort = ["5500", "8080", "3000", "5501", "5000"].includes(port);
       const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1" || /^192\.168\./.test(hostname) || /^10\./.test(hostname);
       if (isDevPort || isLocalHost) {
-        return `${window.location.protocol}//${hostname}:5000/api`;
+        return `${protocol}//${hostname || "localhost"}:5000/api`;
       }
       return `${window.location.origin}/api`;
     })(),
@@ -51,7 +57,10 @@ const app = {
       clientes: { coluna: null, direcao: "asc" },
       vendas: { coluna: null, direcao: "asc" },
       defeitos: { coluna: null, direcao: "asc" }
-    }
+    },
+    movimentacoesEstoque: [],
+    movimentacoesFiltradas: [],
+    subAbaMovimentacaoAtiva: "TODOS"
   },
   debounce: function(func, delay = 250) {
     let timeoutId;
@@ -582,11 +591,13 @@ const app = {
     const menuVendasGeral = document.getElementById("menu-vendas-geral");
     const menuConfiguracoes = document.getElementById("menu-configuracoes");
     const btnCriarNovaLoja = document.getElementById("btn-criar-nova-loja");
+    const menuHistoricoMovimentacoes = document.getElementById("menu-historico-movimentacoes") || document.querySelector('.nav-item[data-target="historico-movimentacoes"]');
  
     if (!isAdmin) {
       // Consultant: oculta todos os menus administrativos
       if (menuPlanilhas) menuPlanilhas.style.display = "none";
       if (menuRevendedoras) menuRevendedoras.style.display = "none";
+      if (menuHistoricoMovimentacoes) menuHistoricoMovimentacoes.style.display = "none";
       if (menuEstoque) menuEstoque.style.display = "none";
       if (menuMarketing) menuMarketing.style.display = "none";
       if (menuDashboard) menuDashboard.style.display = "none";
@@ -602,6 +613,7 @@ const app = {
       // Manager ou SuperAdmin: exibe menus administrativos
       if (menuPlanilhas) menuPlanilhas.style.display = "block";
       if (menuRevendedoras) menuRevendedoras.style.display = "block";
+      if (menuHistoricoMovimentacoes) menuHistoricoMovimentacoes.style.display = "block";
       if (menuEstoque) menuEstoque.style.display = "block";
       if (menuMarketing) menuMarketing.style.display = "block";
       if (menuDashboard) menuDashboard.style.display = "block";
@@ -1747,7 +1759,8 @@ const app = {
     // Mapeamento de abas para recursos do plano
     const abasMapeadas = {
       'planilhas': 'importar-excel',
-      'notas-fiscais': 'notas-fiscais'
+      'notas-fiscais': 'notas-fiscais',
+      'historico-movimentacoes': 'movimentacoes-estoque'
     };
 
     if (abasMapeadas[tabId]) {
@@ -1806,6 +1819,15 @@ const app = {
     }
     if (tabId === "meu-plano-saas") {
       this.carregarMeuPlanoSaaS();
+    }
+    if (tabId === "historico-movimentacoes") {
+      const role = this.state.usuarioLogado ? this.state.usuarioLogado.role : "Consultant";
+      const isAdmin = ['Manager', 'SuperAdmin', 'ADMIN_LOJA', 'SUPER_ADMIN', 'admin'].includes(role);
+      if (!isAdmin) {
+        this.toast("Acesso restrito para Gestoras (Manager).", "warning");
+        return;
+      }
+      this.carregarHistoricoMovimentacoes();
     }
   },
 
@@ -6916,10 +6938,16 @@ const app = {
 
           let acaoBtn = "";
           if (t.status === "ASSINADO") {
+            const pdfUrl = `${this.state.apiUrl}/public/termos/${t.id}/pdf`;
             acaoBtn = `
-              <button class="btn-qty" style="color: var(--gold-primary);" onclick="app.visualizarTermoAssinado('${t.id}')">
-                <i class="fa-solid fa-eye"></i> Ver Assinatura
-              </button>
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <button class="btn-qty" style="color: var(--gold-primary);" onclick="app.visualizarTermoAssinado('${t.id}')" title="Ver Assinatura">
+                  <i class="fa-solid fa-eye"></i> Ver
+                </button>
+                <a href="${pdfUrl}" target="_blank" class="btn-qty" style="color: #81c784; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;" title="Baixar Termo em PDF">
+                  <i class="fa-solid fa-file-pdf"></i> PDF
+                </a>
+              </div>
             `;
           } else {
             const linkAssinatura = `termo_assinatura.html?id=${t.id}`;
@@ -7326,11 +7354,13 @@ const app = {
     // SuperAdmin tem acesso irrestrito
     if (this.state.usuarioLogado.role === 'SuperAdmin') return true;
     
-    const plano = (this.state.usuarioLogado.planoLoja || 'BASICO').toUpperCase();
+    const plano = (localStorage.getItem("conectajoias_plano") || (this.state.usuarioLogado && this.state.usuarioLogado.planoLoja) || 'BASICO').toUpperCase();
+    document.documentElement.setAttribute("data-plano", plano);
     
     const regras = {
       'importar-excel': ['BRONZE', 'GOLD', 'PLATINUM'],
       'links-pagamento': ['BRONZE', 'GOLD', 'PLATINUM'],
+      'movimentacoes-estoque': ['BRONZE', 'GOLD', 'PLATINUM'],
       'notas-fiscais': ['GOLD', 'PLATINUM'],
       'dre': ['GOLD', 'PLATINUM'],
       'termos-maleta': ['GOLD', 'PLATINUM'],
@@ -7347,6 +7377,11 @@ const app = {
         'importar-excel': {
           nome: 'Importação em Massa via Excel',
           desc: 'A importação de joias e consultoras via planilha Excel está disponível a partir do plano <strong>Bronze</strong>. Faça o upgrade agora para economizar horas de digitação manual!',
+          plano: 'BRONZE'
+        },
+        'movimentacoes-estoque': {
+          nome: 'Histórico de Movimentações de Estoque',
+          desc: 'O rastreamento completo de movimentações (entradas, saídas, consignações e acertos) está disponível a partir do plano <strong>Bronze</strong>. Faça o upgrade para ter controle total do fluxo das suas joias!',
           plano: 'BRONZE'
         },
         'links-pagamento': {
@@ -7495,7 +7530,8 @@ const app = {
     
     const abas = {
       'planilhas': 'importar-excel',
-      'notas-fiscais': 'notas-fiscais'
+      'notas-fiscais': 'notas-fiscais',
+      'historico-movimentacoes': 'movimentacoes-estoque'
     };
     
     for (const [tabId, recurso] of Object.entries(abas)) {
@@ -7522,9 +7558,8 @@ const app = {
 
   carregarMeuPlanoSaaS: async function() {
     // 1. Renderização SÍNCRONA imediata com base no perfil logado (Zero Latência)
-    const planoAtual = (this.state.usuarioLogado && this.state.usuarioLogado.planoLoja) 
-      ? this.state.usuarioLogado.planoLoja.toUpperCase() 
-      : (localStorage.getItem("conectajoias_plano") || "BASICO").toUpperCase();
+    const planoAtual = (localStorage.getItem("conectajoias_plano") || (this.state.usuarioLogado && this.state.usuarioLogado.planoLoja) || "BASICO").toUpperCase();
+    document.documentElement.setAttribute("data-plano", planoAtual);
 
     const elNome = document.getElementById("saas-plano-nome");
     const elStatus = document.getElementById("saas-plano-badge-status");
@@ -7606,6 +7641,422 @@ const app = {
     } catch (e) {
       console.warn("Erro ao sincronizar plano do servidor:", e);
     }
+  },
+
+  // ==========================================
+  // HISTÓRICO DE MOVIMENTAÇÕES DE ESTOQUE (SIMPLIFICADO PARA GESTORA)
+  // ==========================================
+  carregarHistoricoMovimentacoes: async function() {
+    const role = this.state.usuarioLogado ? this.state.usuarioLogado.role : "Consultant";
+    const isAdmin = ['Manager', 'SuperAdmin', 'ADMIN_LOJA', 'SUPER_ADMIN', 'admin'].includes(role);
+    if (!isAdmin) {
+      this.toast("Acesso restrito para Gestoras (Manager).", "warning");
+      return;
+    }
+
+    const tbody = document.getElementById("tbody-movimentacoes-estoque");
+    if (tbody) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="6" style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+            <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 1.6rem; color: var(--gold-primary);"></i><br><br>
+            Sincronizando movimentações do estoque...
+          </td>
+        </tr>
+      `;
+    }
+
+    try {
+      // 1. Atualizar cards de KPIs
+      try {
+        const resumo = await this.requisitarAPI("/estoque/movimentacoes/resumo");
+        if (resumo) {
+          const elEntradas = document.getElementById("kpi-mov-entradas");
+          const elConsignados = document.getElementById("kpi-mov-consignados");
+          const elDevolucoes = document.getElementById("kpi-mov-devolucoes");
+          const elVendas = document.getElementById("kpi-mov-vendas");
+
+          if (elEntradas) elEntradas.innerText = Number(resumo.totalEntradas || 0).toLocaleString("pt-BR");
+          if (elConsignados) elConsignados.innerText = Number(resumo.totalConsignado || 0).toLocaleString("pt-BR");
+          if (elDevolucoes) elDevolucoes.innerText = Number(resumo.totalDevolvido || 0).toLocaleString("pt-BR");
+          if (elVendas) elVendas.innerText = Number(resumo.totalVendas || 0).toLocaleString("pt-BR");
+        }
+      } catch (errResumo) {
+        console.warn("Aviso ao carregar resumo de movimentações:", errResumo);
+      }
+
+      // 2. Carregar lista completa de movimentações
+      const movimentacoes = await this.requisitarAPI("/estoque/movimentacoes?limite=500");
+      this.state.movimentacoesEstoque = Array.isArray(movimentacoes) ? movimentacoes : [];
+      
+      // Filtra e renderiza conforme aba ativa e termo de busca
+      this.filtrarMovimentacoesEstoque();
+    } catch (error) {
+      console.error("Erro ao carregar movimentações:", error);
+      if (tbody) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="6" style="text-align: center; padding: 2.5rem; color: #ff6b6b;">
+              <i class="fa-solid fa-triangle-exclamation" style="font-size: 1.8rem; margin-bottom: 8px;"></i><br>
+              Não foi possível carregar as movimentações.<br>
+              <small style="color: var(--text-secondary);">${error.message || "Erro de conexão."}</small>
+            </td>
+          </tr>
+        `;
+      }
+    }
+  },
+
+  filtrarAbaMovimentacoes: function(abaTipo) {
+    this.state.subAbaMovimentacaoAtiva = abaTipo || "TODOS";
+
+    // Atualiza visual ativo das abas
+    const tabs = {
+      'TODOS': 'tab-mov-todos',
+      'ENTRADA_MANUAL': 'tab-mov-entradas',
+      'SAIDA_CONSIGNACAO': 'tab-mov-maletas',
+      'VENDAS': 'tab-mov-vendas',
+      'DEVOLUCAO_CONSIGNACAO': 'tab-mov-devolucoes',
+      'AVARIAS': 'tab-mov-avarias'
+    };
+
+    Object.entries(tabs).forEach(([tipo, id]) => {
+      const btn = document.getElementById(id);
+      if (btn) {
+        if (tipo === this.state.subAbaMovimentacaoAtiva) {
+          btn.classList.add("active");
+        } else {
+          btn.classList.remove("active");
+        }
+      }
+    });
+
+    this.filtrarMovimentacoesEstoque();
+  },
+
+  filtrarMovimentacoesEstoque: function() {
+    const inputBusca = document.getElementById("filtro-mov-busca");
+    const busca = inputBusca ? inputBusca.value.trim().toLowerCase() : "";
+    const abaTipo = this.state.subAbaMovimentacaoAtiva || "TODOS";
+
+    let lista = this.state.movimentacoesEstoque || [];
+
+    // Filtro por Aba Rápida
+    if (abaTipo === "ENTRADA_MANUAL") {
+      lista = lista.filter(m => m.tipo === "ENTRADA_MANUAL");
+    } else if (abaTipo === "SAIDA_CONSIGNACAO") {
+      lista = lista.filter(m => m.tipo === "SAIDA_CONSIGNACAO");
+    } else if (abaTipo === "VENDAS") {
+      lista = lista.filter(m => m.tipo === "VENDA_DIRETA" || m.tipo === "VENDA_REVENDEDORA");
+    } else if (abaTipo === "DEVOLUCAO_CONSIGNACAO") {
+      lista = lista.filter(m => m.tipo === "DEVOLUCAO_CONSIGNACAO");
+    } else if (abaTipo === "AVARIAS") {
+      lista = lista.filter(m => m.tipo === "PERDA" || m.tipo === "DEFEITO");
+    }
+
+    // Filtro por Busca Textual
+    if (busca) {
+      lista = lista.filter(m => 
+        (m.codigoProduto && m.codigoProduto.toLowerCase().includes(busca)) ||
+        (m.nomeProduto && m.nomeProduto.toLowerCase().includes(busca)) ||
+        (m.skuVariacao && m.skuVariacao.toLowerCase().includes(busca)) ||
+        (m.origemDestino && m.origemDestino.toLowerCase().includes(busca)) ||
+        (m.observacao && m.observacao.toLowerCase().includes(busca)) ||
+        (m.usuarioResponsavel && m.usuarioResponsavel.toLowerCase().includes(busca))
+      );
+    }
+
+    this.state.movimentacoesFiltradas = lista;
+    this.renderizarTabelaMovimentacoes(lista);
+  },
+
+  renderizarTabelaMovimentacoes: function(lista) {
+    const tbody = document.getElementById("tbody-movimentacoes-estoque");
+    const badgeTotal = document.getElementById("badge-total-movimentacoes");
+    
+    if (badgeTotal) {
+      const total = (lista && Array.isArray(lista)) ? lista.length : 0;
+      badgeTotal.innerText = `${total} ${total === 1 ? 'movimentação' : 'movimentações'}`;
+    }
+
+    if (!tbody) return;
+
+    if (!lista || lista.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="6" style="text-align: center; padding: 3.5rem 1rem; color: var(--text-secondary);">
+            <div style="font-size: 2.2rem; opacity: 0.35; margin-bottom: 12px;"><i class="fa-solid fa-box-open"></i></div>
+            <div style="font-size: 1rem; font-weight: 500; color: var(--text-primary); margin-bottom: 4px;">Nenhuma movimentação nesta visualização</div>
+            <small style="color: var(--text-secondary);">Alterne para outra aba acima ou ajuste o termo de busca.</small>
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    const html = lista.map(mov => {
+      // 1. Data e Hora
+      let dataDia = "-";
+      let dataHora = "";
+      if (mov.data || mov.createdAt) {
+        try {
+          const d = new Date(mov.data || mov.createdAt);
+          dataDia = d.toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit', year: 'numeric' });
+          dataHora = d.toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' });
+        } catch(e) {
+          dataDia = String(mov.data || "-");
+        }
+      }
+
+      // 2. Tipo e Sinal
+      let tipoBadge = "";
+      let qtdSinal = "";
+      let qtdCor = "var(--text-primary)";
+
+      switch (mov.tipo) {
+        case "ENTRADA_MANUAL":
+          tipoBadge = `<span class="badge" style="background: rgba(76, 175, 80, 0.12); color: #4caf50; border: 1px solid rgba(76, 175, 80, 0.25); font-weight: 600; padding: 4px 10px;"><i class="fa-solid fa-arrow-down" style="margin-right: 5px;"></i> Entrada</span>`;
+          qtdSinal = "+";
+          qtdCor = "#4caf50";
+          break;
+        case "SAIDA_CONSIGNACAO":
+          tipoBadge = `<span class="badge" style="background: rgba(33, 150, 243, 0.12); color: #2196f3; border: 1px solid rgba(33, 150, 243, 0.25); font-weight: 600; padding: 4px 10px;"><i class="fa-solid fa-briefcase" style="margin-right: 5px;"></i> Em Maleta</span>`;
+          qtdSinal = "-";
+          qtdCor = "#2196f3";
+          break;
+        case "DEVOLUCAO_CONSIGNACAO":
+          tipoBadge = `<span class="badge" style="background: rgba(255, 152, 0, 0.12); color: #ff9800; border: 1px solid rgba(255, 152, 0, 0.25); font-weight: 600; padding: 4px 10px;"><i class="fa-solid fa-rotate-left" style="margin-right: 5px;"></i> Devolução</span>`;
+          qtdSinal = "+";
+          qtdCor = "#ff9800";
+          break;
+        case "VENDA_DIRETA":
+          tipoBadge = `<span class="badge" style="background: rgba(171, 71, 188, 0.12); color: #ab47bc; border: 1px solid rgba(171, 71, 188, 0.25); font-weight: 600; padding: 4px 10px;"><i class="fa-solid fa-bag-shopping" style="margin-right: 5px;"></i> Venda Direta</span>`;
+          qtdSinal = "-";
+          qtdCor = "#ab47bc";
+          break;
+        case "VENDA_REVENDEDORA":
+          tipoBadge = `<span class="badge" style="background: var(--gold-translucent); color: var(--gold-primary); border: 1px solid var(--border-color); font-weight: 600; padding: 4px 10px;"><i class="fa-solid fa-gem" style="margin-right: 5px;"></i> Venda Rev.</span>`;
+          qtdSinal = "-";
+          qtdCor = "var(--gold-primary)";
+          break;
+        case "PERDA":
+          tipoBadge = `<span class="badge" style="background: rgba(239, 83, 80, 0.12); color: #ef5350; border: 1px solid rgba(239, 83, 80, 0.25); font-weight: 600; padding: 4px 10px;"><i class="fa-solid fa-triangle-exclamation" style="margin-right: 5px;"></i> Perda</span>`;
+          qtdSinal = "-";
+          qtdCor = "#ef5350";
+          break;
+        case "DEFEITO":
+          tipoBadge = `<span class="badge" style="background: rgba(255, 112, 67, 0.12); color: #ff7043; border: 1px solid rgba(255, 112, 67, 0.25); font-weight: 600; padding: 4px 10px;"><i class="fa-solid fa-wrench" style="margin-right: 5px;"></i> Defeito</span>`;
+          qtdSinal = "-";
+          qtdCor = "#ff7043";
+          break;
+        default:
+          tipoBadge = `<span class="badge" style="background: rgba(255, 255, 255, 0.08); color: var(--text-primary); padding: 4px 10px;">${mov.tipo}</span>`;
+          qtdSinal = "";
+          qtdCor = "var(--text-primary)";
+      }
+
+      // 3. Informações da Joia
+      const varInfo = mov.skuVariacao ? `<span style="color: var(--text-secondary); font-size: 0.78rem;"> • ${mov.skuVariacao}</span>` : "";
+      const codInfo = mov.codigoProduto ? `<span style="color: var(--gold-primary); font-family: monospace; font-size: 0.78rem; background: rgba(212, 175, 55, 0.08); padding: 2px 6px; border-radius: 4px;">#${mov.codigoProduto}</span>` : "";
+
+      // 4. Saldo no estoque
+      let saldoHtml = '<span style="color: var(--text-secondary);">-</span>';
+      if (mov.saldoPosterior !== null && mov.saldoPosterior !== undefined) {
+        saldoHtml = `<span style="font-weight: 600; color: var(--text-primary); font-size: 0.95rem;">${mov.saldoPosterior} un</span>`;
+      }
+
+      // 5. Destino / Origem e Responsável
+      const destinoLimpo = mov.origemDestino || mov.local || "Estoque Central";
+      let responsavelExibicao = mov.usuarioResponsavel || "";
+      if (!responsavelExibicao || /super\s*admin/i.test(responsavelExibicao)) {
+        responsavelExibicao = this.state.nomeEmpresa || (this.state.loja && this.state.loja.nome) || localStorage.getItem("conectajoias_nome_empresa") || "Loja";
+      }
+
+      return `
+        <tr>
+          <td style="white-space: nowrap;">
+            <div style="font-weight: 500; color: var(--text-primary); font-size: 0.85rem;">${dataDia}</div>
+            <small style="color: var(--text-secondary); font-size: 0.75rem;"><i class="fa-regular fa-clock" style="margin-right: 3px;"></i>${dataHora}</small>
+          </td>
+          <td>
+            <div style="font-weight: 600; color: var(--text-primary); font-size: 0.92rem; margin-bottom: 3px;">${mov.nomeProduto || "Peça sem nome"}</div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              ${codInfo}
+              ${varInfo}
+            </div>
+          </td>
+          <td>${tipoBadge}</td>
+          <td style="text-align: center;">
+            <span style="font-weight: 700; color: ${qtdCor}; font-size: 1.05rem;">${qtdSinal}${mov.quantidade} un</span>
+          </td>
+          <td style="text-align: center;">${saldoHtml}</td>
+          <td>
+            <div style="font-size: 0.85rem; color: var(--text-primary);">${destinoLimpo}</div>
+            ${responsavelExibicao ? `<small style="color: var(--text-secondary); font-size: 0.75rem;">por ${responsavelExibicao}</small>` : ''}
+          </td>
+        </tr>
+      `;
+    }).join("");
+
+    tbody.innerHTML = html;
+  },
+
+  exportarMovimentacoesExcel: function() {
+    const lista = this.state.movimentacoesFiltradas || this.state.movimentacoesEstoque || [];
+    if (lista.length === 0) {
+      this.toast("Não há movimentações para exportar.", "warning");
+      return;
+    }
+
+    const headers = [
+      "Data e Hora",
+      "Código do Produto",
+      "Nome do Produto",
+      "Variação / SKU",
+      "Tipo de Movimentação",
+      "Quantidade",
+      "Saldo Anterior",
+      "Saldo Posterior",
+      "Origem / Destino",
+      "Usuário Responsável",
+      "Observações"
+    ];
+
+    const linhas = lista.map(mov => {
+      let dataFormatada = "";
+      try {
+        const d = new Date(mov.data || mov.createdAt);
+        dataFormatada = d.toLocaleString("pt-BR");
+      } catch(e) {
+        dataFormatada = String(mov.data || "");
+      }
+
+      return [
+        `"${dataFormatada.replace(/"/g, '""')}"`,
+        `"${(mov.codigoProduto || '').replace(/"/g, '""')}"`,
+        `"${(mov.nomeProduto || '').replace(/"/g, '""')}"`,
+        `"${(mov.skuVariacao || '').replace(/"/g, '""')}"`,
+        `"${(mov.tipo || '').replace(/"/g, '""')}"`,
+        mov.quantidade,
+        mov.saldoAnterior !== null && mov.saldoAnterior !== undefined ? mov.saldoAnterior : "",
+        mov.saldoPosterior !== null && mov.saldoPosterior !== undefined ? mov.saldoPosterior : "",
+        `"${(mov.origemDestino || mov.local || '').replace(/"/g, '""')}"`,
+        `"${(mov.usuarioResponsavel || '').replace(/"/g, '""')}"`,
+        `"${(mov.observacao || '').replace(/"/g, '""')}"`
+      ].join(";");
+    });
+
+    const csvContent = "\uFEFF" + [headers.join(";"), ...linhas].join("\r\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const hoje = new Date().toISOString().split("T")[0];
+    link.setAttribute("href", url);
+    link.setAttribute("download", `historico_movimentacoes_estoque_${hoje}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    this.toast("Histórico exportado com sucesso!", "success");
+  },
+
+  abrirAjudaMovimentacoes: function() {
+    const modalExistente = document.getElementById("modal-ajuda-movimentacoes");
+    if (modalExistente) modalExistente.remove();
+
+    const backdrop = document.createElement("div");
+    backdrop.className = "modal-backdrop active";
+    backdrop.id = "modal-ajuda-movimentacoes";
+    backdrop.style.display = "flex";
+    backdrop.style.zIndex = "100000";
+
+    backdrop.innerHTML = `
+      <div class="modal-card" style="width: 680px; max-width: 95%; max-height: 90vh; overflow-y: auto; background: var(--bg-card); border: 1px solid var(--border-gold); border-radius: var(--radius-lg); box-shadow: var(--shadow-premium); padding: 2rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 1rem; margin-bottom: 1.5rem;">
+          <div style="display: flex; align-items: center; gap: 0.8rem;">
+            <div style="width: 42px; height: 42px; border-radius: 10px; background: rgba(212,175,55,0.15); border: 1px solid var(--border-gold); display: flex; align-items: center; justify-content: center; color: var(--gold-primary); font-size: 1.2rem;">
+              <i class="fa-solid fa-clock-rotate-left"></i>
+            </div>
+            <div>
+              <h3 style="font-family: var(--font-title); color: #fff; font-size: 1.25rem; margin: 0;">Guia de Movimentações de Estoque</h3>
+              <p style="color: var(--text-secondary); font-size: 0.8rem; margin: 0.2rem 0 0 0;">Como funciona o rastreamento automático do Conecta Joias</p>
+            </div>
+          </div>
+          <button class="modal-close-btn" onclick="document.getElementById('modal-ajuda-movimentacoes').remove()" style="background: none; border: none; color: var(--text-secondary); font-size: 1.2rem; cursor: pointer;">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <p style="font-size: 0.88rem; color: var(--text-secondary); line-height: 1.6; margin-bottom: 1.5rem;">
+          Toda movimentação física de semijoias no Conecta Joias é registrada de forma <strong>100% automática e auditável</strong>, protegendo seu estoque contra perdas e garantindo precisão em cada acerto.
+        </p>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+          
+          <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(76, 175, 80, 0.25); border-radius: 8px; padding: 1rem;">
+            <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.4rem;">
+              <span style="color: #4caf50; font-size: 1.1rem;"><i class="fa-solid fa-arrow-down"></i></span>
+              <strong style="color: #4caf50; font-size: 0.9rem;">Entrada de Peças</strong>
+            </div>
+            <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; margin: 0;">
+              Ocorre no cadastro inicial do produto ou ao adicionar novas peças no estoque central da distribuidora.
+            </p>
+          </div>
+
+          <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(33, 150, 243, 0.25); border-radius: 8px; padding: 1rem;">
+            <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.4rem;">
+              <span style="color: #2196f3; font-size: 1.1rem;"><i class="fa-solid fa-briefcase"></i></span>
+              <strong style="color: #2196f3; font-size: 0.9rem;">Saída para Maleta (Consignação)</strong>
+            </div>
+            <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; margin: 0;">
+              Quando você monta uma maleta consignada e transfere as peças para a revendedora levar aos clientes.
+            </p>
+          </div>
+
+          <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255, 152, 0, 0.25); border-radius: 8px; padding: 1rem;">
+            <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.4rem;">
+              <span style="color: #ff9800; font-size: 1.1rem;"><i class="fa-solid fa-rotate-left"></i></span>
+              <strong style="color: #ff9800; font-size: 0.9rem;">Devolução no Acerto (Retorno)</strong>
+            </div>
+            <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; margin: 0;">
+              Peças não vendidas devolvidas pela revendedora no acerto, retornando instantaneamente ao estoque central.
+            </p>
+          </div>
+
+          <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(212, 175, 55, 0.35); border-radius: 8px; padding: 1rem;">
+            <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.4rem;">
+              <span style="color: var(--gold-primary); font-size: 1.1rem;"><i class="fa-solid fa-cart-shopping"></i></span>
+              <strong style="color: var(--gold-primary); font-size: 0.9rem;">Venda Concluída</strong>
+            </div>
+            <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; margin: 0;">
+              Baixa definitiva por venda direta na loja ou acerto aprovado de itens vendidos pelas revendedoras.
+            </p>
+          </div>
+
+        </div>
+
+        <div style="background: rgba(212,175,55,0.06); border: 1px dashed var(--border-gold); border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem;">
+          <h4 style="color: var(--gold-light); font-size: 0.88rem; margin: 0 0 0.4rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <i class="fa-solid fa-shield-halved"></i> Auditoria de Segurança
+          </h4>
+          <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; margin: 0;">
+            Cada registro armazena o <strong>saldo antes</strong> e o <strong>saldo depois</strong> da operação, junto ao nome de quem realizou a movimentação (ex: sua loja ou a consultora).
+          </p>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 0.8rem;">
+          <button class="btn btn-secondary" onclick="document.getElementById('modal-ajuda-movimentacoes').remove(); if(typeof window.initOnboardingTour === 'function') window.initOnboardingTour(true);" style="padding: 0.6rem 1.2rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem;">
+            <i class="fa-solid fa-play"></i> Iniciar Tutorial Interativo
+          </button>
+          <button class="btn-gold" onclick="document.getElementById('modal-ajuda-movimentacoes').remove()" style="padding: 0.6rem 1.4rem; font-size: 0.85rem;">
+            Entendi, Fechar
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(backdrop);
   }
 
 };
@@ -7683,4 +8134,14 @@ function hexToRgbA(hex, alpha){
 // Inicializa a aplicação ao carregar a página
 window.addEventListener("DOMContentLoaded", () => {
   app.init();
+  
+  // Checa se o usuário veio de um pagamento aprovado pelo Mercado Pago
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("planoAtivado") === "1" || params.get("status") === "approved" || params.get("collection_status") === "approved") {
+    const plano = (localStorage.getItem("conectajoias_plano") || "BRONZE").toUpperCase();
+    setTimeout(() => {
+      app.toast(`🎉 Parabéns! Seu pagamento foi aprovado e o Plano ${plano} foi ativado com sucesso!`, "success");
+    }, 500);
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
 });

@@ -246,6 +246,11 @@ const signApp = {
     document.getElementById("success-sign-cpf").innerText = cpf;
     document.getElementById("success-sign-ip").innerText = ip;
     document.getElementById("success-sign-date").innerText = new Date(data).toLocaleString("pt-BR");
+
+    const btnPdf = document.getElementById("btn-download-pdf-termo");
+    if (btnPdf) {
+      btnPdf.href = `${API_BASE_URL}/public/termos/${this.termoId}/pdf`;
+    }
     
     document.getElementById("signature-success-content").classList.add("active");
   }

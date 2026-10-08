@@ -2520,6 +2520,7 @@ const app = {
     const regras = {
       'importar-excel': ['BRONZE', 'GOLD', 'PLATINUM'],
       'links-pagamento': ['BRONZE', 'GOLD', 'PLATINUM'],
+      'movimentacoes-estoque': ['BRONZE', 'GOLD', 'PLATINUM'],
       'notas-fiscais': ['GOLD', 'PLATINUM'],
       'dre': ['GOLD', 'PLATINUM'],
       'termos-maleta': ['GOLD', 'PLATINUM'],
@@ -2534,6 +2535,11 @@ const app = {
         'importar-excel': {
           nome: 'Importação em Massa via Excel',
           desc: 'A importação de joias e consultoras via planilha Excel está disponível a partir do plano <strong>Bronze</strong>. Faça o upgrade agora para economizar horas de digitação manual!',
+          plano: 'BRONZE'
+        },
+        'movimentacoes-estoque': {
+          nome: 'Histórico de Movimentações de Estoque',
+          desc: 'O rastreamento completo de movimentações de estoque está disponível a partir do plano <strong>Bronze</strong>.',
           plano: 'BRONZE'
         },
         'links-pagamento': {
@@ -8283,22 +8289,10 @@ ${dinheiroAReceberDaRev >= comissaoApagarParaRev
 
   abrirModalCheckoutPlano: function(plano) {
     this.planoSaasSelecionado = plano || 'GOLD';
-    const valores = { BRONZE: 'R$ 69,90', GOLD: 'R$ 99,90', PLATINUM: 'R$ 249,90' };
-
-    document.getElementById("modal-saas-plano-nome").innerText = `Plano ${this.planoSaasSelecionado}`;
-    document.getElementById("modal-saas-plano-valor").innerText = valores[this.planoSaasSelecionado] || 'R$ 99,90';
-    
-    // Reseta estado das seções PIX / Boleto
-    document.getElementById("sec-saas-pix-qr").style.display = "none";
-    document.getElementById("btn-gerar-saas-pix").style.display = "block";
-    document.getElementById("sec-saas-boleto-res").style.display = "none";
-    document.getElementById("btn-gerar-saas-boleto").style.display = "block";
-    
-    this.selecionarFormaSaas('pix');
-    const saasModal = document.getElementById("modal-checkout-plano-saas");
-    if (saasModal) {
-      saasModal.style.display = "flex";
-      saasModal.classList.add("active");
+    const planoClean = String(this.planoSaasSelecionado).toUpperCase();
+    const precos = { BRONZE: 69.90, GOLD: 99.90, PLATINUM: 249.90 };
+    if (typeof window.assinarPlano === 'function') {
+      window.assinarPlano(`Plano ${planoClean}`, precos[planoClean] || 99.90);
     }
   },
 
