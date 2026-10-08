@@ -5807,10 +5807,16 @@ app.post('/api/saas/calcular-upgrade', autenticarJWTOpcional, async (req, res) =
     const separator = baseUrl.includes('?') ? '&' : '?';
     const checkoutUrl = `${baseUrl}${separator}src=${encodeURIComponent(refString)}&custom_id=${encodeURIComponent(refString)}&external_reference=${encodeURIComponent(refString)}`;
 
+    const dataProximaRenovacao = (loja && loja.vencimentoPlano)
+      ? new Date(loja.vencimentoPlano).toLocaleDateString('pt-BR')
+      : new Date(Date.now() + 30 * 86400000).toLocaleDateString('pt-BR');
+
     res.json({
       planoAtual,
       novoPlano: planoTarget,
       diasRestantes,
+      vencimentoPlano: loja ? loja.vencimentoPlano : null,
+      dataProximaRenovacao,
       precoPlanoAtual,
       precoNovoPlano,
       creditoPlanoAtual: Math.round(creditoPlanoAtual * 100) / 100,

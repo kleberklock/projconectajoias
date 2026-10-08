@@ -632,47 +632,29 @@ async function exibirModalUpgradeProRata(novoPlano, usuarioId) {
     `;
 
     if (eUpgrade) {
+      const dataRenovacao = data.dataProximaRenovacao || 'fim do ciclo atual';
       modalDiv.innerHTML = `
         <div style="background: #18181b; border: 1px solid var(--gold-primary, #d4af37); border-radius: 12px; max-width: 460px; width: 100%; padding: 1.5rem; color: #fff; font-family: sans-serif; box-shadow: 0 10px 30px rgba(0,0,0,0.5); position: relative;">
           <button onclick="document.getElementById('modal-upgrade-prorata').remove()" style="position: absolute; top: 12px; right: 14px; background: none; border: none; color: #a1a1aa; font-size: 1.2rem; cursor: pointer;">✕</button>
           
           <div style="text-align: center; margin-bottom: 1.2rem;">
             <div style="font-size: 2rem; color: var(--gold-primary, #d4af37); margin-bottom: 0.3rem;"><i class="fa-solid fa-angles-up"></i></div>
-            <h3 style="margin: 0; font-size: 1.25rem; color: #fff;">Upgrade Proporcional de Plano</h3>
-            <p style="margin: 0.3rem 0 0 0; font-size: 0.85rem; color: #a1a1aa;">Migração imediata com compensação de dias estilo PS Plus</p>
+            <h3 style="margin: 0; font-size: 1.25rem; color: #fff;">Upgrade para o Plano ${data.novoPlano}</h3>
+            <p style="margin: 0.3rem 0 0 0; font-size: 0.85rem; color: #a1a1aa;">Condições da sua transição de assinatura</p>
           </div>
 
-          <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 1rem; margin-bottom: 1.2rem; display: flex; flex-direction: column; gap: 0.6rem; font-size: 0.9rem;">
-            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.4rem;">
-              <span style="color: #a1a1aa;">Plano Atual:</span>
-              <span style="font-weight: 600; color: #e4e4e7;">Plano ${data.planoAtual}</span>
+          <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 1rem; margin-bottom: 1.2rem; display: flex; flex-direction: column; gap: 0.8rem; font-size: 0.9rem;">
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5rem;">
+              <span style="color: #a1a1aa;">Diferença cobrada hoje:</span>
+              <span style="font-weight: 700; color: #34d399; font-size: 1.05rem;">R$ ${data.valorUpgrade.toFixed(2).replace('.', ',')}</span>
             </div>
-            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.4rem;">
-              <span style="color: #a1a1aa;">Novo Plano Desejado:</span>
-              <span style="font-weight: 600; color: var(--gold-primary, #d4af37);">Plano ${data.novoPlano}</span>
+            <div style="line-height: 1.5; color: #e4e4e7; font-size: 0.85rem;">
+              A partir do dia <strong style="color: var(--gold-primary, #d4af37);">${dataRenovacao}</strong>, a sua assinatura passará a ser no valor recorrente de <strong style="color: #fff;">R$ ${data.precoNovoPlano.toFixed(2).replace('.', ',')}/mês</strong> (em vez de R$ ${data.precoPlanoAtual.toFixed(2).replace('.', ',')}/mês do Plano ${data.planoAtual}).
             </div>
-            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.4rem;">
-              <span style="color: #a1a1aa;">Dias restantes no ciclo atual:</span>
-              <span style="font-weight: 600; color: #38bdf8;">${data.diasRestantes} dias</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.4rem;">
-              <span style="color: #a1a1aa;">Crédito abatido (${data.planoAtual}):</span>
-              <span style="font-weight: 600; color: #4ade80;">- R$ ${data.creditoPlanoAtual.toFixed(2).replace('.', ',')}</span>
-            </div>
-            <div style="display: flex; justify-content: space-between;">
-              <span style="color: #a1a1aa;">Custo proporcional (${data.novoPlano}):</span>
-              <span style="font-weight: 600; color: #f87171;">+ R$ ${data.custoNovoPlanoProporcional.toFixed(2).replace('.', ',')}</span>
-            </div>
-          </div>
-
-          <div style="background: linear-gradient(135deg, rgba(212,175,55,0.15) 0%, rgba(0,0,0,0.4) 100%); border: 1px solid var(--gold-primary, #d4af37); border-radius: 8px; padding: 1rem; text-align: center; margin-bottom: 1.2rem;">
-            <span style="font-size: 0.8rem; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.5px;">Diferença a pagar agora:</span>
-            <div style="font-size: 1.8rem; font-weight: 800; color: var(--gold-primary, #d4af37); margin-top: 0.2rem;">R$ ${data.valorUpgrade.toFixed(2).replace('.', ',')}</div>
-            <span style="font-size: 0.75rem; color: #a1a1aa; display: block; margin-top: 0.2rem;">Próxima fatura cheia em ${data.diasRestantes} dias (R$ ${data.precoNovoPlano.toFixed(2).replace('.', ',')}/mês)</span>
           </div>
 
           <button onclick="window.location.href='${data.linkDePagamento}'" style="width: 100%; padding: 0.9rem; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; border: none; font-weight: 700; font-size: 1rem; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
-            <i class="fa-solid fa-bolt"></i> Pagar Diferença e Ativar Upgrade (Cakto Pay)
+            <i class="fa-solid fa-bolt"></i> Pagar R$ ${data.valorUpgrade.toFixed(2).replace('.', ',')} e Ativar (Cakto Pay)
           </button>
         </div>
       `;
@@ -779,19 +761,19 @@ async function atualizarBadgesUpgradeProRata() {
           // É o plano atual
           const badge = document.createElement("div");
           badge.className = "badge-prorata-live";
-          badge.style.cssText = "background: rgba(129, 199, 132, 0.15); border: 1px solid #81c784; color: #81c784; font-size: 0.75rem; font-weight: bold; padding: 4px 10px; border-radius: 8px; margin-bottom: 0.8rem; text-align: center;";
-          badge.innerHTML = '<i class="fa-solid fa-check-circle"></i> Seu Plano Atual (Ativo)';
+          badge.style.cssText = "font-size: 0.78rem; color: #81c784; margin-top: 4px; font-weight: 500; text-align: left;";
+          badge.innerHTML = '<i class="fa-solid fa-circle-check"></i> Seu Plano Atual (Ativo)';
           if (priceEl) priceEl.after(badge);
           targetBtn.innerHTML = '<i class="fa-solid fa-check"></i> Plano Atual Ativo';
           targetBtn.style.opacity = '0.7';
         } else if (data.planoAtual !== 'BASICO' && data.diasRestantes > 0 && data.creditoPlanoAtual > 0 && data.valorUpgrade < data.precoNovoPlano) {
-          // É um upgrade proporcional
+          // É um upgrade proporcional - Discreto e limpo abaixo do preço
           const badge = document.createElement("div");
           badge.className = "badge-prorata-live";
-          badge.style.cssText = "background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.1) 100%); border: 1px solid #10b981; color: #34d399; font-size: 0.8rem; font-weight: 700; padding: 6px 10px; border-radius: 8px; margin-bottom: 0.8rem; text-align: center; box-shadow: 0 2px 10px rgba(16, 185, 129, 0.15);";
-          badge.innerHTML = `<i class="fa-solid fa-bolt" style="color: #f59e0b;"></i> Upgrade hoje por apenas <strong>R$ ${data.valorUpgrade.toFixed(2).replace('.', ',')}</strong> <div style="font-size: 0.7rem; opacity: 0.85; font-weight: normal; margin-top: 2px;">(-R$ ${data.creditoPlanoAtual.toFixed(2).replace('.', ',')} de crédito dos seus ${data.diasRestantes} dias restantes)</div>`;
+          badge.style.cssText = "font-size: 0.78rem; color: #34d399; margin-top: 4px; font-weight: 500; text-align: left;";
+          badge.innerHTML = `<i class="fa-solid fa-bolt" style="font-size: 0.7rem; color: #f59e0b;"></i> Upgrade hoje por R$ ${data.valorUpgrade.toFixed(2).replace('.', ',')}`;
           if (priceEl) priceEl.after(badge);
-          targetBtn.innerHTML = `<i class="fa-solid fa-bolt"></i> Upgrade por R$ ${data.valorUpgrade.toFixed(2).replace('.', ',')} (Cakto Pay)`;
+          targetBtn.innerHTML = `<i class="fa-solid fa-bolt"></i> Fazer Upgrade (Cakto Pay)`;
         } else {
           targetBtn.innerHTML = `<i class="fa-solid fa-crown"></i> Assinar Plano ${p.charAt(0) + p.slice(1).toLowerCase()} (Cakto Pay)`;
         }
