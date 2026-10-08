@@ -770,10 +770,12 @@ async function atualizarBadgesUpgradeProRata() {
 
         if (data.planoAtual === p) {
           // É o plano atual -> Desabilita o botão e desativa qualquer clique
+          const dataRenovacao = data.dataProximaRenovacao || (data.vencimentoPlano ? new Date(data.vencimentoPlano).toLocaleDateString('pt-BR') : 'A renovar');
+
           const badge = document.createElement("div");
           badge.className = "badge-prorata-live";
-          badge.style.cssText = "font-size: 0.78rem; color: #81c784; margin-top: 4px; font-weight: 500; text-align: left;";
-          badge.innerHTML = '<i class="fa-solid fa-circle-check"></i> Seu Plano Atual (Ativo)';
+          badge.style.cssText = "font-size: 0.78rem; color: #81c784; margin-top: 4px; font-weight: 500; text-align: left; line-height: 1.4;";
+          badge.innerHTML = `<i class="fa-solid fa-circle-check"></i> Seu Plano Atual (Ativo)<br><span style="font-size: 0.76rem; color: #a1a1aa; font-weight: 400; display: inline-block; margin-top: 3px;"><i class="fa-regular fa-calendar-check" style="color: var(--gold-primary, #d4af37); margin-right: 3px;"></i> Próximo pagamento: <strong style="color: #34d399;">${dataRenovacao}</strong></span>`;
           if (priceEl) priceEl.after(badge);
           
           targetBtn.disabled = true;
@@ -781,6 +783,12 @@ async function atualizarBadgesUpgradeProRata() {
           targetBtn.style.cursor = 'not-allowed';
           targetBtn.style.pointerEvents = 'none';
           targetBtn.innerHTML = '<i class="fa-solid fa-check"></i> Plano Ativo';
+
+          // Atualiza o painel superior (#saas-plano-vencimento) se existir na página
+          const elVenc = document.getElementById("saas-plano-vencimento");
+          if (elVenc && data.planoAtual !== 'BASICO') {
+            elVenc.innerHTML = `<span style="color: #34d399; font-weight: 700;"><i class="fa-regular fa-calendar-check" style="margin-right: 4px;"></i> ${dataRenovacao}</span>`;
+          }
         } else {
           // Re-habilita se não for o plano atual
           targetBtn.disabled = false;
