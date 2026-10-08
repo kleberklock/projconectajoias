@@ -552,6 +552,7 @@ async function assinarPlano(planoNome, preco, event) {
     
     try {
       await exibirModalUpgradeProRata(planoClean, usuarioId);
+      atualizarBadgesUpgradeProRata();
       return;
     } catch (e) {
       console.warn("Fallback para fluxo normal de pagamento:", e);
@@ -602,6 +603,15 @@ async function assinarPlano(planoNome, preco, event) {
 }
 
 /**
+ * Fecha o modal de upgrade e restaura os botões de plano
+ */
+function fecharModalUpgradeProRata() {
+  const modal = document.getElementById("modal-upgrade-prorata");
+  if (modal) modal.remove();
+  atualizarBadgesUpgradeProRata();
+}
+
+/**
  * Exibe o modal de Upgrade Pro Rata (estilo PS Plus)
  */
 async function exibirModalUpgradeProRata(novoPlano, usuarioId) {
@@ -624,6 +634,7 @@ async function exibirModalUpgradeProRata(novoPlano, usuarioId) {
     // Cria o Modal Overlay estilizado tipo PS Plus
     const modalDiv = document.createElement("div");
     modalDiv.id = "modal-upgrade-prorata";
+    modalDiv.onclick = (e) => { if (e.target === modalDiv) fecharModalUpgradeProRata(); };
     modalDiv.style.cssText = `
       position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
       background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 99999;
@@ -635,7 +646,7 @@ async function exibirModalUpgradeProRata(novoPlano, usuarioId) {
       const dataRenovacao = data.dataProximaRenovacao || 'fim do ciclo atual';
       modalDiv.innerHTML = `
         <div style="background: #18181b; border: 1px solid var(--gold-primary, #d4af37); border-radius: 12px; max-width: 460px; width: 100%; padding: 1.5rem; color: #fff; font-family: sans-serif; box-shadow: 0 10px 30px rgba(0,0,0,0.5); position: relative;">
-          <button onclick="document.getElementById('modal-upgrade-prorata').remove()" style="position: absolute; top: 12px; right: 14px; background: none; border: none; color: #a1a1aa; font-size: 1.2rem; cursor: pointer;">✕</button>
+          <button onclick="fecharModalUpgradeProRata()" style="position: absolute; top: 12px; right: 14px; background: none; border: none; color: #a1a1aa; font-size: 1.2rem; cursor: pointer;">✕</button>
           
           <div style="text-align: center; margin-bottom: 1.2rem;">
             <div style="font-size: 2rem; color: var(--gold-primary, #d4af37); margin-bottom: 0.3rem;"><i class="fa-solid fa-angles-up"></i></div>
@@ -661,7 +672,7 @@ async function exibirModalUpgradeProRata(novoPlano, usuarioId) {
     } else {
       modalDiv.innerHTML = `
         <div style="background: #18181b; border: 1px solid var(--gold-primary, #d4af37); border-radius: 12px; max-width: 460px; width: 100%; padding: 1.5rem; color: #fff; font-family: sans-serif; box-shadow: 0 10px 30px rgba(0,0,0,0.5); position: relative;">
-          <button onclick="document.getElementById('modal-upgrade-prorata').remove()" style="position: absolute; top: 12px; right: 14px; background: none; border: none; color: #a1a1aa; font-size: 1.2rem; cursor: pointer;">✕</button>
+          <button onclick="fecharModalUpgradeProRata()" style="position: absolute; top: 12px; right: 14px; background: none; border: none; color: #a1a1aa; font-size: 1.2rem; cursor: pointer;">✕</button>
           
           <div style="text-align: center; margin-bottom: 1.2rem;">
             <div style="font-size: 2rem; color: var(--gold-primary, #d4af37); margin-bottom: 0.3rem;"><i class="fa-solid fa-crown"></i></div>
@@ -758,24 +769,36 @@ async function atualizarBadgesUpgradeProRata() {
         const priceEl = cardContainer.querySelector("div[style*='font-size: 1.8rem']") || cardContainer.querySelector("div[style*='font-size: 1.5rem']");
 
         if (data.planoAtual === p) {
-          // É o plano atual
+          // É o plano atual -> Desabilita o botão e desativa qualquer clique
           const badge = document.createElement("div");
           badge.className = "badge-prorata-live";
           badge.style.cssText = "font-size: 0.78rem; color: #81c784; margin-top: 4px; font-weight: 500; text-align: left;";
           badge.innerHTML = '<i class="fa-solid fa-circle-check"></i> Seu Plano Atual (Ativo)';
           if (priceEl) priceEl.after(badge);
-          targetBtn.innerHTML = '<i class="fa-solid fa-check"></i> Plano Atual Ativo';
-          targetBtn.style.opacity = '0.7';
-        } else if (data.planoAtual !== 'BASICO' && data.diasRestantes > 0 && data.creditoPlanoAtual > 0 && data.valorUpgrade < data.precoNovoPlano) {
-          // É um upgrade proporcional - Discreto e limpo abaixo do preço
-          const badge = document.createElement("div");
-          badge.className = "badge-prorata-live";
-          badge.style.cssText = "font-size: 0.78rem; color: #34d399; margin-top: 4px; font-weight: 500; text-align: left;";
-          badge.innerHTML = `<i class="fa-solid fa-bolt" style="font-size: 0.7rem; color: #f59e0b;"></i> Upgrade hoje por R$ ${data.valorUpgrade.toFixed(2).replace('.', ',')}`;
-          if (priceEl) priceEl.after(badge);
-          targetBtn.innerHTML = `<i class="fa-solid fa-bolt"></i> Fazer Upgrade (Cakto Pay)`;
+          
+          targetBtn.disabled = true;
+          targetBtn.style.opacity = '0.5';
+          targetBtn.style.cursor = 'not-allowed';
+          targetBtn.style.pointerEvents = 'none';
+          targetBtn.innerHTML = '<i class="fa-solid fa-check"></i> Plano Ativo';
         } else {
-          targetBtn.innerHTML = `<i class="fa-solid fa-crown"></i> Assinar Plano ${p.charAt(0) + p.slice(1).toLowerCase()} (Cakto Pay)`;
+          // Re-habilita se não for o plano atual
+          targetBtn.disabled = false;
+          targetBtn.style.opacity = '1';
+          targetBtn.style.cursor = 'pointer';
+          targetBtn.style.pointerEvents = 'auto';
+
+          if (data.planoAtual !== 'BASICO' && data.diasRestantes > 0 && data.creditoPlanoAtual > 0 && data.valorUpgrade < data.precoNovoPlano) {
+            // É um upgrade proporcional - Discreto e limpo abaixo do preço
+            const badge = document.createElement("div");
+            badge.className = "badge-prorata-live";
+            badge.style.cssText = "font-size: 0.78rem; color: #34d399; margin-top: 4px; font-weight: 500; text-align: left;";
+            badge.innerHTML = `<i class="fa-solid fa-bolt" style="font-size: 0.7rem; color: #f59e0b;"></i> Upgrade hoje por R$ ${data.valorUpgrade.toFixed(2).replace('.', ',')}`;
+            if (priceEl) priceEl.after(badge);
+            targetBtn.innerHTML = `<i class="fa-solid fa-bolt"></i> Fazer Upgrade (Cakto Pay)`;
+          } else {
+            targetBtn.innerHTML = `<i class="fa-solid fa-crown"></i> Assinar Plano ${p.charAt(0) + p.slice(1).toLowerCase()} (Cakto Pay)`;
+          }
         }
       } catch (e) {
         console.warn(`Erro ao calcular badge de upgrade para ${p}:`, e);
@@ -788,6 +811,7 @@ async function atualizarBadgesUpgradeProRata() {
 
 // Exporta globalmente as funções
 window.assinarPlano = assinarPlano;
+window.fecharModalUpgradeProRata = fecharModalUpgradeProRata;
 window.exibirModalUpgradeProRata = exibirModalUpgradeProRata;
 window.atualizarBadgesUpgradeProRata = atualizarBadgesUpgradeProRata;
 
