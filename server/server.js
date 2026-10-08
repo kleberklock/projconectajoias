@@ -5713,7 +5713,7 @@ app.get('/api/saas/meu-plano', autenticarJWTOpcional, identificarLoja, async (re
       },
       planosDisponiveis: [
         { id: 'BRONZE', nome: 'Plano Bronze', valor: 69.90, limiteConsultoras: 5, limiteEstoque: 300 },
-        { id: 'GOLD', nome: 'Plano Gold', valor: 99.90, limiteConsultoras: 25, limiteEstoque: 1500, popular: true },
+        { id: 'GOLD', nome: 'Plano Gold', valor: 99.90, limiteConsultoras: 25, limiteEstoque: 1500 },
         { id: 'PLATINUM', nome: 'Plano Platinum', valor: 249.90, limiteConsultoras: 'Ilimitado', limiteEstoque: 'Ilimitado' }
       ]
     });
