@@ -526,6 +526,19 @@ async function assinarPlano(planoNome, preco, event) {
     }
 
     if (!usuarioId) {
+      const token = localStorage.getItem("conectajoias_token");
+      if (token && token.includes(".")) {
+        try {
+          const payloadBase64 = token.split(".")[1];
+          const payloadDecoded = JSON.parse(atob(payloadBase64));
+          if (payloadDecoded && payloadDecoded.id) {
+            usuarioId = payloadDecoded.id;
+          }
+        } catch (e) {}
+      }
+    }
+
+    if (!usuarioId) {
       const planoClean = (planoNome || "gold").toLowerCase().includes("bronze") ? "bronze" : ((planoNome || "gold").toLowerCase().includes("platinum") ? "platinum" : "gold");
       localStorage.setItem("plano_selecionado", planoClean);
       const isPagesDir = window.location.pathname.includes("/pages/");

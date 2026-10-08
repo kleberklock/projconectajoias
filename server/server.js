@@ -5818,12 +5818,12 @@ app.get('/api/saas/meu-plano', autenticarJWTOpcional, identificarLoja, async (re
     });
     const totalEstoque = totalProdutos._sum.quantidade || 0;
 
-    // Limites de acordo com os 4 planos (Básico zerado e preços em R$ 1,00 para teste)
+    // Limites de acordo com os 4 planos
     const limites = {
       BASICO: { consultoras: 0, estoque: 0, valor: 0.00 },
-      BRONZE: { consultoras: 5, estoque: 300, valor: 1.00 },
-      GOLD: { consultoras: 25, estoque: 1500, valor: 1.00 },
-      PLATINUM: { consultoras: 9999, estoque: 99999, valor: 1.00 }
+      BRONZE: { consultoras: 5, estoque: 300, valor: 69.90 },
+      GOLD: { consultoras: 25, estoque: 1500, valor: 99.90 },
+      PLATINUM: { consultoras: 9999, estoque: 99999, valor: 249.90 }
     };
 
     const limiteAtual = limites[planoStr] || limites.BASICO;
@@ -5849,14 +5849,115 @@ app.get('/api/saas/meu-plano', autenticarJWTOpcional, identificarLoja, async (re
         limiteEstoque: limiteAtual.estoque
       },
       planosDisponiveis: [
-        { id: 'BRONZE', nome: 'Plano Bronze', valor: 1.00, limiteConsultoras: 5, limiteEstoque: 300 },
-        { id: 'GOLD', nome: 'Plano Gold', valor: 1.00, limiteConsultoras: 25, limiteEstoque: 1500, popular: true },
-        { id: 'PLATINUM', nome: 'Plano Platinum', valor: 1.00, limiteConsultoras: 'Ilimitado', limiteEstoque: 'Ilimitado' }
+        { id: 'BRONZE', nome: 'Plano Bronze', valor: 69.90, limiteConsultoras: 5, limiteEstoque: 300 },
+        { id: 'GOLD', nome: 'Plano Gold', valor: 99.90, limiteConsultoras: 25, limiteEstoque: 1500, popular: true },
+        { id: 'PLATINUM', nome: 'Plano Platinum', valor: 249.90, limiteConsultoras: 'Ilimitado', limiteEstoque: 'Ilimitado' }
       ]
     });
   } catch (error) {
     console.error("Erro ao buscar dados do plano da loja:", error);
     res.status(500).json({ error: 'Erro ao buscar dados do plano.' });
+  }
+});
+
+// Endpoint para calcular o Upgrade Pro Rata (estilo PS Plus)
+app.post('/api/saas/calcular-upgrade', autenticarJWTOpcional, async (req, res) => {
+  try {
+    const { usuarioId, novoPlano } = req.body;
+    const planoTarget = String(novoPlano || 'GOLD').toUpperCase();
+
+    if (!['BRONZE', 'GOLD', 'PLATINUM'].includes(planoTarget)) {
+      return res.status(400).json({ error: 'Plano de destino inválido.' });
+    }
+
+    let uid = usuarioId;
+    if (!uid && req.user) uid = req.user.id;
+
+    let loja = null;
+    let usuario = null;
+
+    if (uid) {
+      usuario = await prisma.usuario.findUnique({
+        where: { id: uid },
+        include: { loja: true }
+      }).catch(() => null);
+
+      if (usuario && usuario.loja) {
+        loja = usuario.loja;
+      } else {
+        loja = await prisma.loja.findUnique({ where: { id: uid } }).catch(() => null);
+      }
+    }
+
+    if (!loja && req.lojaId && req.lojaId !== 'default-loja') {
+      loja = await prisma.loja.findUnique({ where: { id: req.lojaId } }).catch(() => null);
+    }
+
+    if (!loja) {
+      loja = await prisma.loja.findFirst().catch(() => null);
+    }
+
+    const precos = {
+      BASICO: 0.00,
+      BRONZE: 69.90,
+      GOLD: 99.90,
+      PLATINUM: 249.90
+    };
+
+    const planoAtual = loja ? (loja.plano || 'BASICO').toUpperCase() : 'BASICO';
+    const precoPlanoAtual = precos[planoAtual] || 0.00;
+    const precoNovoPlano = precos[planoTarget] || 99.90;
+
+    let diasRestantes = 0;
+    if (loja && loja.vencimentoPlano && planoAtual !== 'BASICO') {
+      const hoje = new Date();
+      const vencimento = new Date(loja.vencimentoPlano);
+      const diffTime = vencimento.getTime() - hoje.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      diasRestantes = Math.max(0, Math.min(30, diffDays));
+    }
+
+    // Cálculo Pro Rata
+    const valorDiarioAtual = precoPlanoAtual / 30;
+    const creditoPlanoAtual = valorDiarioAtual * diasRestantes;
+
+    const valorDiarioNovo = precoNovoPlano / 30;
+    const custoNovoPlanoProporcional = valorDiarioNovo * diasRestantes;
+
+    let valorUpgrade = custoNovoPlanoProporcional - creditoPlanoAtual;
+    if (valorUpgrade < 0) valorUpgrade = 0;
+
+    // Se for contratação nova (sem upgrade de plano pago ativo)
+    if (planoAtual === 'BASICO' || diasRestantes === 0) {
+      valorUpgrade = precoNovoPlano;
+    }
+
+    const refString = `${(usuario ? usuario.id : (loja ? loja.id : 'admin'))}|${planoTarget}`;
+
+    let baseUrl = process.env.CAKTO_LINK_GOLD || 'https://pay.cakto.com.br/hzyzntj';
+    if (planoTarget === 'BRONZE') {
+      baseUrl = process.env.CAKTO_LINK_BRONZE || 'https://pay.cakto.com.br/hzi4fxm_1185271';
+    } else if (planoTarget === 'PLATINUM') {
+      baseUrl = process.env.CAKTO_LINK_PLATINUM || 'https://pay.cakto.com.br/34zr7nh';
+    }
+
+    const separator = baseUrl.includes('?') ? '&' : '?';
+    const checkoutUrl = `${baseUrl}${separator}src=${encodeURIComponent(refString)}&custom_id=${encodeURIComponent(refString)}&external_reference=${encodeURIComponent(refString)}`;
+
+    res.json({
+      planoAtual,
+      novoPlano: planoTarget,
+      diasRestantes,
+      precoPlanoAtual,
+      precoNovoPlano,
+      creditoPlanoAtual: Math.round(creditoPlanoAtual * 100) / 100,
+      custoNovoPlanoProporcional: Math.round(custoNovoPlanoProporcional * 100) / 100,
+      valorUpgrade: Math.round(valorUpgrade * 100) / 100,
+      linkDePagamento: checkoutUrl
+    });
+  } catch (error) {
+    console.error('Erro ao calcular upgrade:', error);
+    res.status(500).json({ error: 'Erro interno ao calcular upgrade proporcional.' });
   }
 });
 
