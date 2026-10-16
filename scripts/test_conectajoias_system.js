@@ -10,6 +10,16 @@
  * 6. Encerramento seguro (Teardown em bloco try/finally).
  */
 
+// Forçar resolução IPv4 para compatibilidade com CDP / Node 17+
+const dns = require('dns');
+if (dns.setDefaultResultOrder) {
+    dns.setDefaultResultOrder('ipv4first');
+}
+process.env.NODE_OPTIONS = (process.env.NODE_OPTIONS || '') + ' --dns-result-order=ipv4first';
+
+const os = require('os');
+const fs = require('fs');
+const path = require('path');
 const puppeteer = require('puppeteer');
 
 (async () => {
@@ -18,12 +28,15 @@ const puppeteer = require('puppeteer');
     console.log('==========================================================\n');
 
     let browser = null;
+    const tempProfileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'puppeteer_profile_'));
 
     try {
         console.log('[1/6] Inicializando o navegador Chrome...');
         browser = await puppeteer.launch({
             headless: false, // Abre a janela do navegador no ambiente do usuário
+            pipe: true,      // Comunicação direta via IPC stream (imune a erros de CDP/rede/IPv6)
             defaultViewport: null,
+            userDataDir: tempProfileDir,
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',

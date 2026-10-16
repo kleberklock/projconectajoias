@@ -7,6 +7,16 @@
  * - Suporte completo à bateria sequencial nos 4 Planos (BÁSICO -> BRONZE -> GOLD -> PLATINUM).
  */
 
+// Forçar resolução IPv4 para compatibilidade com CDP / Node 17+
+const dns = require('dns');
+if (dns.setDefaultResultOrder) {
+    dns.setDefaultResultOrder('ipv4first');
+}
+process.env.NODE_OPTIONS = (process.env.NODE_OPTIONS || '') + ' --dns-result-order=ipv4first';
+
+const os = require('os');
+const fs = require('fs');
+const path = require('path');
 const puppeteer = require('puppeteer');
 
 (async () => {
@@ -15,6 +25,7 @@ const puppeteer = require('puppeteer');
     console.log('========================================================================\n');
 
     let browser = null;
+    const tempProfileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'puppeteer_profile_'));
     const reportMultiPlano = {
         planoBasico: { status: 'PENDENTE', travasValidadas: [] },
         planoBronze: { status: 'PENDENTE', travasValidadas: [] },
@@ -30,7 +41,9 @@ const puppeteer = require('puppeteer');
         browser = await puppeteer.launch({
             headless: false,
             slowMo: 80,
+            pipe: true,      // Comunicação direta via IPC stream (imune a erros de CDP/rede/IPv6)
             defaultViewport: null,
+            userDataDir: tempProfileDir,
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
