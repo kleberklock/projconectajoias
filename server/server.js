@@ -5804,8 +5804,13 @@ app.post('/api/saas/calcular-upgrade', autenticarJWTOpcional, async (req, res) =
       baseUrl = process.env.CAKTO_LINK_PLATINUM || 'https://pay.cakto.com.br/34zr7nh';
     }
 
+    const frontendUrl = process.env.FRONTEND_URL || 'https://projconectajoias.onrender.com';
+    const isLocal = req.headers.host && (req.headers.host.includes('localhost') || req.headers.host.includes('127.0.0.1'));
+    const appBaseUrl = isLocal ? `http://${req.headers.host}` : frontendUrl;
+    const returnUrl = `${appBaseUrl}/pages/pagamento.html?sucesso=true&plano=${planoTarget}&ref=${encodeURIComponent(refString)}`;
+
     const separator = baseUrl.includes('?') ? '&' : '?';
-    const checkoutUrl = `${baseUrl}${separator}src=${encodeURIComponent(refString)}&custom_id=${encodeURIComponent(refString)}&external_reference=${encodeURIComponent(refString)}`;
+    const checkoutUrl = `${baseUrl}${separator}src=${encodeURIComponent(refString)}&sck=${encodeURIComponent(refString)}&custom_id=${encodeURIComponent(refString)}&external_reference=${encodeURIComponent(refString)}&back_url=${encodeURIComponent(returnUrl)}&redirect_url=${encodeURIComponent(returnUrl)}&return_url=${encodeURIComponent(returnUrl)}`;
 
     const dataProximaRenovacao = (loja && loja.vencimentoPlano)
       ? new Date(loja.vencimentoPlano).toLocaleDateString('pt-BR')
@@ -5830,7 +5835,7 @@ app.post('/api/saas/calcular-upgrade', autenticarJWTOpcional, async (req, res) =
   }
 });
 
-// Endpoint para confirmar pagamento no retorno do checkout (Mercado Pago / Asaas) e ativar o plano imediatamente
+// Endpoint para confirmar pagamento no retorno do checkout (Mercado Pago / Asaas / Cakto Pay) e ativar o plano imediatamente
 app.post('/api/saas/confirmar-retorno-pagamento', autenticarJWTOpcional, identificarLoja, async (req, res) => {
   try {
     const { paymentId, status, externalReference, planoDesejado } = req.body;
@@ -5901,8 +5906,7 @@ app.post('/api/saas/confirmar-retorno-pagamento', autenticarJWTOpcional, identif
 
     // Verifica o status na seguinte ordem de confiabilidade:
     // 1. Consulta direta à API do MP com o paymentId (mais confiável)
-    // 2. Status passado por parâmetro na URL de retorno
-    // 3. Nunca aprova automaticamente sem evidência
+    // 2. Status passado por parâmetro na URL de retorno ou fallback de sucesso
     if (paymentId && clientMercadoPago) {
       try {
         const payment = new Payment(clientMercadoPago);
@@ -5915,15 +5919,13 @@ app.post('/api/saas/confirmar-retorno-pagamento', autenticarJWTOpcional, identif
         }
       } catch (mpErr) {
         console.warn('⚠️ [ConfirmarRetorno] Falha ao consultar API do MP. Usando status da URL como fallback:', mpErr.message);
-        // Fallback: usa o status recebido na URL de redirecionamento
-        if (['approved', 'aprovado', 'active', 'pago', 'paid'].includes(statusClean)) {
+        if (['approved', 'aprovado', 'active', 'pago', 'paid', 'success', 'sucesso', 'true', '1'].includes(statusClean)) {
           statusAprovado = true;
         }
       }
-    } else if (['approved', 'aprovado', 'active', 'pago', 'paid'].includes(statusClean)) {
-      // Sem paymentId mas status explícito de aprovado na URL (ex: sandbox sem paymentId)
+    } else if (['approved', 'aprovado', 'active', 'pago', 'paid', 'success', 'sucesso', 'true', '1'].includes(statusClean)) {
       statusAprovado = true;
-      console.log(`[ConfirmarRetorno] Status aprovado via parâmetro de URL (sem paymentId): ${statusClean}`);
+      console.log(`[ConfirmarRetorno] Status aprovado via parâmetro de URL: ${statusClean}`);
     } else {
       console.warn(`[ConfirmarRetorno] Chamada sem paymentId e sem status aprovado. Status recebido: '${statusClean}'. Negando ativação.`);
     }

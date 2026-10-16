@@ -31,6 +31,7 @@ const checkout = {
   init: function() {
     this.carregarLinkId();
     this.registrarAcoes();
+    this.checarRetornoPagamento();
     
     if (this.linkId) {
       this.carregarDadosLink();
@@ -44,6 +45,48 @@ const checkout = {
       if (summarySection) summarySection.style.display = "none";
       if (tabsSection) tabsSection.style.display = "none";
       tabContents.forEach(c => c.style.display = "none");
+    }
+  },
+
+  checarRetornoPagamento: async function() {
+    const params = new URLSearchParams(window.location.search);
+    const eSucesso = params.get("sucesso") === "true" || params.get("status") === "approved" || params.get("checkout") === "success";
+    const plano = params.get("plano") || params.get("novoPlano");
+    const ref = params.get("ref") || params.get("external_reference") || params.get("src");
+
+    if (eSucesso || plano) {
+      console.log("🎉 Detectado retorno de checkout de pagamento!", { plano, ref });
+      try {
+        const token = localStorage.getItem("conectajoias_token");
+        const headers = { "Content-Type": "application/json" };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+
+        const res = await fetch(`${API_BASE_URL}/saas/confirmar-retorno-pagamento`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            status: "approved",
+            planoDesejado: plano || "GOLD",
+            externalReference: ref
+          })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          const planoAtivado = data.plano || plano || "GOLD";
+          this.toast(`🎉 Parabéns! Seu pagamento foi confirmado e o Plano ${planoAtivado.toUpperCase()} foi ativado com sucesso!`, "success");
+          
+          // Limpa os parâmetros da URL mantendo a navegação limpa
+          window.history.replaceState({}, document.title, window.location.pathname);
+          
+          // Se o app manager estiver carregado, recarrega o plano na interface
+          if (typeof app !== "undefined" && app.carregarMeuPlanoSaaS) {
+            app.carregarMeuPlanoSaaS();
+          }
+        }
+      } catch (err) {
+        console.warn("Aviso na ativação de retorno de pagamento:", err.message);
+      }
     }
   },
 

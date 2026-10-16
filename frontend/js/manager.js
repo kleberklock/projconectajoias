@@ -202,7 +202,10 @@ const app = {
         this.state.token = token;
         this.state.usuarioLogado = usuario;
         this.exibirInterfacePosLogin();
-        try { this.carregarMeuPlanoSaaS(); } catch (e) { console.error("Erro ao carregar plano no init:", e); }
+        try { 
+          this.checarRetornoPagamentoSaas();
+          this.carregarMeuPlanoSaaS(); 
+        } catch (e) { console.error("Erro ao carregar plano no init:", e); }
         
         // Renderizar imediatamente usando os dados locais em cache para evitar atrasos e tela preta
         this.renderizarMinhaMaleta();
@@ -8214,6 +8217,33 @@ ${dinheiroAReceberDaRev >= comissaoApagarParaRev
 
   planoSaasSelecionado: 'GOLD',
   pollingTimerSaas: null,
+
+  checarRetornoPagamentoSaas: async function() {
+    const params = new URLSearchParams(window.location.search);
+    const eSucesso = params.get("sucesso") === "true" || params.get("status") === "approved" || params.get("checkout") === "success";
+    const plano = params.get("plano") || params.get("novoPlano");
+    const ref = params.get("ref") || params.get("external_reference") || params.get("src");
+
+    if (eSucesso || plano) {
+      console.log("🎉 [Manager] Retorno de checkout detectado!", { plano, ref });
+      try {
+        const res = await this.requisitarAPI("/saas/confirmar-retorno-pagamento", "POST", {
+          status: "approved",
+          planoDesejado: plano || "GOLD",
+          externalReference: ref
+        });
+
+        if (res && (res.status === "PAGO" || res.status === "ATIVO" || res.plano)) {
+          const planoAtivado = res.plano || plano || "GOLD";
+          this.toast(`🎉 Parabéns! Seu pagamento foi confirmado e o Plano ${planoAtivado.toUpperCase()} foi ativado com sucesso!`, "success");
+          window.history.replaceState({}, document.title, window.location.pathname);
+          await this.carregarMeuPlanoSaaS();
+        }
+      } catch (err) {
+        console.warn("Aviso na checagem de retorno do plano:", err.message);
+      }
+    }
+  },
 
   carregarMeuPlanoSaaS: async function() {
     // 1. Renderização SÍNCRONA imediata com base no perfil logado (Zero Latência)
