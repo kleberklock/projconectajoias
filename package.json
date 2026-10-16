@@ -6,7 +6,6 @@
     "dev": "scripts/start.bat",
     "server": "cd server && npm run dev",
     "frontend": "cd frontend && npx http-server -p 8080 -c-1",
-    "test:google": "node --dns-result-order=ipv4first scripts/test_google.js",
     "test:system": "node --dns-result-order=ipv4first scripts/test_conectajoias_system.js",
     "test:live": "node --dns-result-order=ipv4first scripts/test_live_demo.js"
   },
