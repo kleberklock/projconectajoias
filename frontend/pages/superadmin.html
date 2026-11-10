@@ -113,9 +113,6 @@
           <li class="nav-item" data-target="notas-fiscais">
             <button id="btn-tab-notas-fiscais"><i class="fa-solid fa-file-invoice"></i>Notas Fiscais</button>
           </li>
-          <li class="nav-item" data-target="admin-treinamentos">
-            <button id="btn-tab-admin-treinamentos"><i class="fa-solid fa-graduation-cap"></i>Treinamentos</button>
-          </li>
           <li class="nav-item" data-target="meu-plano-saas" id="menu-meu-plano-saas">
             <button id="btn-tab-meu-plano-saas"><i class="fa-solid fa-crown"></i>Meu Plano & Assinatura</button>
           </li>
@@ -1451,7 +1448,7 @@
             </div>
           </div>
 
-          <!-- Coluna Direita (Status + Tutorial) -->
+          <!-- Coluna Direita (Status + Ajuda) -->
           <div style="display: flex; flex-direction: column; gap: 2rem;">
             <!-- Informações e Status -->
             <div class="dashboard-panel" style="display: flex; flex-direction: column; justify-content: space-between; flex: 1;">
@@ -1471,16 +1468,16 @@
               </div>
             </div>
 
-            <!-- Ajuda & Onboarding -->
+            <!-- Ajuda & Suporte -->
             <div class="dashboard-panel" style="display: flex; flex-direction: column; justify-content: space-between;">
               <div>
                 <div class="panel-header">
-                  <h2><i class="fa-solid fa-sparkles"></i> Ajuda & Onboarding</h2>
+                  <h2><i class="fa-solid fa-sparkles"></i> Ajuda & Suporte</h2>
                 </div>
                 <div style="margin-top: 1.5rem; font-size: 0.9rem; line-height: 1.6;">
                   <p>Precisa de ajuda para dominar todos os recursos da plataforma?</p>
                   <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.82rem; line-height: 1.4;">
-                    Inicie o tutorial interativo guiado passo a passo ou consulte os guias das áreas vitais:
+                    Consulte os guias rápidos e atalhos das áreas vitais:
                   </p>
                   <div style="display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 0.8rem;">
                     <span style="background: rgba(212,175,55,0.12); color: var(--gold-light); border: 1px solid rgba(212,175,55,0.25); border-radius: 4px; padding: 0.2rem 0.55rem; font-size: 0.75rem;"><i class="fa-solid fa-boxes-stacked"></i> Estoque</span>
@@ -1491,7 +1488,6 @@
                 </div>
               </div>
               <div style="margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1rem; display: flex; flex-direction: column; gap: 0.6rem;">
-                <button class="btn-gold" onclick="window.initOnboardingTour(true)" style="width: 100%; justify-content: center; padding: 0.65rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem;"><i class="fa-solid fa-play"></i> Iniciar Tutorial Interativo (12 Passos)</button>
                 <button class="btn btn-secondary" onclick="app.abrirAjudaMovimentacoes()" style="width: 100%; justify-content: center; padding: 0.55rem; font-size: 0.82rem; display: flex; align-items: center; gap: 0.5rem; background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.1);"><i class="fa-solid fa-circle-question"></i> Guia Rápido de Movimentações</button>
               </div>
             </div>
@@ -1573,158 +1569,7 @@
       </section>
 
 
-      <!-- ==========================================
-           ABA: GESTÃO DE TREINAMENTOS (ADMIN)
-           ========================================== -->
-      <section id="admin-treinamentos" class="app-section">
-        <div class="section-header">
-          <div class="section-title">
-            <h2>Portal de Treinamento e Capacitação</h2>
-            <p>Assista aos treinamentos oficiais do sistema e gerencie materiais disponibilizados para suas revendedoras.</p>
-          </div>
-        </div>
 
-        <!-- MÓDULOS DE TREINAMENTO INTEGRADOS (VISUAL LUXO) -->
-        <div style="margin-bottom: 2.5rem;">
-          <h3 style="color: var(--gold-primary); font-size: 1.25rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 8px;">
-            <i class="fa-solid fa-graduation-cap"></i> Treinamento Oficial da Distribuidora
-          </h3>
-          <div class="treinamento-modulos-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">
-            
-            <!-- Módulo 1 -->
-            <div class="modulo-premium-card" onclick="app.abrirVideoPlayer('Módulo 1: Visão Geral & Métricas', 'https://www.youtube.com/embed/dQw4w9WgXcQ')">
-              <div class="modulo-video-cover cover-1">
-                <div class="play-btn-glow"><i class="fa-solid fa-play"></i></div>
-                <span class="modulo-tag">Módulo 1</span>
-              </div>
-              <div class="modulo-premium-content">
-                <h4>Visão Geral & Métricas</h4>
-                <p>Domine o Painel Geral: faturamento, controle de lucro real e o fluxo do demonstrativo DRE.</p>
-                <div class="modulo-premium-footer">
-                  <span class="aula-duration"><i class="fa-regular fa-clock"></i> 4 min</span>
-                  <button class="btn-gold btn-assistir-aula" onclick="event.stopPropagation(); app.abrirVideoPlayer('Módulo 1: Visão Geral & Métricas', 'https://www.youtube.com/embed/dQw4w9WgXcQ')">
-                    <i class="fa-solid fa-play"></i> Assistir Aula
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Módulo 2 -->
-            <div class="modulo-premium-card" onclick="app.abrirVideoPlayer('Módulo 2: Cadastro de Estoque & Custos', 'https://www.youtube.com/embed/dQw4w9WgXcQ')">
-              <div class="modulo-video-cover cover-2">
-                <div class="play-btn-glow"><i class="fa-solid fa-play"></i></div>
-                <span class="modulo-tag">Módulo 2</span>
-              </div>
-              <div class="modulo-premium-content">
-                <h4>Cadastro de Estoque & Custos</h4>
-                <p>Aprenda a cadastrar peças, registrar banhos de ouro, markup dinâmico e precificação.</p>
-                <div class="modulo-premium-footer">
-                  <span class="aula-duration"><i class="fa-regular fa-clock"></i> 6 min</span>
-                  <button class="btn-gold btn-assistir-aula" onclick="event.stopPropagation(); app.abrirVideoPlayer('Módulo 2: Cadastro de Estoque & Custos', 'https://www.youtube.com/embed/dQw4w9WgXcQ')">
-                    <i class="fa-solid fa-play"></i> Assistir Aula
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Módulo 3 -->
-            <div class="modulo-premium-card" onclick="app.abrirVideoPlayer('Módulo 3: Revendedoras & Consignados', 'https://www.youtube.com/embed/dQw4w9WgXcQ')">
-              <div class="modulo-video-cover cover-3">
-                <div class="play-btn-glow"><i class="fa-solid fa-play"></i></div>
-                <span class="modulo-tag">Módulo 3</span>
-              </div>
-              <div class="modulo-premium-content">
-                <h4>Revendedoras & Consignados</h4>
-                <p>Aprenda como cadastrar vendedoras, montar maletas e efetuar acertos fiscais e comissões.</p>
-                <div class="modulo-premium-footer">
-                  <span class="aula-duration"><i class="fa-regular fa-clock"></i> 5 min</span>
-                  <button class="btn-gold btn-assistir-aula" onclick="event.stopPropagation(); app.abrirVideoPlayer('Módulo 3: Revendedoras & Consignados', 'https://www.youtube.com/embed/dQw4w9WgXcQ')">
-                    <i class="fa-solid fa-play"></i> Assistir Aula
-                  </button>
-                </div>
-              </div>
-            <!-- Módulo 4 -->
-            <div class="modulo-premium-card" onclick="app.abrirVideoPlayer('Módulo 4: Movimentações & Rastreamento de Estoque', 'https://www.youtube.com/embed/dQw4w9WgXcQ')">
-              <div class="modulo-video-cover cover-1" style="background: linear-gradient(135deg, rgba(212,175,55,0.2) 0%, rgba(20,20,20,0.9) 100%);">
-                <div class="play-btn-glow"><i class="fa-solid fa-play"></i></div>
-                <span class="modulo-tag">Módulo 4</span>
-              </div>
-              <div class="modulo-premium-content">
-                <h4>Movimentações & Rastreamento</h4>
-                <p>Aprenda a rastrear o fluxo completo: entradas de peças, saídas em maletas, retornos de acertos e baixas de avarias.</p>
-                <div class="modulo-premium-footer">
-                  <span class="aula-duration"><i class="fa-regular fa-clock"></i> 4 min</span>
-                  <button class="btn-gold btn-assistir-aula" onclick="event.stopPropagation(); app.abrirVideoPlayer('Módulo 4: Movimentações & Rastreamento de Estoque', 'https://www.youtube.com/embed/dQw4w9WgXcQ')">
-                    <i class="fa-solid fa-play"></i> Assistir Aula
-                  </button>
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-
-        <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.08); margin: 2.5rem 0;">
-
-        <h3 style="color: #fff; font-size: 1.15rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 8px;">
-          <i class="fa-solid fa-photo-film"></i> Repositório de Conteúdos On-Demand (Revendedoras)
-        </h3>
-
-        <div class="split-layout" style="grid-template-columns: 1.2fr 0.8fr; gap: 2rem;">
-          <!-- Lista de Treinamentos -->
-          <div class="dashboard-panel">
-            <div class="panel-header">
-              <h2><i class="fa-solid fa-photo-film"></i> Conteúdos Cadastrados</h2>
-            </div>
-            <div class="table-responsive" style="margin-top: 1rem;">
-              <table class="premium-table">
-                <thead>
-                  <tr>
-                    <th>Título</th>
-                    <th>Tipo</th>
-                    <th>URL Recurso</th>
-                    <th>Ações</th>
-                  </tr>
-                </thead>
-                <tbody id="tbody-admin-treinamentos">
-                  <tr>
-                    <td colspan="4" style="text-align: center; color: var(--text-secondary);">Nenhum conteúdo de treinamento cadastrado.</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <!-- Formulário Cadastro -->
-          <div class="dashboard-panel">
-            <div class="panel-header">
-              <h2><i class="fa-solid fa-plus"></i> Novo Conteúdo</h2>
-            </div>
-            <div style="margin-top: 1.5rem;">
-              <div class="form-group" style="margin-bottom: 1rem;">
-                <label for="trein-titulo" style="display: block; margin-bottom: 0.3rem;">Título do Conteúdo *</label>
-                <input type="text" id="trein-titulo" class="form-control" placeholder="Ex: Como gerar Links de Pagamento" required>
-              </div>
-              <div class="form-group" style="margin-bottom: 1rem;">
-                <label for="trein-desc" style="display: block; margin-bottom: 0.3rem;">Descrição</label>
-                <input type="text" id="trein-desc" class="form-control" placeholder="Breve explicação sobre o conteúdo">
-              </div>
-              <div class="form-group" style="margin-bottom: 1rem;">
-                <label for="trein-tipo" style="display: block; margin-bottom: 0.3rem;">Tipo de Conteúdo *</label>
-                <select id="trein-tipo" class="form-control" required>
-                  <option value="VIDEO">Vídeo (YouTube/Vimeo)</option>
-                  <option value="PDF">Manual em PDF / Link Externo</option>
-                </select>
-              </div>
-              <div class="form-group" style="margin-bottom: 1.5rem;">
-                <label for="trein-url" style="display: block; margin-bottom: 0.3rem;">URL do Recurso *</label>
-                <input type="text" id="trein-url" class="form-control" placeholder="https://youtube.com/embed/... ou link pdf" required>
-              </div>
-              <button class="btn-gold" onclick="app.cadastrarTreinamento()" style="width: 100%; justify-content: center;"><i class="fa-solid fa-circle-check"></i> Cadastrar Conteúdo</button>
-            </div>
-          </div>
-        </div>
-      </section>
 
       <!-- ==========================================
            ABA: MEU PLANO & ASSINATURA SAAS
@@ -1773,6 +1618,33 @@
                 <div id="saas-bar-estoque" style="width: 0%; height: 100%; background: var(--gold-gradient); transition: width 0.4s ease;"></div>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- Barra de Teste Rápido de Pagamento (Simulação Coerente) -->
+        <div id="barra-teste-fluxo-pagamento" style="background: rgba(212, 175, 55, 0.08); border: 1px dashed rgba(212, 175, 55, 0.35); border-radius: var(--radius-md); padding: 1rem 1.4rem; margin-bottom: 2rem; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem;">
+          <div style="display: flex; align-items: center; gap: 0.8rem; font-size: 0.9rem; color: var(--gold-light);">
+            <div style="width: 38px; height: 38px; border-radius: 50%; background: rgba(212, 175, 55, 0.2); display: flex; align-items: center; justify-content: center; color: var(--gold-primary); font-size: 1.1rem; flex-shrink: 0;">
+              <i class="fa-solid fa-flask-vial"></i>
+            </div>
+            <div>
+              <strong style="color: #fff; font-size: 0.95rem;">Modo de Teste do Fluxo Pós-Pagamento</strong>
+              <div style="color: #a1a1aa; font-size: 0.82rem; margin-top: 2px;">Pule o pagamento real da Cakto e simule o retorno completo (sucesso &rarr; sincronização &rarr; painel ativo):</div>
+            </div>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 0.6rem;">
+            <button type="button" class="btn btn-outline" onclick="window.simularRetornoPagamento('BRONZE')" style="padding: 0.45rem 0.9rem; font-size: 0.82rem; border-color: #cd7f32; color: #cd7f32; cursor: pointer; border-radius: 6px; background: rgba(205, 127, 50, 0.1);">
+              <i class="fa-solid fa-play" style="font-size: 0.75rem; margin-right: 4px;"></i> Simular Bronze
+            </button>
+            <button type="button" class="btn btn-outline" onclick="window.simularRetornoPagamento('GOLD')" style="padding: 0.45rem 0.9rem; font-size: 0.82rem; border-color: var(--gold-primary); color: var(--gold-light); cursor: pointer; border-radius: 6px; background: rgba(212, 175, 55, 0.15);">
+              <i class="fa-solid fa-crown" style="font-size: 0.75rem; margin-right: 4px;"></i> Simular Gold
+            </button>
+            <button type="button" class="btn btn-outline" onclick="window.simularRetornoPagamento('PLATINUM')" style="padding: 0.45rem 0.9rem; font-size: 0.82rem; border-color: #a855f7; color: #c084fc; cursor: pointer; border-radius: 6px; background: rgba(168, 85, 247, 0.1);">
+              <i class="fa-solid fa-star" style="font-size: 0.75rem; margin-right: 4px;"></i> Simular Platinum
+            </button>
+            <button type="button" class="btn btn-outline" onclick="window.simularRetornoPagamento('BASICO')" style="padding: 0.45rem 0.9rem; font-size: 0.82rem; border-color: #71717a; color: #a1a1aa; cursor: pointer; border-radius: 6px; background: rgba(255, 255, 255, 0.05);">
+              <i class="fa-solid fa-rotate-left" style="font-size: 0.75rem; margin-right: 4px;"></i> Resetar Básico
+            </button>
           </div>
         </div>
 
@@ -2176,6 +2048,72 @@
         <button class="btn-outline-gold" id="btn-cancelar-revendedora" style="cursor: pointer;" onclick="app.fecharModalRevendedora()">Cancelar</button>
         <button class="btn-gold" id="btn-salvar-revendedora" style="cursor: pointer;"><i class="fa-solid fa-floppy-disk"></i> Cadastrar</button>
       </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       MODAL: CONFIRMAÇÃO & ENVIO WHATSAPP (REVENDEDORA)
+       ========================================== -->
+  <div class="modal-backdrop" id="modal-sucesso-revendedora-whatsapp" style="display: none; align-items: center; justify-content: center; z-index: 100000;">
+    <div class="modal-card" style="width: 520px; max-width: 95%; background: linear-gradient(165deg, #181818 0%, #0d0d0d 100%); border: 1px solid rgba(212, 175, 55, 0.4); border-radius: 18px; box-shadow: 0 25px 60px rgba(0,0,0,0.85), 0 0 30px rgba(37, 211, 102, 0.15); overflow: hidden; padding: 0;">
+      
+      <!-- Cabeçalho com Ícone WhatsApp & Dourado -->
+      <div style="background: linear-gradient(135deg, rgba(37, 211, 102, 0.12) 0%, rgba(212, 175, 55, 0.08) 100%); padding: 1.5rem 1.5rem 1rem 1.5rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(37, 211, 102, 0.18); border: 1px solid #25d366; display: flex; align-items: center; justify-content: center; color: #25d366; font-size: 1.4rem; box-shadow: 0 0 15px rgba(37, 211, 102, 0.25);">
+            <i class="fa-brands fa-whatsapp"></i>
+          </div>
+          <div>
+            <h3 style="color: #ffffff; font-size: 1.15rem; font-weight: 700; margin: 0 0 2px 0;">Revendedora Cadastrada! ✨</h3>
+            <span style="color: var(--gold-light); font-size: 0.78rem;">Credenciais prontas para envio</span>
+          </div>
+        </div>
+        <button class="btn-close-modal" onclick="app.fecharModalWhatsAppRevendedora()" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.1rem;"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <!-- Corpo com Detalhes da Consultora -->
+      <div style="padding: 1.5rem;">
+        <p style="color: var(--text-secondary); font-size: 0.88rem; line-height: 1.5; margin: 0 0 1.2rem 0;">
+          A consultora foi registrada com sucesso no sistema. Você pode enviar as credenciais de acesso diretamente para o WhatsApp dela agora mesmo:
+        </p>
+
+        <!-- Card de Credenciais -->
+        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(212, 175, 55, 0.25); border-radius: 12px; padding: 1rem 1.2rem; margin-bottom: 1.2rem;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 0.6rem;">
+            <span style="font-size: 0.74rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Consultora:</span>
+            <strong id="modal-zap-rev-nome" style="font-size: 0.9rem; color: #fff;">—</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 0.6rem; background: rgba(212,175,55,0.08); padding: 6px 10px; border-radius: 6px;">
+            <span style="font-size: 0.74rem; color: var(--gold-primary); text-transform: uppercase; font-weight: 700;">PIN de Acesso:</span>
+            <strong id="modal-zap-rev-pin" style="font-size: 1.1rem; color: var(--gold-primary); letter-spacing: 2px;">—</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 0.6rem;">
+            <span style="font-size: 0.74rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Senha Temporária:</span>
+            <strong id="modal-zap-rev-senha" style="font-size: 0.88rem; color: #e0e0e0; font-family: monospace;">—</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="font-size: 0.74rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">WhatsApp:</span>
+            <strong id="modal-zap-rev-telefone" style="font-size: 0.88rem; color: #25d366;">—</strong>
+          </div>
+        </div>
+
+        <div style="background: rgba(37, 211, 102, 0.08); border-left: 3px solid #25d366; border-radius: 4px; padding: 0.65rem 0.85rem;">
+          <p style="margin: 0; font-size: 0.78rem; color: #a5d6a7; line-height: 1.45;">
+            Ao clicar em <strong>OK</strong>, uma nova aba do WhatsApp Web/App será aberta automaticamente com a mensagem personalizada pronta para envio.
+          </p>
+        </div>
+      </div>
+
+      <!-- Rodapé com Ações -->
+      <div style="padding: 1rem 1.5rem; background: rgba(0,0,0,0.25); border-top: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: flex-end; gap: 0.8rem;">
+        <button type="button" class="btn-outline-gold" onclick="app.fecharModalWhatsAppRevendedora()" style="padding: 0.65rem 1.2rem; font-size: 0.85rem; border-radius: 8px;">
+          Agora Não
+        </button>
+        <button type="button" class="btn-gold" id="btn-confirmar-envio-zap-rev" onclick="app.confirmarEnvioWhatsAppRevendedora()" style="background: linear-gradient(135deg, #25d366 0%, #128c7e 100%); border: none; color: #ffffff; padding: 0.65rem 1.4rem; font-size: 0.88rem; font-weight: 700; border-radius: 8px; box-shadow: 0 4px 15px rgba(37, 211, 102, 0.35); cursor: pointer; display: inline-flex; align-items: center; gap: 7px;">
+          <i class="fa-brands fa-whatsapp" style="font-size: 1.05rem;"></i> OK, Enviar WhatsApp
+        </button>
+      </div>
+
     </div>
   </div>
 
@@ -3037,20 +2975,7 @@
   </div>
 
 
-  <!-- ==========================================
-       MODAL: PLAYER DE VÍDEO TUTORIAL
-       ========================================== -->
-  <div class="modal-backdrop" id="modal-video-player">
-    <div class="modal-card" style="width: 780px; max-width: 95%; background: #0f0f0f; border-color: rgba(212, 175, 55, 0.35);">
-      <div class="modal-title-row" style="border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 1rem; margin-bottom: 1rem;">
-        <h3 id="video-player-titulo" style="font-size: 1.15rem; color: #fff;"><i class="fa-solid fa-circle-play" style="color: var(--gold-primary); margin-right: 6px;"></i> Assistir Vídeo</h3>
-        <button class="btn-close-modal" onclick="app.fecharVideoPlayer()"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="video-player-body" style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05); background: #000;">
-        <iframe id="video-player-iframe" src="" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0;" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-      </div>
-    </div>
-  </div>
+
 
   <!-- Container de Toasts Dinâmicos -->
   <div id="toast-container"></div>

@@ -9,113 +9,211 @@
   <link rel="icon" type="image/png" href="/assets/favicon.png">
   <link rel="apple-touch-icon" href="/assets/favicon.png">
   
-  <!-- Estilos Globais -->
+  <!-- Fontes e Estilos Globais -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
   <style>
+    :root {
+      --gold-primary: #d4af37;
+      --gold-light: #f3e5ab;
+      --gold-dark: #aa820a;
+      --gold-gradient: linear-gradient(135deg, #d4af37 0%, #aa820a 100%);
+      --bg-dark: #09090b;
+      --bg-card: rgba(24, 24, 27, 0.95);
+      --border-card: 1px solid rgba(212, 175, 55, 0.25);
+      --radius-lg: 16px;
+      --radius-md: 10px;
+    }
+
+    * { box-sizing: border-box; }
+
     body {
       display: flex;
       justify-content: center;
       align-items: center;
       min-height: 100vh;
-      background: radial-gradient(circle at center, #151515 0%, #050505 100%);
+      background: radial-gradient(circle at 50% 20%, #1c1917 0%, #09090b 100%);
       padding: 1.5rem;
       margin: 0;
       font-family: 'Plus Jakarta Sans', sans-serif;
+      color: #fafafa;
     }
 
     .sucesso-container {
       width: 100%;
       max-width: 520px;
       background: var(--bg-card);
-      border: var(--border-gold);
+      border: var(--border-card);
       border-radius: var(--radius-lg);
-      box-shadow: var(--shadow-premium);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 40px rgba(212, 175, 55, 0.15);
       padding: 2.5rem 2rem;
       text-align: center;
-      animation: fadeIn 0.8s ease;
+      position: relative;
+      overflow: hidden;
+      animation: fadeIn 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .sucesso-container::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: var(--gold-gradient);
     }
 
     .success-icon-badge {
-      width: 90px;
-      height: 90px;
+      width: 86px;
+      height: 86px;
       border-radius: 50%;
-      background: rgba(46, 125, 50, 0.15);
-      border: 3px solid #81c784;
-      color: #81c784;
+      background: rgba(34, 197, 94, 0.12);
+      border: 2px solid #22c55e;
+      color: #22c55e;
       display: inline-flex;
       justify-content: center;
       align-items: center;
-      font-size: 3rem;
-      margin-bottom: 1.5rem;
-      box-shadow: 0 0 25px rgba(129, 199, 132, 0.25);
-      animation: scaleUp 0.5s ease-out;
+      font-size: 2.8rem;
+      margin-bottom: 1.2rem;
+      box-shadow: 0 0 30px rgba(34, 197, 94, 0.25);
+      animation: scalePop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }
 
     .sucesso-title {
-      font-family: var(--font-title);
-      color: var(--gold-primary);
-      font-size: 1.8rem;
-      margin: 0 0 0.8rem 0;
+      font-family: 'Playfair Display', serif;
+      color: var(--gold-light);
+      font-size: 1.9rem;
+      margin: 0 0 0.5rem 0;
+      letter-spacing: 0.5px;
     }
 
     .sucesso-subtitle {
-      color: var(--text-secondary);
-      font-size: 1rem;
-      line-height: 1.6;
-      margin-bottom: 2rem;
+      color: #a1a1aa;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      margin-bottom: 1.8rem;
     }
 
-    .redirect-box {
-      background: rgba(0, 0, 0, 0.3);
-      border: 1px solid rgba(212, 175, 55, 0.15);
-      border-radius: var(--radius-md);
-      padding: 1.2rem;
+    .plano-badge-highlight {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(212, 175, 55, 0.12);
+      border: 1px solid rgba(212, 175, 55, 0.3);
+      color: var(--gold-light);
+      padding: 0.4rem 1rem;
+      border-radius: 9999px;
+      font-weight: 700;
+      font-size: 0.9rem;
       margin-bottom: 1.5rem;
     }
 
-    .redirect-box p {
-      margin: 0;
+    /* Steps de Ativação */
+    .steps-list {
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: var(--radius-md);
+      padding: 1.1rem 1.2rem;
+      margin-bottom: 1.5rem;
+      text-align: left;
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+
+    .step-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.88rem;
+      color: #a1a1aa;
+      transition: all 0.3s ease;
+    }
+
+    .step-item.active {
+      color: #fafafa;
+      font-weight: 600;
+    }
+
+    .step-item.done {
+      color: #22c55e;
+    }
+
+    .step-icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      flex-shrink: 0;
+      background: rgba(255, 255, 255, 0.1);
+      color: #71717a;
+    }
+
+    .step-item.active .step-icon {
+      background: rgba(212, 175, 55, 0.2);
       color: var(--gold-light);
-      font-size: 0.9rem;
+    }
+
+    .step-item.done .step-icon {
+      background: rgba(34, 197, 94, 0.2);
+      color: #22c55e;
+    }
+
+    .redirect-status-box {
+      background: rgba(212, 175, 55, 0.08);
+      border: 1px solid rgba(212, 175, 55, 0.2);
+      border-radius: var(--radius-md);
+      padding: 0.9rem;
+      margin-bottom: 1.5rem;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 0.6rem;
+      font-size: 0.9rem;
+      color: var(--gold-light);
     }
 
     .btn-painel {
       width: 100%;
-      padding: 0.9rem;
+      padding: 0.95rem;
       border: none;
-      border-radius: var(--radius-sm);
+      border-radius: var(--radius-md);
       background: var(--gold-gradient);
-      color: var(--text-dark);
-      font-weight: 700;
+      color: #18181b;
+      font-weight: 800;
       cursor: pointer;
       font-size: 1rem;
-      transition: var(--transition);
+      transition: all 0.2s ease;
       display: flex;
       justify-content: center;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.6rem;
       text-decoration: none;
+      box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3);
     }
 
     .btn-painel:hover {
-      box-shadow: var(--shadow-glow);
+      box-shadow: 0 6px 20px rgba(212, 175, 55, 0.5);
       transform: translateY(-2px);
+      filter: brightness(1.05);
     }
 
     @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(15px); }
+      from { opacity: 0; transform: translateY(18px); }
       to { opacity: 1; transform: translateY(0); }
     }
 
-    @keyframes scaleUp {
-      from { transform: scale(0.6); opacity: 0; }
-      to { transform: scale(1); opacity: 1; }
+    @keyframes scalePop {
+      0% { transform: scale(0.6); opacity: 0; }
+      70% { transform: scale(1.1); }
+      100% { transform: scale(1); opacity: 1; }
     }
   </style>
 </head>
@@ -123,163 +221,228 @@
 
   <div class="sucesso-container">
     <div class="success-icon-badge">
-      <i class="fa-solid fa-circle-check"></i>
+      <i class="fa-solid fa-check"></i>
     </div>
     
     <h1 class="sucesso-title">Pagamento Aprovado!</h1>
     <p class="sucesso-subtitle">
-      Seu plano foi ativado com sucesso. Você já tem acesso total a todos os recursos da sua conta Conecta Joias!
+      Seu pagamento foi confirmado com sucesso pela <strong>Cakto Pay</strong>.
     </p>
 
-    <div class="redirect-box">
-      <p>
-        <i class="fa-solid fa-spinner fa-spin" style="color: var(--gold-primary);"></i>
-        Redirecionando para o painel em <strong id="countdown" style="color: var(--gold-primary); font-size: 1.1rem;">4</strong> segundos...
-      </p>
+    <div class="plano-badge-highlight" id="badge-plano">
+      <i class="fa-solid fa-crown" style="color: var(--gold-primary);"></i>
+      <span>Ativando Plano <strong id="nome-plano-destaque">GOLD</strong></span>
     </div>
 
-    <a href="/pages/superadmin.html" class="btn-painel">
+    <!-- Lista de Etapas em Tempo Real -->
+    <div class="steps-list">
+      <div class="step-item done" id="step-1">
+        <div class="step-icon"><i class="fa-solid fa-check"></i></div>
+        <span>Pagamento processado e aprovado</span>
+      </div>
+      <div class="step-item active" id="step-2">
+        <div class="step-icon" id="step-2-icon"><i class="fa-solid fa-spinner fa-spin"></i></div>
+        <span id="step-2-txt">Sincronizando assinatura no sistema...</span>
+      </div>
+      <div class="step-item" id="step-3">
+        <div class="step-icon" id="step-3-icon"><i class="fa-regular fa-clock"></i></div>
+        <span id="step-3-txt">Liberando acesso total aos recursos VIP</span>
+      </div>
+    </div>
+
+    <div class="redirect-status-box" id="redirect-box">
+      <i class="fa-solid fa-circle-notch fa-spin" id="redirect-spinner"></i>
+      <span id="redirect-msg">Finalizando ativação da sua conta...</span>
+    </div>
+
+    <button id="btn-acessar-painel" class="btn-painel" onclick="irParaPainelAgora()">
       <i class="fa-solid fa-gauge-high"></i> Acessar Painel Agora
-    </a>
+    </button>
   </div>
 
   <script>
-    (async function atualizarSessaoLocal() {
-      try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const paymentId = urlParams.get("payment_id") || urlParams.get("collection_id") || urlParams.get("id");
-        const status = urlParams.get("status") || urlParams.get("collection_status") || "approved";
-        const externalReference = urlParams.get("external_reference") || "";
-        const planoQuery = urlParams.get("plano") || "";
+    // Parâmetros da URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const paymentId = urlParams.get("payment_id") || urlParams.get("collection_id") || urlParams.get("id") || "";
+    const status = urlParams.get("status") || urlParams.get("collection_status") || "approved";
+    const externalReference = urlParams.get("external_reference") || urlParams.get("ref") || urlParams.get("src") || "";
+    const planoQuery = urlParams.get("plano") || urlParams.get("novoPlano") || "";
 
-        let planoAdquirido = "GOLD";
-        if (externalReference && externalReference.includes("|")) {
-          const parts = externalReference.split("|");
-          if (parts[1]) planoAdquirido = parts[1].toUpperCase();
-        } else if (planoQuery) {
-          planoAdquirido = planoQuery.toUpperCase();
-        }
+    let planoFinal = "GOLD";
+    if (externalReference && externalReference.includes("|")) {
+      const parts = externalReference.split("|");
+      if (parts[1]) planoFinal = parts[1].toUpperCase();
+    } else if (planoQuery) {
+      planoFinal = planoQuery.toUpperCase();
+    }
 
-        function getApiBaseUrl() {
-          const savedUrl = localStorage.getItem("conectajoias_api_url");
-          if (savedUrl) return savedUrl;
+    // Atualiza nome na interface
+    const elNomePlano = document.getElementById("nome-plano-destaque");
+    if (elNomePlano) elNomePlano.innerText = planoFinal;
 
-          const hostname = window.location.hostname;
-          const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1" || /^192\.168\./.test(hostname) || /^10\./.test(hostname);
-          if (isLocalHost) {
-            return `${window.location.protocol}//${hostname}:5000/api`;
-          }
-          return `${window.location.origin}/api`;
-        }
+    function getApiBaseUrl() {
+      const savedUrl = localStorage.getItem("conectajoias_api_url");
+      if (savedUrl) return savedUrl;
 
-        // Tenta enviar a confirmação de pagamento para a API
-        const token = localStorage.getItem("conectajoias_token") || localStorage.getItem("token") || "";
-        const headers = { "Content-Type": "application/json" };
-        if (token && !token.startsWith("mock_")) {
-          headers["Authorization"] = `Bearer ${token}`;
-        }
-
-        try {
-          const apiBase = getApiBaseUrl();
-          const resp = await fetch(`${apiBase}/saas/confirmar-retorno-pagamento`, {
-            method: "POST",
-            headers: headers,
-            body: JSON.stringify({
-              paymentId,
-              status,
-              externalReference,
-              planoDesejado: planoAdquirido
-            })
-          });
-          if (resp.ok) {
-            const resData = await resp.json();
-            if (resData.plano) planoAdquirido = resData.plano.toUpperCase();
-            console.log(`✅ [API Sync Sucesso] Banco de Dados atualizado para o plano ${planoAdquirido}.`);
-          } else {
-            // Loga o erro detalhado para diagnóstico
-            let errorBody = {};
-            try { errorBody = await resp.json(); } catch(_) {}
-            console.error(`❌ [API Sync Falha] Status HTTP ${resp.status}. Erro:`, errorBody);
-
-            if (resp.status === 400 && errorBody.error && errorBody.error.includes('identificar sua loja')) {
-              // Loja não identificada: orienta o usuário
-              const redirectEl = document.querySelector('.redirect-box p');
-              if (redirectEl) {
-                redirectEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="color: #FFB300;"></i>
-                  <span style="color: #FFB300; font-size: 0.85rem;">
-                    Seu pagamento foi aprovado! Para ativar o plano, faça <strong>login</strong> e vá em <strong>Configurações → Plano</strong>.
-                  </span>`;
-              }
-            } else if (resp.status === 403) {
-              console.warn('⚠️ [API Sync] Acesso negado (403). Verifique se o token JWT é válido e se a loja tem permissão.');
-            } else {
-              console.warn(`⚠️ [API Sync] Erro ${resp.status} ao sincronizar plano. O localStorage será atualizado localmente.`);
-            }
-          }
-        } catch (e) {
-          console.warn("⚠️ Sincronização via API não concluída (usando estado retornado):", e.message);
-        }
-
-        // Atualiza chaves do localStorage com o plano pago
-        localStorage.setItem("conectajoias_status_plano", "ATIVO");
-        localStorage.setItem("conectajoias_plano", planoAdquirido);
-
-        const usuarioRaw = localStorage.getItem("conectajoias_usuario");
-        if (usuarioRaw) {
-          const user = JSON.parse(usuarioRaw);
-          user.statusPlano = 'ATIVO';
-          user.status = 'ATIVO';
-          user.planoLoja = planoAdquirido;
-          user.plano = planoAdquirido;
-          localStorage.setItem("conectajoias_usuario", JSON.stringify(user));
-        }
-
-        const usuarioGenerico = localStorage.getItem("usuario");
-        if (usuarioGenerico) {
-          const userGen = JSON.parse(usuarioGenerico);
-          userGen.statusPlano = 'ATIVO';
-          userGen.status = 'ATIVO';
-          userGen.planoLoja = planoAdquirido;
-          userGen.plano = planoAdquirido;
-          localStorage.setItem("usuario", JSON.stringify(userGen));
-        }
-
-        const lojaRaw = localStorage.getItem("conectajoias_loja");
-        if (lojaRaw) {
-          const loja = JSON.parse(lojaRaw);
-          loja.statusPlano = 'ATIVO';
-          loja.plano = planoAdquirido;
-          localStorage.setItem("conectajoias_loja", JSON.stringify(loja));
-        }
-
-        console.log(`✅ [Checkout Sucesso] Plano ${planoAdquirido} ativado e salvo no localStorage.`);
-      } catch (err) {
-        console.warn("Aviso ao atualizar localStorage pós-pagamento:", err.message);
+      const hostname = window.location.hostname;
+      const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1" || /^192\.168\./.test(hostname) || /^10\./.test(hostname);
+      if (isLocalHost) {
+        return `${window.location.protocol}//${hostname}:5000/api`;
       }
-    })();
+      return `${window.location.origin}/api`;
+    }
 
-    // Redireciona o usuário para o painel em 1 segundo
-    let segundos = 1;
-    const countEl = document.getElementById("countdown");
+    function aplicarSessaoLocal(planoAtivado) {
+      const p = (planoAtivado || planoFinal || "GOLD").toUpperCase();
+      document.documentElement.setAttribute("data-plano", p);
+      localStorage.setItem("conectajoias_status_plano", "ATIVO");
+      localStorage.setItem("conectajoias_plano", p);
+      sessionStorage.setItem("conectajoias_upgrade_recem_ativado", p);
 
-    const timer = setInterval(() => {
-      segundos--;
-      if (countEl) countEl.innerText = segundos;
-      if (segundos <= 0) {
-        clearInterval(timer);
-        let targetPage = "/pages/superadmin.html?planoAtivado=1";
-        const userRaw = localStorage.getItem("conectajoias_usuario") || localStorage.getItem("usuario");
-        if (userRaw) {
+      const atualizarUser = (storageKey) => {
+        const raw = localStorage.getItem(storageKey);
+        if (raw) {
           try {
-            const u = JSON.parse(userRaw);
-            if (u.role === "Consultant" || u.role === "Manager") {
-              targetPage = "/pages/superadmin.html?planoAtivado=1";
-            }
+            const u = JSON.parse(raw);
+            u.statusPlano = "ATIVO";
+            u.status = "ATIVO";
+            u.planoLoja = p;
+            u.plano = p;
+            localStorage.setItem(storageKey, JSON.stringify(u));
           } catch(e) {}
         }
-        window.location.href = targetPage;
+      };
+
+      atualizarUser("conectajoias_usuario");
+      atualizarUser("usuario");
+
+      const lojaRaw = localStorage.getItem("conectajoias_loja");
+      if (lojaRaw) {
+        try {
+          const l = JSON.parse(lojaRaw);
+          l.statusPlano = "ATIVO";
+          l.plano = p;
+          localStorage.setItem("conectajoias_loja", JSON.stringify(l));
+        } catch(e) {}
       }
-    }, 1000);
+
+      console.log(`✅ [Sucesso Checkout] Sessão local 100% atualizada para o Plano ${p}`);
+    }
+
+    function irParaPainelAgora() {
+      window.location.href = `/pages/superadmin.html?upgrade_sucesso=true&plano=${encodeURIComponent(planoFinal)}`;
+    }
+
+    async function processarConfirmacaoEPolling() {
+      const apiBase = getApiBaseUrl();
+      const token = localStorage.getItem("conectajoias_token") || localStorage.getItem("token") || "";
+      
+      let usuarioId = "";
+      let usuarioEmail = "";
+      let lojaDoUsuario = "";
+      try {
+        const u = JSON.parse(localStorage.getItem("conectajoias_usuario") || localStorage.getItem("usuario") || "{}");
+        if (u.id) usuarioId = u.id;
+        if (u.email) usuarioEmail = u.email;
+        if (u.lojaId) lojaDoUsuario = u.lojaId;
+      } catch(e) {}
+
+      const lojaSalva = localStorage.getItem("conectajoias_loja_id") || 
+                        localStorage.getItem("conectajoias_lojaId") || 
+                        lojaDoUsuario || "";
+
+      const headers = { "Content-Type": "application/json" };
+      if (token && !token.startsWith("mock_")) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+      if (lojaSalva) {
+        headers["x-loja-id"] = lojaSalva;
+      }
+
+      // Aplica imediatamente a sessão local para nunca prender o usuário
+      aplicarSessaoLocal(planoFinal);
+
+      // 1. Envia confirmação de retorno para a API
+      try {
+        const respConfirma = await fetch(`${apiBase}/saas/confirmar-retorno-pagamento`, {
+          method: "POST",
+          headers: headers,
+          body: JSON.stringify({
+            paymentId,
+            status: "approved",
+            externalReference: externalReference || `${usuarioId}|${planoFinal}`,
+            planoDesejado: planoFinal,
+            lojaId: lojaSalva,
+            userId: usuarioId,
+            email: usuarioEmail
+          })
+        });
+
+        if (respConfirma.ok) {
+          const dados = await respConfirma.json();
+          if (dados.plano) planoFinal = dados.plano.toUpperCase();
+          aplicarSessaoLocal(planoFinal);
+        }
+      } catch (err) {
+        console.warn("⚠️ Aviso na requisição inicial de confirmação:", err.message);
+      }
+
+      // Avança Step 2
+      const step2 = document.getElementById("step-2");
+      const step2Icon = document.getElementById("step-2-icon");
+      if (step2) {
+        step2.classList.remove("active");
+        step2.classList.add("done");
+      }
+      if (step2Icon) step2Icon.innerHTML = `<i class="fa-solid fa-check"></i>`;
+
+      // 2. Polling inteligente para garantir que /saas/meu-plano já reflete o banco
+      const step3 = document.getElementById("step-3");
+      const step3Icon = document.getElementById("step-3-icon");
+      if (step3) step3.classList.add("active");
+      if (step3Icon) step3Icon.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i>`;
+
+      let sincronizado = false;
+      for (let i = 0; i < 4; i++) {
+        try {
+          const respPlano = await fetch(`${apiBase}/saas/meu-plano`, { headers });
+          if (respPlano.ok) {
+            const dataPlano = await respPlano.json();
+            if (dataPlano.statusPlano === "ATIVO" || dataPlano.plano === planoFinal) {
+              planoFinal = (dataPlano.plano || planoFinal).toUpperCase();
+              aplicarSessaoLocal(planoFinal);
+              sincronizado = true;
+              break;
+            }
+          }
+        } catch(e) {}
+        await new Promise(r => setTimeout(r, 600));
+      }
+
+      // Conclui Step 3
+      if (step3) {
+        step3.classList.remove("active");
+        step3.classList.add("done");
+      }
+      if (step3Icon) step3Icon.innerHTML = `<i class="fa-solid fa-check"></i>`;
+
+      const redirectBox = document.getElementById("redirect-box");
+      const redirectSpinner = document.getElementById("redirect-spinner");
+      const redirectMsg = document.getElementById("redirect-msg");
+
+      if (redirectSpinner) redirectSpinner.className = "fa-solid fa-circle-check";
+      if (redirectSpinner) redirectSpinner.style.color = "#22c55e";
+      if (redirectMsg) redirectMsg.innerHTML = `<strong>Tudo pronto!</strong> Redirecionando para seu painel...`;
+
+      setTimeout(() => {
+        irParaPainelAgora();
+      }, 1000);
+    }
+
+    // Inicia o processo automaticamente
+    window.addEventListener("DOMContentLoaded", () => {
+      processarConfirmacaoEPolling();
+    });
   </script>
 </body>
 </html>

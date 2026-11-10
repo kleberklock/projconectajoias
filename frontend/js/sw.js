@@ -1,4 +1,4 @@
-const CACHE_NAME = "conectajoias-v9";
+const CACHE_NAME = "conectajoias-v10";
 const ASSETS = [
   "/",
   "/index.html",
@@ -25,7 +25,6 @@ const ASSETS = [
   "/pages/superadmin.html",
   "/js/superadmin.js",
   "/js/superadmin-vendas.js",
-  "/js/superadmin-tour.js",
   "/pages/termo_assinatura.html",
   "/js/termo_assinatura.js",
   "/pages/apresentacao.html"

@@ -718,9 +718,6 @@ const app = {
         if (upperMetodo === "POST") return { id: 'venda_' + Date.now(), ...body };
         return this.state.vendasConsolidadas || [];
       }
-      if (endpoint.startsWith("/whatsapp/fila")) {
-        return JSON.parse(localStorage.getItem("conectajoias_whatsapp_mock") || "[]");
-      }
       if (endpoint.startsWith("/treinamentos")) {
         return JSON.parse(localStorage.getItem("conectajoias_treinamentos_mock") || "[]");
       }
@@ -1637,6 +1634,53 @@ const app = {
     }
   },
 
+  _dadosWhatsAppPendente: null,
+
+  abrirModalWhatsAppRevendedora: function({ nome, pin, senha, whatsapp }) {
+    this._dadosWhatsAppPendente = { nome, pin, senha, whatsapp };
+    
+    const elNome = document.getElementById("modal-zap-rev-nome");
+    const elPin = document.getElementById("modal-zap-rev-pin");
+    const elSenha = document.getElementById("modal-zap-rev-senha");
+    const elTel = document.getElementById("modal-zap-rev-telefone");
+
+    if (elNome) elNome.innerText = nome || "—";
+    if (elPin) elPin.innerText = pin || "—";
+    if (elSenha) elSenha.innerText = senha || "—";
+    if (elTel) elTel.innerText = whatsapp || "—";
+
+    const modal = document.getElementById("modal-sucesso-revendedora-whatsapp");
+    if (modal) {
+      modal.style.display = "flex";
+      modal.classList.add("active");
+    }
+  },
+
+  fecharModalWhatsAppRevendedora: function() {
+    const modal = document.getElementById("modal-sucesso-revendedora-whatsapp");
+    if (modal) {
+      modal.style.display = "none";
+      modal.classList.remove("active");
+    }
+    this._dadosWhatsAppPendente = null;
+  },
+
+  confirmarEnvioWhatsAppRevendedora: function() {
+    if (!this._dadosWhatsAppPendente) {
+      this.fecharModalWhatsAppRevendedora();
+      return;
+    }
+
+    const { nome, pin, senha, whatsapp } = this._dadosWhatsAppPendente;
+    const msgTexto = `Olá ${nome}, seja muito bem-vinda à nossa equipe! ✨ Seu cadastro de Consultora foi realizado com sucesso. Aqui estão suas credenciais para entrar no portal:\n\n🔑 Login (PIN): ${pin}\n🔒 Senha Temporária: ${senha}\n\n🔗 Link do portal: ${window.location.origin}/pages/manager.html\n\nQualquer dúvida, estamos à disposição!`;
+    const phoneClean = (whatsapp || "").replace(/\D/g, "");
+    const waUrl = `https://api.whatsapp.com/send?phone=55${phoneClean}&text=${encodeURIComponent(msgTexto)}`;
+
+    this.fecharModalWhatsAppRevendedora();
+    this.toast("Abrindo conversa do WhatsApp...", "success");
+    window.open(waUrl, "_blank");
+  },
+
   fecharModalConsignar: function() {
     const modal = document.getElementById("modal-consignar");
     if (modal) {
@@ -1812,10 +1856,6 @@ const app = {
     }
     if (tabId === "configuracoes") {
       this.renderizarConfiguracoes();
-    }
-
-    if (tabId === "admin-treinamentos") {
-      this.carregarTreinamentosAdmin();
     }
     if (tabId === "meu-plano-saas") {
       this.carregarMeuPlanoSaaS();
@@ -2094,7 +2134,7 @@ const app = {
   },
 
   carregarDRE: async function() {
-    const plano = (this.state.usuarioLogado && this.state.usuarioLogado.planoLoja || 'BASICO').toUpperCase();
+    const plano = this.obterPlanoAtual();
     const temDRE = plano === 'GOLD' || plano === 'PLATINUM' || (this.state.usuarioLogado && this.state.usuarioLogado.role === 'SuperAdmin');
     const drePanel = document.getElementById("dashboard-dre-panel");
 
@@ -2738,12 +2778,7 @@ const app = {
 
     // 1. Trava de Planos para Estoque Central
     if (delta > 0) {
-      const planoAtual = (
-        (this.state.loja && this.state.loja.plano) ||
-        (this.state.usuarioLogado && this.state.usuarioLogado.planoLoja) ||
-        localStorage.getItem("conectajoias_plano") ||
-        "BASICO"
-      ).toUpperCase();
+      const planoAtual = this.obterPlanoAtual();
 
       let limiteEst = 300;
       if (planoAtual === 'BASICO') limiteEst = 50;
@@ -3767,15 +3802,18 @@ const app = {
       if (editId) {
         this.toast("Cadastro de revendedora atualizado com sucesso!", "success");
       } else {
-        const pinCriado = this.state.revendedoras.find(r => r.id === this.state.revendedoraSelecionadaId).pin;
-        alert(`Revendedora cadastrada com sucesso!\n\n🔑 PIN de Acesso: ${pinCriado}\n🔒 Senha: ${senhaInput}\n\nInforme esses dados para a revendedora acessar o aplicativo.`);
-        
-        if (confirm("Deseja enviar as credenciais de acesso para a revendedora via WhatsApp agora?")) {
-          const msgTexto = `Olá ${nome}, seja muito bem-vinda à nossa equipe! ✨ Seu cadastro de Consultora foi realizado com sucesso. Aqui estão suas credenciais para entrar no portal:\n\n🔑 Login (PIN): ${pinCriado}\n🔒 Senha Temporária: ${senhaInput}\n\n🔗 Link do portal: ${window.location.origin}/pages/manager.html\n\nQualquer dúvida, estamos à disposição!`;
-          const phoneClean = whatsapp.replace(/\D/g, "");
-          const waUrl = `https://api.whatsapp.com/send?phone=55${phoneClean}&text=${encodeURIComponent(msgTexto)}`;
-          window.open(waUrl, "_blank");
-        }
+        const revSalva = this.state.revendedoras.find(r => r.id === this.state.revendedoraSelecionadaId);
+        const pinCriado = revSalva ? revSalva.pin : "1234";
+
+        this.toast("Revendedora cadastrada com sucesso!", "success");
+
+        // Abre o modal estilizado customizado para envio das credenciais no WhatsApp
+        this.abrirModalWhatsAppRevendedora({
+          nome,
+          pin: pinCriado,
+          senha: senhaInput,
+          whatsapp
+        });
       }
     } catch (error) {
       console.error(error);
@@ -6721,122 +6759,6 @@ const app = {
     }
   },
 
-
-
-  carregarTreinamentosAdmin: async function() {
-    const tbody = document.getElementById("tbody-admin-treinamentos");
-    if (!tbody) return;
-
-    try {
-      let lista = [];
-      if (this.state.token && !this.state.token.startsWith("mock_")) {
-        lista = await this.requisitarAPI("/treinamentos");
-      } else {
-        lista = JSON.parse(localStorage.getItem("conectajoias_treinamentos_mock") || "[]");
-      }
-
-      if (lista.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-secondary); padding: 1.5rem;">Nenhum treinamento cadastrado.</td></tr>`;
-      } else {
-        tbody.innerHTML = lista.map(t => `
-          <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-            <td style="padding: 12px; font-weight: bold;">${t.titulo}</td>
-            <td style="padding: 12px; color: var(--gold-light); font-size: 0.85rem;">${t.tipo}</td>
-            <td style="padding: 12px; max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><a href="${t.url}" target="_blank" style="color: var(--gold-primary);">${t.url}</a></td>
-            <td style="padding: 12px;">
-              <button class="btn-danger-outline" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="app.excluirTreinamento('${t.id}')">
-                <i class="fa-solid fa-trash"></i> Excluir
-              </button>
-            </td>
-          </tr>
-        `).join("");
-      }
-    } catch (error) {
-      console.error(error);
-    }
-  },
-
-  cadastrarTreinamento: async function() {
-    const titulo = document.getElementById("trein-titulo").value.trim();
-    const descricao = document.getElementById("trein-desc").value.trim();
-    const tipo = document.getElementById("trein-tipo").value;
-    const url = document.getElementById("trein-url").value.trim();
-
-    if (!titulo || !url) {
-      this.toast("Título e URL são obrigatórios.", "warning");
-      return;
-    }
-
-    try {
-      if (this.state.token && !this.state.token.startsWith("mock_")) {
-        await this.requisitarAPI("/treinamentos", "POST", { titulo, descricao, tipo, url });
-      } else {
-        let mockList = JSON.parse(localStorage.getItem("conectajoias_treinamentos_mock") || "[]");
-        mockList.push({ id: `t-${Date.now()}`, titulo, descricao, tipo, url });
-        localStorage.setItem("conectajoias_treinamentos_mock", JSON.stringify(mockList));
-      }
-
-      this.toast("Treinamento cadastrado com sucesso!", "success");
-      document.getElementById("trein-titulo").value = "";
-      document.getElementById("trein-desc").value = "";
-      document.getElementById("trein-url").value = "";
-      this.carregarTreinamentosAdmin();
-    } catch (e) {
-      this.toast("Erro ao cadastrar treinamento: " + e.message, "error");
-    }
-  },
-
-  abrirVideoPlayer: function(titulo, url) {
-    const player = document.getElementById("modal-video-player");
-    const iframe = document.getElementById("video-player-iframe");
-    const titleEl = document.getElementById("video-player-titulo");
-
-    if (!player || !iframe) return;
-
-    if (titleEl) titleEl.innerText = titulo;
-    
-    // Converte links normais do YouTube para o formato embed se necessário
-    let embedUrl = url;
-    if (url.includes("youtube.com/watch?v=")) {
-      const vidId = url.split("v=")[1]?.split("&")[0];
-      embedUrl = `https://www.youtube.com/embed/${vidId}`;
-    } else if (url.includes("youtu.be/")) {
-      const vidId = url.split("youtu.be/")[1]?.split("?")[0];
-      embedUrl = `https://www.youtube.com/embed/${vidId}`;
-    }
-    
-    iframe.src = embedUrl;
-    player.classList.add("active");
-  },
-
-  fecharVideoPlayer: function() {
-    const player = document.getElementById("modal-video-player");
-    const iframe = document.getElementById("video-player-iframe");
-
-    if (!player || !iframe) return;
-
-    player.classList.remove("active");
-    iframe.src = "";
-  },
-
-  excluirTreinamento: async function(id) {
-    if (!await this.confirmar("Deseja realmente excluir este conteúdo de treinamento?")) return;
-
-    try {
-      if (this.state.token && !this.state.token.startsWith("mock_")) {
-        await this.requisitarAPI(`/treinamentos/${id}`, "DELETE");
-      } else {
-        let mockList = JSON.parse(localStorage.getItem("conectajoias_treinamentos_mock") || "[]");
-        mockList = mockList.filter(t => t.id !== id);
-        localStorage.setItem("conectajoias_treinamentos_mock", JSON.stringify(mockList));
-      }
-      this.toast("Conteúdo removido!", "success");
-      this.carregarTreinamentosAdmin();
-    } catch (e) {
-      this.toast("Erro ao excluir: " + e.message, "error");
-    }
-  },
-
   carregarCofreDocumentos: async function() {
     const containerRespostas = document.getElementById("onboarding-respostas-container");
     const containerDocs = document.getElementById("cofre-documentos-list");
@@ -7347,6 +7269,28 @@ const app = {
     }
   },
 
+  // Função central para obter o plano ativo da loja com máxima sincronia
+  obterPlanoAtual: function() {
+    const planoStorage = localStorage.getItem("conectajoias_plano");
+    const plano = (
+      planoStorage ||
+      (this.state.loja && this.state.loja.plano) ||
+      (this.state.usuarioLogado && (this.state.usuarioLogado.planoLoja || this.state.usuarioLogado.plano)) ||
+      "BASICO"
+    ).toUpperCase();
+
+    // Mantém o DOM e o estado interno sintonizados
+    document.documentElement.setAttribute("data-plano", plano);
+    if (this.state.usuarioLogado) {
+      this.state.usuarioLogado.planoLoja = plano;
+      this.state.usuarioLogado.plano = plano;
+    }
+    if (this.state.loja) {
+      this.state.loja.plano = plano;
+    }
+    return plano;
+  },
+
   // Validação central de recursos do plano SaaS
   validarAcessoRecurso: function(recurso, exibirModal = true) {
     if (!this.state.usuarioLogado) return true;
@@ -7354,8 +7298,7 @@ const app = {
     // SuperAdmin tem acesso irrestrito
     if (this.state.usuarioLogado.role === 'SuperAdmin') return true;
     
-    const plano = (localStorage.getItem("conectajoias_plano") || (this.state.usuarioLogado && this.state.usuarioLogado.planoLoja) || 'BASICO').toUpperCase();
-    document.documentElement.setAttribute("data-plano", plano);
+    const plano = this.obterPlanoAtual();
     
     const regras = {
       'importar-excel': ['BRONZE', 'GOLD', 'PLATINUM'],
@@ -7463,7 +7406,7 @@ const app = {
     const isSuperAdmin = this.state.usuarioLogado && (this.state.usuarioLogado.role === 'SuperAdmin' || this.state.usuarioLogado.role === 'SUPERADMIN');
     if (isSuperAdmin) return true;
 
-    const plano = ((this.state.loja && this.state.loja.plano) || (this.state.usuarioLogado && this.state.usuarioLogado.planoLoja) || localStorage.getItem("conectajoias_plano") || 'BASICO').toUpperCase();
+    const plano = this.obterPlanoAtual();
 
     // Se for alteração de um registro que já existe (edição), permite salvar
     if (editId) return true;
@@ -7527,6 +7470,7 @@ const app = {
     if (!this.state.usuarioLogado) return;
     
     const isSuperAdmin = this.state.usuarioLogado.role === 'SuperAdmin';
+    const plano = this.obterPlanoAtual();
     
     const abas = {
       'planilhas': 'importar-excel',
@@ -7558,8 +7502,16 @@ const app = {
 
   carregarMeuPlanoSaaS: async function() {
     // 1. Renderização SÍNCRONA imediata com base no perfil logado (Zero Latência)
-    const planoAtual = (localStorage.getItem("conectajoias_plano") || (this.state.usuarioLogado && this.state.usuarioLogado.planoLoja) || "BASICO").toUpperCase();
-    document.documentElement.setAttribute("data-plano", planoAtual);
+    const planoAtual = this.obterPlanoAtual();
+
+    // Trava de Segurança: A barra de simulação só aparece em ambiente local ou para SuperAdmin
+    const isDev = window.location.hostname === "localhost" || 
+                  window.location.hostname === "127.0.0.1" || 
+                  (this.state.usuarioLogado && this.state.usuarioLogado.role === "SuperAdmin");
+    const elBarraTeste = document.getElementById("barra-teste-fluxo-pagamento");
+    if (elBarraTeste) {
+      elBarraTeste.style.display = isDev ? "flex" : "none";
+    }
 
     const elNome = document.getElementById("saas-plano-nome");
     const elStatus = document.getElementById("saas-plano-badge-status");
@@ -8047,9 +7999,6 @@ const app = {
         </div>
 
         <div style="display: flex; justify-content: flex-end; gap: 0.8rem;">
-          <button class="btn btn-secondary" onclick="document.getElementById('modal-ajuda-movimentacoes').remove(); if(typeof window.initOnboardingTour === 'function') window.initOnboardingTour(true);" style="padding: 0.6rem 1.2rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem;">
-            <i class="fa-solid fa-play"></i> Iniciar Tutorial Interativo
-          </button>
           <button class="btn-gold" onclick="document.getElementById('modal-ajuda-movimentacoes').remove()" style="padding: 0.6rem 1.4rem; font-size: 0.85rem;">
             Entendi, Fechar
           </button>
@@ -8132,17 +8081,95 @@ function hexToRgbA(hex, alpha){
   return hex;
 }
 
+// Modal de Celebração de Upgrade / Ativação de Plano
+app.exibirModalSucessoUpgrade = function(plano) {
+  const modalOld = document.getElementById("modal-sucesso-upgrade-vip");
+  if (modalOld) modalOld.remove();
+
+  const planoNome = (plano || "GOLD").toUpperCase();
+  const nomeFmt = planoNome.charAt(0) + planoNome.slice(1).toLowerCase();
+
+  const backdrop = document.createElement("div");
+  backdrop.id = "modal-sucesso-upgrade-vip";
+  backdrop.style.cssText = `
+    position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(10px); z-index: 99999;
+    display: flex; align-items: center; justify-content: center;
+    padding: 1.5rem; animation: fadeIn 0.4s ease;
+  `;
+
+  backdrop.innerHTML = `
+    <div style="background: #18181b; border: 1px solid var(--gold-primary, #d4af37); border-radius: 16px; max-width: 480px; width: 100%; padding: 2.2rem 2rem; color: #fff; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.8), 0 0 40px rgba(212,175,55,0.2); position: relative; animation: scaleUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+      <button onclick="document.getElementById('modal-sucesso-upgrade-vip').remove()" style="position: absolute; top: 14px; right: 16px; background: none; border: none; color: #71717a; font-size: 1.3rem; cursor: pointer;">✕</button>
+      
+      <div style="width: 80px; height: 80px; border-radius: 50%; background: rgba(212, 175, 55, 0.15); border: 2px solid var(--gold-primary, #d4af37); color: var(--gold-primary, #d4af37); display: inline-flex; align-items: center; justify-content: center; font-size: 2.5rem; margin-bottom: 1.2rem; box-shadow: 0 0 25px rgba(212, 175, 55, 0.3);">
+        <i class="fa-solid fa-crown"></i>
+      </div>
+
+      <h2 style="font-family: var(--font-title, 'Playfair Display', serif); color: var(--gold-light, #f3e5ab); font-size: 1.7rem; margin: 0 0 0.5rem 0;">
+        Plano ${nomeFmt} Ativado!
+      </h2>
+      <p style="color: #a1a1aa; font-size: 0.95rem; line-height: 1.5; margin-bottom: 1.5rem;">
+        Seu pagamento foi confirmado e todos os recursos exclusivos da sua assinatura já estão totalmente liberados no painel.
+      </p>
+
+      <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 1rem; margin-bottom: 1.8rem; text-align: left; display: flex; flex-direction: column; gap: 0.6rem; font-size: 0.88rem;">
+        <div style="display: flex; align-items: center; gap: 0.6rem; color: #34d399;">
+          <i class="fa-solid fa-circle-check"></i>
+          <span style="color: #e4e4e7;">Limites de consultoras e estoque central atualizados</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.6rem; color: #34d399;">
+          <i class="fa-solid fa-circle-check"></i>
+          <span style="color: #e4e4e7;">Cadeados das ferramentas avançadas removidos</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.6rem; color: #34d399;">
+          <i class="fa-solid fa-circle-check"></i>
+          <span style="color: #e4e4e7;">Acesso ativo e renovado por 30 dias</span>
+        </div>
+      </div>
+
+      <button onclick="document.getElementById('modal-sucesso-upgrade-vip').remove()" style="width: 100%; padding: 0.95rem; background: var(--gold-gradient, linear-gradient(135deg, #d4af37 0%, #aa820a 100%)); color: #18181b; font-weight: 800; font-size: 1rem; border: none; border-radius: 8px; cursor: pointer; transition: all 0.2s ease;">
+        Começar a Usar Agora
+      </button>
+    </div>
+  `;
+
+  document.body.appendChild(backdrop);
+};
+
 // Inicializa a aplicação ao carregar a página
 window.addEventListener("DOMContentLoaded", () => {
   app.init();
   
-  // Checa se o usuário veio de um pagamento aprovado pelo Mercado Pago
+  // Checa se o usuário veio de um pagamento aprovado (Cakto Pay / Mercado Pago / Asaas)
   const params = new URLSearchParams(window.location.search);
-  if (params.get("planoAtivado") === "1" || params.get("status") === "approved" || params.get("collection_status") === "approved") {
-    const plano = (localStorage.getItem("conectajoias_plano") || "BRONZE").toUpperCase();
+  const veioDeUpgrade = params.get("upgrade_sucesso") === "true" ||
+                        params.get("planoAtivado") === "1" ||
+                        params.get("status") === "approved" ||
+                        params.get("collection_status") === "approved" ||
+                        sessionStorage.getItem("conectajoias_upgrade_recem_ativado");
+
+  if (veioDeUpgrade) {
+    const plano = (params.get("plano") || sessionStorage.getItem("conectajoias_upgrade_recem_ativado") || localStorage.getItem("conectajoias_plano") || "GOLD").toUpperCase();
+    
+    // Garante que o plano esteja no storage e limpa a flag da sessão
+    localStorage.setItem("conectajoias_plano", plano);
+    localStorage.setItem("conectajoias_status_plano", "ATIVO");
+    sessionStorage.removeItem("conectajoias_upgrade_recem_ativado");
+
+    // Força atualização imediata da UI sem restrições
+    try {
+      app.carregarMeuPlanoSaaS();
+      app.atualizarCadeadosUI();
+    } catch(e) {
+      console.warn("Aviso ao forçar atualização de plano pós-retorno:", e);
+    }
+
     setTimeout(() => {
-      app.toast(`🎉 Parabéns! Seu pagamento foi aprovado e o Plano ${plano} foi ativado com sucesso!`, "success");
-    }, 500);
+      app.exibirModalSucessoUpgrade(plano);
+    }, 400);
+
+    // Limpa os parâmetros da URL mantendo a navegação limpa
     window.history.replaceState({}, document.title, window.location.pathname);
   }
 });

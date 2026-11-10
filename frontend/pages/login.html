@@ -513,62 +513,114 @@
     </div>
 
     <!-- ══════════════════════════════════════════════
-         TELA FINAL — CREDENCIAIS DE ACESSO
+         TELA FINAL — CONFIRMAÇÃO & CREDENCIAIS DE ACESSO (DESIGN PREMIUM)
          ══════════════════════════════════════════════ -->
-    <div class="login-card" id="credentials-card" style="display:none; max-width: 500px; width: 95%; margin: 0 auto; text-align: center; background: radial-gradient(circle at top left, #1a1a1a, #0d0d0d); border: 1px solid rgba(212,175,55,0.4); box-shadow: 0 20px 50px rgba(0,0,0,0.8); border-radius: 16px; padding: 2.2rem;">
+    <div class="login-card" id="credentials-card" style="display:none; max-width: 540px; width: 95%; margin: 0 auto; text-align: center; background: linear-gradient(165deg, #181818 0%, #0d0d0d 100%); border: 1px solid rgba(212, 175, 55, 0.4); box-shadow: 0 25px 60px rgba(0,0,0,0.85), 0 0 30px rgba(212, 175, 55, 0.08); border-radius: 20px; padding: 2.5rem 2rem; position: relative; overflow: hidden;">
       
-      <div style="text-align:center; margin-bottom: 1.5rem;">
-        <div style="width: 70px; height: 70px; background: rgba(212, 175, 55, 0.12); border: 1.5px solid var(--gold-primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem auto; box-shadow: 0 0 25px rgba(212, 175, 55, 0.3);">
-          <i class="fa-solid fa-crown" style="color: var(--gold-primary); font-size: 2rem;"></i>
-        </div>
-        <h2 style="font-family:'Montserrat',sans-serif; color:#fff; font-size: 1.5rem; font-weight: 700; margin-bottom: 0.4rem; letter-spacing: -0.3px;">Sua Loja Foi Criada! ✨</h2>
-        <p style="color: var(--text-secondary); font-size: 0.88rem; line-height: 1.4;">Sua conta foi registrada com sucesso. Guarde suas credenciais abaixo:</p>
-      </div>
+      <!-- Efeito sutil de luz de fundo -->
+      <div style="position: absolute; top: -80px; left: 50%; transform: translateX(-50%); width: 220px; height: 160px; background: radial-gradient(circle, rgba(212,175,55,0.2) 0%, transparent 70%); pointer-events: none; filter: blur(20px);"></div>
 
-      <div class="cred-box" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 12px; padding: 1.2rem; margin-bottom: 1.5rem; text-align: left;">
-        <h4 style="font-size: 0.9rem; color: var(--gold-primary); margin-bottom: 1rem; display: flex; align-items: center; gap: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
-          <i class="fa-solid fa-key"></i> Dados de Acesso à sua Conta
-        </h4>
-        
-        <div class="cred-item" style="margin-bottom: 0.8rem; display: flex; flex-direction: column; gap: 2px;">
-          <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">E-mail de Login</span>
-          <span id="cred-email" style="font-size: 0.95rem; color: #fff; font-weight: 600;">—</span>
+      <!-- Badge de Sucesso com Halo Dourado -->
+      <div style="text-align: center; margin-bottom: 1.6rem; position: relative; z-index: 2;">
+        <div style="width: 76px; height: 76px; background: linear-gradient(135deg, rgba(212, 175, 55, 0.2) 0%, rgba(212, 175, 55, 0.05) 100%); border: 2px solid var(--gold-primary); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 1rem; box-shadow: 0 0 25px rgba(212, 175, 55, 0.35), inset 0 0 15px rgba(212, 175, 55, 0.15);">
+          <i class="fa-solid fa-crown" style="color: var(--gold-primary); font-size: 2.2rem; filter: drop-shadow(0 2px 8px rgba(212,175,55,0.5));"></i>
         </div>
         
-        <div class="cred-item" style="margin-bottom: 0.8rem; display: flex; align-items: center; justify-content: space-between; background: rgba(212,175,55,0.08); padding: 0.6rem 0.8rem; border-radius: 8px; border: 1px solid rgba(212,175,55,0.25);">
-          <div>
-            <span style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; display: block;">PIN de Acesso Rápido</span>
-            <span id="cred-pin" class="pin-val" style="font-size: 1.2rem; color: var(--gold-primary); font-weight: 700; letter-spacing: 2px;">—</span>
-          </div>
-          <button type="button" onclick="loginApp.copiarPIN()" style="background: rgba(212,175,55,0.15); color: var(--gold-primary); border: 1px solid rgba(212,175,55,0.4); padding: 5px 12px; border-radius: 6px; font-size: 0.78rem; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: all 0.2s;">
-            <i class="fa-solid fa-copy"></i> <span id="lbl-copiar-pin">Copiar PIN</span>
-          </button>
+        <div style="display: inline-flex; align-items: center; gap: 6px; padding: 0.3rem 0.9rem; background: rgba(46, 125, 50, 0.15); border: 1px solid rgba(129, 199, 132, 0.35); border-radius: 20px; margin-bottom: 0.8rem;">
+          <i class="fa-solid fa-circle-check" style="color: #81c784; font-size: 0.75rem;"></i>
+          <span style="color: #a5d6a7; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px;">Conta Ativada com Sucesso</span>
         </div>
 
-        <div class="cred-item" style="margin-bottom: 0.8rem; display: flex; flex-direction: column; gap: 2px;">
-          <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Senha</span>
-          <span style="font-size: 0.88rem; color: #ccc;">A senha cadastrada por você</span>
-        </div>
-
-        <div class="cred-item" style="margin-bottom: 0.4rem; display: flex; flex-direction: column; gap: 4px; background: rgba(255,255,255,0.02); padding: 0.6rem 0.8rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Link de Acesso Direto</span>
-            <button type="button" onclick="loginApp.copiarLink()" style="background: transparent; color: var(--gold-primary); border: none; font-size: 0.78rem; cursor: pointer; display: flex; align-items: center; gap: 4px;">
-              <i class="fa-solid fa-copy"></i> <span id="lbl-copiar-link">Copiar</span>
-            </button>
-          </div>
-          <span id="cred-link" style="font-size: 0.8rem; color: var(--gold-light); word-break: break-all;">—</span>
-        </div>
-
-        <p style="font-size: 0.72rem; color: #ffb74d; margin-top: 0.8rem; margin-bottom: 0; line-height: 1.4; text-align: center;">
-          <i class="fa-solid fa-circle-info"></i>
-          Você poderá acessar seu painel usando tanto seu E-mail quanto seu PIN + Senha.
+        <h2 style="font-family: 'Montserrat', sans-serif; color: #ffffff; font-size: 1.65rem; font-weight: 700; margin: 0 0 0.5rem 0; letter-spacing: -0.4px;">
+          Sua Loja Foi Criada! ✨
+        </h2>
+        <p style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.5; margin: 0 auto; max-width: 440px;">
+          Seja muito bem-vinda à plataforma. Guarde seus dados de acesso abaixo para entrar quando quiser:
         </p>
       </div>
 
-      <button class="btn-gold" id="btn-ir-para-painel" style="width: 100%; justify-content: center; padding: 1.1rem; font-size: 1.05rem; font-weight: 700; border-radius: 10px; box-shadow: 0 4px 20px rgba(212, 175, 55, 0.3); cursor: pointer;">
-        <i class="fa-solid fa-rocket"></i> Acessar Meu Painel Agora
+      <!-- Container das Credenciais em Estilo VIP Card -->
+      <div class="cred-box" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(212, 175, 55, 0.22); border-radius: 14px; padding: 1.3rem; margin-bottom: 1.6rem; text-align: left; position: relative; z-index: 2; backdrop-filter: blur(8px);">
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.1rem; padding-bottom: 0.7rem; border-bottom: 1px solid rgba(255, 255, 255, 0.07);">
+          <span style="font-size: 0.8rem; font-weight: 700; color: var(--gold-primary); text-transform: uppercase; letter-spacing: 0.8px; display: flex; align-items: center; gap: 7px;">
+            <i class="fa-solid fa-id-badge"></i> Credenciais de Acesso
+          </span>
+          <span style="font-size: 0.7rem; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 2px 8px; border-radius: 10px;">Perfil: Gestora</span>
+        </div>
+
+        <!-- Card de Destaque: PIN Rápido -->
+        <div style="background: linear-gradient(135deg, rgba(212,175,55,0.12) 0%, rgba(212,175,55,0.03) 100%); border: 1.5px solid rgba(212,175,55,0.35); border-radius: 10px; padding: 0.9rem 1rem; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; box-shadow: inset 0 1px 1px rgba(255,255,255,0.05);">
+          <div>
+            <span style="font-size: 0.72rem; color: var(--gold-light); text-transform: uppercase; font-weight: 700; letter-spacing: 0.8px; display: block; margin-bottom: 2px;">
+              <i class="fa-solid fa-key" style="margin-right: 4px;"></i> PIN de Acesso Rápido
+            </span>
+            <span id="cred-pin" class="pin-val" style="font-size: 1.5rem; color: var(--gold-primary); font-weight: 800; letter-spacing: 3px; font-family: 'Montserrat', monospace;">—</span>
+          </div>
+          <button type="button" id="btn-copiar-pin" onclick="loginApp.copiarPIN()" style="background: rgba(212,175,55,0.18); color: var(--gold-primary); border: 1px solid rgba(212,175,55,0.45); padding: 7px 14px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.25s ease;" onmouseover="this.style.background='rgba(212,175,55,0.3)'" onmouseout="this.style.background='rgba(212,175,55,0.18)'">
+            <i class="fa-regular fa-copy" id="icon-copiar-pin"></i> <span id="lbl-copiar-pin">Copiar PIN</span>
+          </button>
+        </div>
+
+        <!-- Grid de E-mail e Senha -->
+        <div style="display: grid; grid-template-columns: 1fr; gap: 0.75rem; margin-bottom: 1rem;">
+          
+          <!-- E-mail de Login -->
+          <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 9px; padding: 0.75rem 0.9rem; display: flex; justify-content: space-between; align-items: center;">
+            <div style="overflow: hidden; padding-right: 8px;">
+              <span style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 2px;">
+                <i class="fa-regular fa-envelope" style="margin-right: 4px;"></i> E-mail de Login
+              </span>
+              <span id="cred-email" style="font-size: 0.9rem; color: #ffffff; font-weight: 600; word-break: break-all;">—</span>
+            </div>
+            <button type="button" onclick="loginApp.copiarEmail()" style="background: transparent; color: var(--gold-primary); border: none; font-size: 0.76rem; cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 6px;" title="Copiar E-mail">
+              <i class="fa-regular fa-copy"></i> <span id="lbl-copiar-email">Copiar</span>
+            </button>
+          </div>
+
+          <!-- Senha de Login -->
+          <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 9px; padding: 0.75rem 0.9rem; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <span style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 2px;">
+                <i class="fa-solid fa-lock" style="margin-right: 4px;"></i> Senha Cadastrada
+              </span>
+              <span style="font-size: 0.88rem; color: #e0e0e0; font-weight: 500;">•••••••• (A senha criada por você)</span>
+            </div>
+            <span style="font-size: 0.72rem; color: #81c784; display: flex; align-items: center; gap: 4px;">
+              <i class="fa-solid fa-shield-check"></i> Segura
+            </span>
+          </div>
+
+        </div>
+
+        <!-- Link Direto -->
+        <div style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 9px; padding: 0.75rem 0.9rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+            <span style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">
+              <i class="fa-solid fa-link" style="margin-right: 4px;"></i> Link de Acesso do seu Painel
+            </span>
+            <button type="button" onclick="loginApp.copiarLink()" style="background: transparent; color: var(--gold-primary); border: none; font-size: 0.76rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 2px 6px;">
+              <i class="fa-regular fa-copy" id="icon-copiar-link"></i> <span id="lbl-copiar-link">Copiar</span>
+            </button>
+          </div>
+          <span id="cred-link" style="font-size: 0.78rem; color: var(--gold-light); word-break: break-all; font-family: monospace; opacity: 0.9;">—</span>
+        </div>
+
+        <!-- Dica Informativa LGPD & Segurança -->
+        <div style="margin-top: 1rem; padding: 0.65rem 0.8rem; background: rgba(255, 183, 77, 0.08); border-left: 3px solid #ffb74d; border-radius: 4px; display: flex; align-items: flex-start; gap: 8px;">
+          <i class="fa-solid fa-circle-info" style="color: #ffb74d; font-size: 0.85rem; margin-top: 2px;"></i>
+          <p style="font-size: 0.74rem; color: #ffcc80; margin: 0; line-height: 1.45;">
+            Você poderá acessar o sistema digitando seu <strong>E-mail</strong> ou seu <strong>PIN de 4 dígitos</strong> acompanhado de sua senha.
+          </p>
+        </div>
+
+      </div>
+
+      <!-- Botão de Acesso Principal com Efeito Glow -->
+      <button class="btn-gold" id="btn-ir-para-painel" style="width: 100%; justify-content: center; padding: 1.15rem; font-size: 1.05rem; font-weight: 700; border-radius: 12px; box-shadow: 0 4px 22px rgba(212, 175, 55, 0.4); cursor: pointer; display: flex; align-items: center; gap: 10px; transition: transform 0.2s, box-shadow 0.2s; position: relative; z-index: 2;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 30px rgba(212, 175, 55, 0.55)'" onmouseout="this.style.transform='none'; this.style.boxShadow='0 4px 22px rgba(212, 175, 55, 0.4)'">
+        <i class="fa-solid fa-rocket" style="font-size: 1.15rem;"></i> Acessar Meu Painel Agora
       </button>
+
     </div>
 
   </div>

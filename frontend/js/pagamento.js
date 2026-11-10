@@ -54,39 +54,88 @@ const checkout = {
     const plano = params.get("plano") || params.get("novoPlano");
     const ref = params.get("ref") || params.get("external_reference") || params.get("src");
 
-    if (eSucesso || plano) {
-      console.log("🎉 Detectado retorno de checkout de pagamento!", { plano, ref });
+    if (eSucesso) {
+      console.log("🎉 Detectado retorno de checkout de pagamento aprovado!", { plano, ref });
+      
+      let planoAtivado = (plano || "GOLD").toUpperCase();
+      if (ref && ref.includes("|")) {
+        const parts = ref.split("|");
+        if (parts[1]) planoAtivado = parts[1].toUpperCase();
+      }
+
+      // Aplica imediatamente no storage local para evitar qualquer atraso
+      localStorage.setItem("conectajoias_status_plano", "ATIVO");
+      localStorage.setItem("conectajoias_plano", planoAtivado);
+      sessionStorage.setItem("conectajoias_upgrade_recem_ativado", planoAtivado);
+
+      const atualizarUser = (k) => {
+        const raw = localStorage.getItem(k);
+        if (raw) {
+          try {
+            const u = JSON.parse(raw);
+            u.statusPlano = "ATIVO";
+            u.status = "ATIVO";
+            u.planoLoja = planoAtivado;
+            u.plano = planoAtivado;
+            localStorage.setItem(k, JSON.stringify(u));
+          } catch(e) {}
+        }
+      };
+      atualizarUser("conectajoias_usuario");
+      atualizarUser("usuario");
+
+      const lojaRaw = localStorage.getItem("conectajoias_loja");
+      if (lojaRaw) {
+        try {
+          const l = JSON.parse(lojaRaw);
+          l.statusPlano = "ATIVO";
+          l.plano = planoAtivado;
+          localStorage.setItem("conectajoias_loja", JSON.stringify(l));
+        } catch(e) {}
+      }
+
       try {
-        const token = localStorage.getItem("conectajoias_token");
+        const token = localStorage.getItem("conectajoias_token") || localStorage.getItem("token") || "";
+        const lojaId = localStorage.getItem("conectajoias_lojaId") || "";
         const headers = { "Content-Type": "application/json" };
-        if (token) headers["Authorization"] = `Bearer ${token}`;
+        if (token && !token.startsWith("mock_")) headers["Authorization"] = `Bearer ${token}`;
+        if (lojaId) headers["x-loja-id"] = lojaId;
+
+        let uId = "", uEmail = "";
+        try {
+          const u = JSON.parse(localStorage.getItem("conectajoias_usuario") || "{}");
+          uId = u.id || "";
+          uEmail = u.email || "";
+        } catch(e) {}
 
         const res = await fetch(`${API_BASE_URL}/saas/confirmar-retorno-pagamento`, {
           method: "POST",
           headers,
           body: JSON.stringify({
             status: "approved",
-            planoDesejado: plano || "GOLD",
-            externalReference: ref
+            planoDesejado: planoAtivado,
+            externalReference: ref,
+            lojaId,
+            userId: uId,
+            email: uEmail
           })
         });
 
-        const data = await res.json();
         if (res.ok) {
-          const planoAtivado = data.plano || plano || "GOLD";
-          this.toast(`🎉 Parabéns! Seu pagamento foi confirmado e o Plano ${planoAtivado.toUpperCase()} foi ativado com sucesso!`, "success");
-          
-          // Limpa os parâmetros da URL mantendo a navegação limpa
-          window.history.replaceState({}, document.title, window.location.pathname);
-          
-          // Se o app manager estiver carregado, recarrega o plano na interface
-          if (typeof app !== "undefined" && app.carregarMeuPlanoSaaS) {
-            app.carregarMeuPlanoSaaS();
-          }
+          const data = await res.json();
+          if (data.plano) planoAtivado = data.plano.toUpperCase();
+          localStorage.setItem("conectajoias_plano", planoAtivado);
         }
       } catch (err) {
         console.warn("Aviso na ativação de retorno de pagamento:", err.message);
       }
+
+      this.toast(`🎉 Pagamento Confirmado! Redirecionando para o painel com o Plano ${planoAtivado}...`, "success");
+
+      // Redireciona imediatamente para o painel com o plano ativo
+      setTimeout(() => {
+        window.location.href = `/pages/superadmin.html?upgrade_sucesso=true&plano=${encodeURIComponent(planoAtivado)}`;
+      }, 1200);
     }
   },
 
@@ -685,6 +734,13 @@ async function exibirModalUpgradeProRata(novoPlano, usuarioId) {
       animation: fadeIn 0.3s ease;
     `;
 
+    const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || localStorage.getItem('conectajoias_user_role') === 'SuperAdmin';
+    const botaoSimulacaoHtml = isDev ? `
+      <button onclick="window.simularRetornoPagamento('${data.novoPlano}', '${usuarioId}')" style="width: 100%; margin-top: 0.7rem; padding: 0.75rem; background: rgba(212, 175, 55, 0.12); color: var(--gold-light, #f3e5ab); border: 1px dashed var(--gold-primary, #d4af37); font-weight: 700; font-size: 0.88rem; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; transition: all 0.2s;">
+        <i class="fa-solid fa-flask-vial"></i> Simular Pagamento Aprovado (Ambiente de Teste)
+      </button>
+    ` : '';
+
     if (eUpgrade) {
       const dataRenovacao = data.dataProximaRenovacao || 'fim do ciclo atual';
       modalDiv.innerHTML = `
@@ -710,6 +766,8 @@ async function exibirModalUpgradeProRata(novoPlano, usuarioId) {
           <button onclick="window.location.href='${data.linkDePagamento}'" style="width: 100%; padding: 0.9rem; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; border: none; font-weight: 700; font-size: 1rem; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
             <i class="fa-solid fa-bolt"></i> Pagar R$ ${data.valorUpgrade.toFixed(2).replace('.', ',')} e Ativar (Cakto Pay)
           </button>
+
+          ${botaoSimulacaoHtml}
         </div>
       `;
     } else {
@@ -742,6 +800,8 @@ async function exibirModalUpgradeProRata(novoPlano, usuarioId) {
           <button onclick="window.location.href='${data.linkDePagamento}'" style="width: 100%; padding: 0.9rem; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; border: none; font-weight: 700; font-size: 1rem; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
             <i class="fa-solid fa-bolt"></i> Ir para o Checkout da Cakto Pay
           </button>
+
+          ${botaoSimulacaoHtml}
         </div>
       `;
     }
@@ -860,11 +920,125 @@ async function atualizarBadgesUpgradeProRata() {
   }
 }
 
+/**
+ * Simula o retorno de checkout de pagamento de forma completamente coerente
+ * Pula a etapa da Cakto Pay e simula o pagamento aprovado chamando /pages/sucesso.html
+ */
+async function simularRetornoPagamento(novoPlano, usuarioIdParam) {
+  const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || localStorage.getItem('conectajoias_user_role') === 'SuperAdmin';
+  if (!isDev) {
+    console.warn("🚫 [Segurança] A simulação de pagamentos só é permitida em ambiente de desenvolvimento ou por SuperAdmins.");
+    alert("A simulação de pagamentos só é permitida em ambiente de testes ou por SuperAdmins.");
+    return;
+  }
+
+  const p = String(novoPlano || 'GOLD').toUpperCase();
+  let uid = usuarioIdParam;
+  let lojaId = "";
+  try {
+    const u = JSON.parse(localStorage.getItem("conectajoias_usuario") || localStorage.getItem("usuario") || "{}");
+    if (!uid) uid = u.id;
+    if (u.lojaId) lojaId = u.lojaId;
+  } catch(e) {}
+  
+  if (!lojaId) {
+    lojaId = localStorage.getItem("conectajoias_loja_id") || localStorage.getItem("conectajoias_lojaId") || "";
+  }
+  if (!uid) {
+    uid = lojaId || "admin";
+  }
+
+  // Se for simulação de reset para BASICO:
+  if (p === 'BASICO') {
+    try {
+      const token = localStorage.getItem("conectajoias_token");
+      const headers = { "Content-Type": "application/json" };
+      if (token && !token.startsWith("mock_")) headers["Authorization"] = `Bearer ${token}`;
+      if (lojaId) headers["x-loja-id"] = lojaId;
+
+      await fetch(`${getApiBaseUrl()}/saas/resetar-plano-teste`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ lojaId, userId: uid })
+      });
+    } catch(e) {}
+
+    document.documentElement.setAttribute("data-plano", "BASICO");
+    localStorage.setItem("conectajoias_plano", "BASICO");
+    localStorage.setItem("conectajoias_status_plano", "PENDENTE");
+
+    const atualizarUser = (k) => {
+      const raw = localStorage.getItem(k);
+      if (raw) {
+        try {
+          const u = JSON.parse(raw);
+          u.statusPlano = "PENDENTE";
+          u.status = "PENDENTE";
+          u.planoLoja = "BASICO";
+          u.plano = "BASICO";
+          localStorage.setItem(k, JSON.stringify(u));
+        } catch(e) {}
+      }
+    };
+    atualizarUser("conectajoias_usuario");
+    atualizarUser("usuario");
+
+    const lojaRaw = localStorage.getItem("conectajoias_loja");
+    if (lojaRaw) {
+      try {
+        const l = JSON.parse(lojaRaw);
+        l.statusPlano = "PENDENTE";
+        l.plano = "BASICO";
+        localStorage.setItem("conectajoias_loja", JSON.stringify(l));
+      } catch(e) {}
+    }
+
+    if (typeof app !== "undefined" && app.carregarMeuPlanoSaaS) {
+      app.carregarMeuPlanoSaaS();
+      if (typeof app.atualizarCadeadosUI === "function") app.atualizarCadeadosUI();
+      if (typeof app.toast === "function") app.toast("Plano resetado para Básico com sucesso!", "info");
+    } else {
+      window.location.reload();
+    }
+    return;
+  }
+
+  // Aplica síncronamente na sessão local para liberação instantânea
+  document.documentElement.setAttribute("data-plano", p);
+  localStorage.setItem("conectajoias_status_plano", "ATIVO");
+  localStorage.setItem("conectajoias_plano", p);
+  sessionStorage.setItem("conectajoias_upgrade_recem_ativado", p);
+
+  const atualizarUser = (k) => {
+    const raw = localStorage.getItem(k);
+    if (raw) {
+      try {
+        const u = JSON.parse(raw);
+        u.statusPlano = "ATIVO";
+        u.status = "ATIVO";
+        u.planoLoja = p;
+        u.plano = p;
+        localStorage.setItem(k, JSON.stringify(u));
+      } catch(e) {}
+    }
+  };
+  atualizarUser("conectajoias_usuario");
+  atualizarUser("usuario");
+
+  const modal = document.getElementById("modal-upgrade-prorata");
+  if (modal) modal.remove();
+
+  const ref = `${lojaId || uid}|${p}`;
+  const targetUrl = `/pages/sucesso.html?status=approved&plano=${encodeURIComponent(p)}&ref=${encodeURIComponent(ref)}&lojaId=${encodeURIComponent(lojaId)}&id=sim_cakto_${Date.now()}`;
+  window.location.href = targetUrl;
+}
+
 // Exporta globalmente as funções
 window.assinarPlano = assinarPlano;
 window.fecharModalUpgradeProRata = fecharModalUpgradeProRata;
 window.exibirModalUpgradeProRata = exibirModalUpgradeProRata;
 window.atualizarBadgesUpgradeProRata = atualizarBadgesUpgradeProRata;
+window.simularRetornoPagamento = simularRetornoPagamento;
 
 // Inicializar na carga da página
 document.addEventListener("DOMContentLoaded", () => {

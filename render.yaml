@@ -15,8 +15,8 @@ services:
       - key: PORT
         value: 10000
       - key: FRONTEND_URL
-        value: https://projconectajoias.onrender.com
+        value: https://conectajoias.app.br
       - key: PUBLIC_URL
-        value: https://projconectajoias.onrender.com
+        value: https://conectajoias.app.br
       - key: MP_ACCESS_TOKEN
         sync: false

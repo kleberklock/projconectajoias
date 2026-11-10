@@ -30,8 +30,8 @@
 
     if (token && userJson) {
       var usuario = JSON.parse(userJson);
-      var role = (usuario.role || "").toUpperCase();
-      var plano = (usuario.planoLoja || "BASICO").toUpperCase();
+      var planoStorage = localStorage.getItem("conectajoias_plano");
+      var plano = (planoStorage || usuario.planoLoja || usuario.plano || "BASICO").toUpperCase();
 
       // 2. Anexa plano e papel no <html> síncronamente para o CSS aplicar travas (cadeados) no primeiro Paint (Zero Latência)
       document.documentElement.setAttribute("data-plano", plano);

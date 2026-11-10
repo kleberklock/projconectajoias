@@ -161,6 +161,9 @@ if (!JWT_SECRET) {
 const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5500';
 const CORS_ORIGINS = [
   frontendUrl,
+  'https://conectajoias.app.br',
+  'https://www.conectajoias.app.br',
+  'https://projconectajoias.onrender.com',
   'http://localhost:5500',
   'http://127.0.0.1:5500',
   'http://localhost:8080',
@@ -1419,9 +1422,21 @@ app.post('/api/produtos', autenticarJWT, autorizarRole(['Manager', 'SuperAdmin']
     return res.status(400).json({ error: 'Nome e categoria são obrigatórios.' });
   }
 
-  const cod = codigo || 'REF-' + Math.floor(1000 + Math.random() * 9000);
+  const cod = (codigo || 'REF-' + Math.floor(1000 + Math.random() * 9000)).trim();
 
   try {
+    // Validação Multi-tenant: Código é único apenas dentro da mesma loja/tenant
+    const produtoExistenteNaLoja = await prisma.produto.findFirst({
+      where: {
+        lojaId: req.lojaId,
+        codigo: cod
+      }
+    });
+
+    if (produtoExistenteNaLoja) {
+      return res.status(400).json({ error: `Já existe um produto cadastrado com este Código/Referência (${cod}) na sua loja.` });
+    }
+
     // Validação de limite de peças no estoque baseado no plano da loja (SaaS)
     const limitCheck = await verificarLimiteEstoque(req.lojaId, parseInt(quantidade) || 0);
     if (!limitCheck.ok) {
@@ -1467,7 +1482,7 @@ app.post('/api/produtos', autenticarJWT, autorizarRole(['Manager', 'SuperAdmin']
   } catch (error) {
     console.error("Erro ao criar produto:", error);
     if (error.code === 'P2002') {
-      return res.status(400).json({ error: 'Já existe um produto cadastrado com este Código/Referência.' });
+      return res.status(400).json({ error: `Já existe um produto ou SKU cadastrado com este Código (${cod}) na sua loja.` });
     }
     res.status(500).json({ error: 'Erro ao criar produto.' });
   }
@@ -1487,6 +1502,22 @@ app.put('/api/produtos/:id', autenticarJWT, autorizarRole(['Manager', 'SuperAdmi
       return res.status(403).json({ error: 'Acesso negado ou produto não encontrado nesta loja.' });
     }
 
+    const codEditado = codigo ? codigo.trim() : prod.codigo;
+
+    // Se o código foi alterado, valida unicidade restrita ao mesmo tenant/loja
+    if (codEditado !== prod.codigo) {
+      const duplicadoMesmaLoja = await prisma.produto.findFirst({
+        where: {
+          lojaId: req.lojaId,
+          codigo: codEditado,
+          NOT: { id: id }
+        }
+      });
+      if (duplicadoMesmaLoja) {
+        return res.status(400).json({ error: `Já existe outro produto cadastrado com o código (${codEditado}) na sua loja.` });
+      }
+    }
+
     const qtdInt = parseInt(quantidade) || 0;
     let varExistente = prod.variacoes.find(v => v.tamanho === "Único" && v.banho === "OURO");
     const qtdAntiga = varExistente ? (varExistente.quantidade || 0) : 0;
@@ -1501,7 +1532,7 @@ app.put('/api/produtos/:id', autenticarJWT, autorizarRole(['Manager', 'SuperAdmi
     const produtoAtualizado = await prisma.produto.update({
       where: { id },
       data: {
-        codigo,
+        codigo: codEditado,
         nome,
         categoria,
         custoBruto: parseFloat(custoBruto) || 0.0,
@@ -1515,7 +1546,7 @@ app.put('/api/produtos/:id', autenticarJWT, autorizarRole(['Manager', 'SuperAdmi
       }
     });
 
-    const cod = codigo || produtoAtualizado.codigo;
+    const cod = codEditado;
     let variacaoPadrao = produtoAtualizado.variacoes.find(v => v.tamanho === "Único" && v.banho === "OURO");
 
     if (variacaoPadrao) {
@@ -1552,6 +1583,9 @@ app.put('/api/produtos/:id', autenticarJWT, autorizarRole(['Manager', 'SuperAdmi
     res.json(produtoRetorno);
   } catch (error) {
     console.error("Erro ao atualizar produto:", error);
+    if (error.code === 'P2002') {
+      return res.status(400).json({ error: 'Já existe outro produto cadastrado com este Código/Referência na sua loja.' });
+    }
     res.status(500).json({ error: 'Erro ao atualizar produto.' });
   }
 });
@@ -4897,20 +4931,44 @@ app.post('/api/webhooks/asaas', async (req, res) => {
   res.json({ received: true });
 });
 
+// Health check / Keep-Alive (utilizado para evitar spin-down / hibernação no Render)
+app.get(['/api/health', '/health', '/ping'], (req, res) => {
+  res.status(200).send('PONG');
+});
+
 // ==============================================================================
 // WEBHOOK CAKTO PAY — ATUALIZAÇÃO AUTOMÁTICA DE PLANOS NO SUPABASE / PRISMA
 // ==============================================================================
-app.post('/api/webhook/cakto', async (req, res) => {
-  // Retorno imediato HTTP 200 para confirmar recebimento à Cakto Pay
+const ROTAS_WEBHOOK_CAKTO = [
+  '/api/webhook/cakto',
+  '/api/webhooks/cakto',
+  '/webhook/cakto',
+  '/webhooks/cakto',
+  '/api/cakto/webhook',
+  '/api/cakto-webhook'
+];
+
+// Endpoint GET amigável para verificação de status pelo navegador
+app.get(ROTAS_WEBHOOK_CAKTO, (req, res) => {
+  res.status(200).json({ status: 'ativo', gateway: 'Cakto Pay Webhook Endpoint', timestamp: new Date().toISOString() });
+});
+
+// Endpoint POST para processamento de eventos do Webhook
+app.post(ROTAS_WEBHOOK_CAKTO, async (req, res) => {
+  // Retorno imediato HTTP 200 para confirmar recebimento à Cakto Pay em menos de 100ms
   res.status(200).send('OK');
 
   try {
     const secretEsperado = process.env.CAKTO_WEBHOOK_SECRET;
     const secretRecebido = req.body?.secret || req.headers['x-cakto-secret'];
 
-    if (secretEsperado && secretRecebido && secretRecebido !== secretEsperado) {
-      console.warn('⚠️ [Webhook Cakto Pay] Tentativa de acesso com secret inválido.');
-      return;
+    // Boas práticas de segurança: se o secret estiver configurado nas variáveis de ambiente,
+    // a requisição obrigatoriamente deve conter o token idêntico para evitar spoofing.
+    if (secretEsperado) {
+      if (!secretRecebido || secretRecebido !== secretEsperado) {
+        console.warn('⚠️ [Webhook Cakto Pay] Tentativa de acesso não autorizada: secret ausente ou inválido.');
+        return;
+      }
     }
 
     const payload = req.body || {};
@@ -4931,36 +4989,57 @@ app.post('/api/webhook/cakto', async (req, res) => {
       || payload.custom_id
       || '';
 
-    console.log(`💳 [Webhook Cakto Pay] Evento recebido: "${event}" | Referência: "${rawRef}"`);
-
     const parts = rawRef.split('|');
-    let usuarioId = parts[0];
+    let usuarioId = parts[0] || null;
     let planoExt = parts[1] || 'GOLD';
 
     // Se o plano não veio na referência, identifica pelo nome do produto/oferta da Cakto
     if (!parts[1]) {
-      const nomeProd = (firstItem.product?.name || firstItem.offer?.name || '').toUpperCase();
+      const nomeProd = (firstItem.product?.name || firstItem.offer?.name || payload.product?.name || '').toUpperCase();
       if (nomeProd.includes('BRONZE')) planoExt = 'BRONZE';
       else if (nomeProd.includes('PLATINUM')) planoExt = 'PLATINUM';
       else if (nomeProd.includes('GOLD')) planoExt = 'GOLD';
     }
 
-    // Busca o usuário no banco pelo ID ou fallback pelo E-mail do comprador
+    // Extração flexível do e-mail do comprador em múltiplos formatos da Cakto Pay
+    const emailComprador = (
+      firstItem.customer?.email ||
+      firstItem.buyer?.email ||
+      firstItem.client?.email ||
+      firstItem.email ||
+      payload.customer?.email ||
+      payload.email ||
+      payload.data?.email ||
+      ''
+    ).trim().toLowerCase();
+
+    console.log(`💳 [Webhook Cakto Pay] Evento: "${event}" | Ref: "${rawRef}" | E-mail: "${emailComprador}"`);
+
+    // Busca o usuário no banco pelo ID ou pelo E-mail do comprador
     let usuario = null;
-    if (usuarioId) {
-      usuario = await prisma.usuario.findUnique({ where: { id: usuarioId } }).catch(() => null);
+    if (usuarioId && usuarioId !== 'admin') {
+      usuario = await prisma.usuario.findUnique({
+        where: { id: usuarioId },
+        include: { loja: true }
+      }).catch(() => null);
     }
-    if (!usuario && firstItem.customer?.email) {
-      usuario = await prisma.usuario.findUnique({ where: { email: firstItem.customer.email } }).catch(() => null);
+    
+    if (!usuario && emailComprador) {
+      usuario = await prisma.usuario.findFirst({
+        where: { email: emailComprador },
+        include: { loja: true }
+      }).catch(() => null);
     }
 
     let lojaTargetId = (usuario && usuario.lojaId) ? usuario.lojaId : (usuarioId || null);
     let lojaExiste = lojaTargetId ? await prisma.loja.findUnique({ where: { id: lojaTargetId } }).catch(() => null) : null;
     
+    // Segurança Multi-tenant Zero-Trust:
+    // NUNCA fazer fallback indiscriminado em prisma.loja.findFirst(), pois isso atualizaria
+    // ou suspenderia a loja de outro cliente arbitrariamente caso a referência não seja encontrada.
     if (!lojaExiste) {
-      // Fallback: busca a loja padrão se for teste do painel da Cakto
-      lojaExiste = await prisma.loja.findFirst().catch(() => null);
-      if (lojaExiste) lojaTargetId = lojaExiste.id;
+      console.warn(`⚠️ [Webhook Cakto Pay] Nenhuma loja localizada para o usuário "${usuarioId}" ou e-mail "${emailComprador}". Operação cancelada com segurança.`);
+      return;
     }
 
     if (lojaExiste) {
@@ -4970,6 +5049,7 @@ app.post('/api/webhook/cakto', async (req, res) => {
         'subscription_renewed',
         'payment_approved',
         'order_approved',
+        'compra_aprovada',
         'approved',
         'paid'
       ];
@@ -5807,7 +5887,7 @@ app.post('/api/saas/calcular-upgrade', autenticarJWTOpcional, async (req, res) =
     const frontendUrl = process.env.FRONTEND_URL || 'https://projconectajoias.onrender.com';
     const isLocal = req.headers.host && (req.headers.host.includes('localhost') || req.headers.host.includes('127.0.0.1'));
     const appBaseUrl = isLocal ? `http://${req.headers.host}` : frontendUrl;
-    const returnUrl = `${appBaseUrl}/pages/pagamento.html?sucesso=true&plano=${planoTarget}&ref=${encodeURIComponent(refString)}`;
+    const returnUrl = `${appBaseUrl}/pages/sucesso.html?status=approved&plano=${planoTarget}&ref=${encodeURIComponent(refString)}`;
 
     const separator = baseUrl.includes('?') ? '&' : '?';
     const checkoutUrl = `${baseUrl}${separator}src=${encodeURIComponent(refString)}&sck=${encodeURIComponent(refString)}&custom_id=${encodeURIComponent(refString)}&external_reference=${encodeURIComponent(refString)}&back_url=${encodeURIComponent(returnUrl)}&redirect_url=${encodeURIComponent(returnUrl)}&return_url=${encodeURIComponent(returnUrl)}`;
@@ -5838,7 +5918,7 @@ app.post('/api/saas/calcular-upgrade', autenticarJWTOpcional, async (req, res) =
 // Endpoint para confirmar pagamento no retorno do checkout (Mercado Pago / Asaas / Cakto Pay) e ativar o plano imediatamente
 app.post('/api/saas/confirmar-retorno-pagamento', autenticarJWTOpcional, identificarLoja, async (req, res) => {
   try {
-    const { paymentId, status, externalReference, planoDesejado } = req.body;
+    const { paymentId, status, externalReference, planoDesejado, lojaId: bodyLojaId, email: bodyEmail, userId: bodyUserId } = req.body;
     let planoExt = (planoDesejado || 'GOLD').toUpperCase();
     let refId = null;
 
@@ -5846,14 +5926,28 @@ app.post('/api/saas/confirmar-retorno-pagamento', autenticarJWTOpcional, identif
       const parts = externalReference.split('|');
       if (parts[0]) refId = parts[0];
       if (parts[1]) planoExt = parts[1].toUpperCase();
+    } else if (externalReference) {
+      refId = externalReference;
     }
 
-    // Inicia sem loja identificada (sem fallback perigoso para 'default-loja')
+    // Inicia sem loja identificada
     let lojaTargetId = null;
     let downgradePendente = null;
 
-    // 1. Tenta identificar a loja via usuário autenticado (JWT) — caminho principal
-    if (req.user && req.user.id) {
+    // 1. Tenta identificar via bodyLojaId ou header x-loja-id fornecido explicitamente
+    const headerLojaId = req.headers['x-loja-id'];
+    const candidatoLojaId = (bodyLojaId && bodyLojaId !== 'default-loja') ? bodyLojaId : (headerLojaId && headerLojaId !== 'default-loja' ? headerLojaId : null);
+    if (candidatoLojaId) {
+      const l = await prisma.loja.findUnique({ where: { id: candidatoLojaId } }).catch(() => null);
+      if (l) {
+        lojaTargetId = l.id;
+        downgradePendente = l.downgradePendente;
+        console.log(`[ConfirmarRetorno] Loja identificada via LojaId explícito: ${lojaTargetId}`);
+      }
+    }
+
+    // 2. Tenta identificar a loja via usuário autenticado (JWT)
+    if (!lojaTargetId && req.user && req.user.id) {
       const usuario = await prisma.usuario.findUnique({
         where: { id: req.user.id },
         include: { loja: true }
@@ -5865,35 +5959,53 @@ app.post('/api/saas/confirmar-retorno-pagamento', autenticarJWTOpcional, identif
       }
     }
 
-    // 2. Fallback: Tenta identificar a loja via refId da externalReference
+    // 3. Tenta identificar a loja via refId da externalReference (loja direta ou ID de usuário)
     if (!lojaTargetId && refId) {
-      const usuarioRef = await prisma.usuario.findUnique({ where: { id: refId } });
-      if (usuarioRef && usuarioRef.lojaId) {
-        lojaTargetId = usuarioRef.lojaId;
-        console.log(`[ConfirmarRetorno] Loja identificada via externalReference (usuário): ${lojaTargetId}`);
+      const lojaRef = await prisma.loja.findUnique({ where: { id: refId } }).catch(() => null);
+      if (lojaRef) {
+        lojaTargetId = lojaRef.id;
+        downgradePendente = lojaRef.downgradePendente;
+        console.log(`[ConfirmarRetorno] Loja identificada via externalReference (loja direta): ${lojaTargetId}`);
       } else {
-        const lojaRef = await prisma.loja.findUnique({ where: { id: refId } });
-        if (lojaRef) {
-          lojaTargetId = lojaRef.id;
-          downgradePendente = lojaRef.downgradePendente;
-          console.log(`[ConfirmarRetorno] Loja identificada via externalReference (loja direta): ${lojaTargetId}`);
+        const usuarioRef = await prisma.usuario.findUnique({ where: { id: refId }, include: { loja: true } }).catch(() => null);
+        if (usuarioRef && usuarioRef.lojaId) {
+          lojaTargetId = usuarioRef.lojaId;
+          downgradePendente = usuarioRef.loja?.downgradePendente;
+          console.log(`[ConfirmarRetorno] Loja identificada via externalReference (usuário): ${lojaTargetId}`);
         }
       }
     }
 
-    // 3. Fallback adicional: Tenta identificar via req.lojaId (header) ou pega a primeira loja da conta
-    if (!lojaTargetId && req.lojaId && req.lojaId !== 'default-loja') {
-      lojaTargetId = req.lojaId;
-    }
-    if (!lojaTargetId) {
-      const primeiraLoja = await prisma.loja.findFirst();
-      if (primeiraLoja) {
-        lojaTargetId = primeiraLoja.id;
-        console.log(`[ConfirmarRetorno] Loja identificada via fallback (primeira loja): ${lojaTargetId}`);
+    // 4. Tenta identificar via bodyUserId se não tiver JWT
+    if (!lojaTargetId && bodyUserId) {
+      const u = await prisma.usuario.findUnique({ where: { id: bodyUserId }, include: { loja: true } }).catch(() => null);
+      if (u && u.lojaId) {
+        lojaTargetId = u.lojaId;
+        downgradePendente = u.loja?.downgradePendente;
+        console.log(`[ConfirmarRetorno] Loja identificada via bodyUserId: ${lojaTargetId}`);
       }
     }
 
-    // 4. Segurança: Se nenhum método identificou a loja, aborta com erro claro
+    // 5. Tenta identificar via bodyEmail se não tiver JWT
+    if (!lojaTargetId && bodyEmail) {
+      const u = await prisma.usuario.findFirst({
+        where: { email: String(bodyEmail).trim().toLowerCase() },
+        include: { loja: true }
+      }).catch(() => null);
+      if (u && u.lojaId) {
+        lojaTargetId = u.lojaId;
+        downgradePendente = u.loja?.downgradePendente;
+        console.log(`[ConfirmarRetorno] Loja identificada via bodyEmail: ${lojaTargetId}`);
+      }
+    }
+
+    // Trava de Segurança IDOR: Se o usuário estiver autenticado e não for SuperAdmin,
+    // ele só tem permissão para confirmar o pagamento de sua PRÓPRIA loja
+    if (req.user && req.user.role !== 'SuperAdmin' && req.user.lojaId) {
+      lojaTargetId = req.user.lojaId;
+    }
+
+    // 6. Segurança: Se nenhum método identificou a loja, aborta com erro claro
     if (!lojaTargetId) {
       console.error(`[ConfirmarRetorno] ERRO: Não foi possível identificar a loja. user=${JSON.stringify(req.user)}, refId=${refId}, lojaId=${req.lojaId}`);
       return res.status(400).json({
@@ -5969,6 +6081,38 @@ app.post('/api/saas/confirmar-retorno-pagamento', autenticarJWTOpcional, identif
   } catch (err) {
     console.error('Erro ao confirmar retorno de pagamento:', err);
     res.status(500).json({ error: 'Erro interno ao sincronizar plano.' });
+  }
+});
+
+// Endpoint de apoio a testes: permite resetar para BASICO instantaneamente para novos testes de upgrade
+// TRAVA DE SEGURANÇA: Desativado em produção pública (apenas acessível em dev/localhost ou por SuperAdmin)
+app.post('/api/saas/resetar-plano-teste', autenticarJWTOpcional, identificarLoja, async (req, res) => {
+  try {
+    const isProd = process.env.NODE_ENV === 'production';
+    const isSuperAdmin = req.user && req.user.role === 'SuperAdmin';
+    if (isProd && !isSuperAdmin) {
+      return res.status(403).json({ error: 'Endpoint de teste desativado em ambiente de produção.' });
+    }
+
+    let lojaId = req.lojaId && req.lojaId !== 'default-loja' ? req.lojaId : null;
+    if (!lojaId && req.user && req.user.lojaId) lojaId = req.user.lojaId;
+    if (!lojaId && req.body && req.body.lojaId) lojaId = req.body.lojaId;
+    if (!lojaId) {
+      const l = await prisma.loja.findFirst().catch(() => null);
+      if (l) lojaId = l.id;
+    }
+
+    if (lojaId) {
+      await prisma.loja.update({
+        where: { id: lojaId },
+        data: { plano: 'BASICO', statusPlano: 'PENDENTE' }
+      });
+      console.log(`🧪 [Reset Teste] Loja ${lojaId} resetada para Plano BASICO / PENDENTE.`);
+      return res.json({ ok: true, message: 'Plano resetado para BASICO com sucesso!' });
+    }
+    return res.status(400).json({ error: 'Loja não encontrada para reset.' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 

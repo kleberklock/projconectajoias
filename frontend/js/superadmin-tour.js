@@ -1,70 +1,65 @@
 /**
- * Conecta Joias - Sistema Premium de Onboarding Tour (Tutorial Interativo)
- * Desenvolvido em JS Vanilla autossuficiente de nível Sênior.
+ * Conecta Joias - Módulo de Tutorial Interativo (Onboarding Tour)
+ * Arquitetura Vanilla JS com Design de Alto Padrão (Dark Mode & Gold Glow)
  */
 
 (function() {
-  // Configuração dos passos do tour
+  // Passos alinhados estritamente com as abas e componentes reais do SuperAdmin
   const tourSteps = [
     {
       elementSelector: '#btn-tab-dashboard',
       title: '💎 Painel Geral',
-      description: 'Este é o seu centro de controle de luxo. Aqui você visualiza o resumo de faturamento da sua marca, gráficos analíticos de vendas, alertas de estoque crítico e visão geral.'
+      description: 'Bem-vinda ao seu centro de controle! Aqui você acompanha o faturamento consolidado da sua marca, métricas de vendas, alertas de estoque crítico e o desempenho das suas peças em tempo real.'
     },
     {
       elementSelector: '#btn-tab-meu-negocio',
-      title: '📊 Meu Negócio',
-      description: 'Monitore o Demonstrativo de Resultados do Exercício (DRE), margens de lucro, faturamento bruto/líquido e a saúde financeira completa da sua empresa em tempo real.'
+      title: '📊 Meu Negócio & DRE',
+      description: 'Monitore o Demonstrativo de Resultados do Exercício (DRE), lucros líquidos, custos de mercadorias e a saúde financeira completa da sua empresa com filtros por período.'
     },
     {
       elementSelector: '#btn-tab-estoque',
-      title: '📦 Estoque & Custos',
-      description: 'Gerencie suas semijoias brutas. Cadastre peças, configure markups de banho, custos operacionais e defina automaticamente a margem de faturamento ideal de cada joia.'
+      title: '📦 Estoque & Precificação',
+      description: 'Cadastre suas semijoias, aplique custos brutos, banhos de ouro/prata e defina automaticamente o markup de venda de cada peça com precificação precisa e controle de defeitos.'
     },
     {
       elementSelector: '#btn-tab-historico-movimentacoes',
       title: '🔄 Movimentações de Estoque',
-      description: 'Acompanhe todo o fluxo das suas semijoias: rastreie entradas de peças, saídas em consignação para maletas, retornos de acertos, vendas e baixas de avarias com histórico detalhado e filtros em tempo real.'
+      description: 'Rastreie todo o fluxo do seu inventário: entradas de fornecedores, saídas em maletas consignadas, retornos de acertos e baixas de avarias com histórico auditável.'
     },
     {
       elementSelector: '#btn-tab-revendedoras',
-      title: '👥 Rede de Revendedoras',
-      description: 'Controle toda a sua rede de vendedoras externas. Distribua maletas consignadas, gere termos de responsabilidade digital e faça conferências e acertos em menos de 5 minutos.'
+      title: '👥 Gestão de Revendedoras',
+      description: 'Gerencie sua força de vendas externa. Crie maletas de consignação, defina regras de comissão progressiva ou meta única e faça acertos rápidos de forma transparente.'
     },
     {
       elementSelector: '#btn-tab-clientes',
-      title: '👥 Meus Clientes',
-      description: 'Cadastro centralizado de clientes finais e histórico de compras. Monitore as preferências de consumo para campanhas direcionadas de marketing.'
+      title: '📇 Carteira de Clientes',
+      description: 'Cadastro completo de clientes finais com controle de datas de aniversário, canais de contato e histórico individual de compras.'
     },
     {
       elementSelector: '#btn-tab-vendas-geral',
       title: '🧾 Histórico de Vendas',
-      description: 'Visualize todas as vendas realizadas. Registre vendas administrativas diretas e consulte a forma de pagamento de cada transação.'
+      description: 'Consulte todas as vendas realizadas pelas revendedoras ou pelo balcão administrativo, com detalhamento de formas de pagamento (Pix, Dinheiro, Cartão ou Link).'
     },
     {
       elementSelector: '#btn-tab-notas-fiscais',
-      title: '📄 Notas Fiscais',
-      description: 'Geração ágil de notas fiscais eletrônicas de joias para vendedoras ou clientes finais, mantendo a conformidade fiscal do seu negócio sem burocracia.'
-    },
-    {
-      elementSelector: '#btn-tab-central-whatsapp',
-      title: '💬 Fila do WhatsApp',
-      description: 'Comunique-se de forma profissional. Envie cobranças de parcelas, avisos de acerto pendente e termos de maleta diretamente no WhatsApp com um clique.'
-    },
-    {
-      elementSelector: '#btn-tab-admin-treinamentos',
-      title: '🎓 Treinamentos',
-      description: 'Vídeos tutoriais rápidos e caprichados para capacitar você e sua equipe administrativa a usarem 100% do potencial da plataforma.'
-    },
-    {
-      elementSelector: '#btn-tab-meu-plano-saas',
-      title: '👑 Meu Plano & Assinaturas',
-      description: 'Gerencie sua assinatura (Básico, Bronze, Gold ou Platinum), acompanhe seu consumo de cotas de produtos e revendedoras ou faça upgrade/downgrade a qualquer momento.'
+      title: '📄 Emissão de Notas Fiscais',
+      description: 'Gere notas fiscais eletrônicas de joias com agilidade para acompanhar maletas ou documentar vendas com conformidade fiscal.'
     },
     {
       elementSelector: '#btn-tab-planilhas',
-      title: '📊 Planilhas Excel',
-      description: 'Importe seu estoque existente em segundos ou exporte relatórios consolidados em planilhas Excel de forma prática e segura.'
+      title: '📊 Planilhas & Importação Excel',
+      description: 'Importe lotes inteiros de semijoias via planilha CSV/Excel ou exporte relatórios consolidados do seu negócio em segundos.'
+    },
+    {
+      elementSelector: '#btn-tab-meu-plano-saas',
+      title: '👑 Meu Plano & Assinatura',
+      description: 'Gerencie o plano ativo da sua marca (Básico, Bronze, Gold ou Platinum), visualize suas cotas de produtos e faça upgrades sob demanda.'
+    },
+    {
+      elementSelector: '#btn-tab-configuracoes',
+      title: '⚙️ Identidade Visual da Marca',
+      description: 'Personalize o sistema no formato White-Label: envie a logotipo da sua loja, selecione suas cores exclusivas e configure o WhatsApp comercial da sua empresa.'
     }
   ];
 
@@ -72,9 +67,11 @@
   let backdropEl = null;
   let popoverEl = null;
   let clickBlockerEl = null;
+  let scrollListenerAttached = false;
 
-  // Injetar estilos de luxo dinamicamente
+  // Injeção de Estilos CSS do Tour
   const styleEl = document.createElement('style');
+  styleEl.id = 'estilos-onboarding-tour-premium';
   styleEl.innerHTML = `
     .tour-backdrop {
       position: absolute;
@@ -83,212 +80,189 @@
       width: 0;
       height: 0;
       background: transparent;
-      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7);
-      z-index: 999999;
-      border-radius: 8px;
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.78);
+      z-index: 999990;
+      border-radius: 10px;
       pointer-events: auto;
-      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      border: 2px solid var(--gold-primary, #d4af37);
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.78), 0 0 25px rgba(212, 175, 55, 0.6);
+      transition: all 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+      cursor: pointer;
     }
-    
+
     .tour-click-blocker {
       position: fixed;
       top: 0;
       left: 0;
       width: 100vw;
       height: 100vh;
-      z-index: 999998;
+      z-index: 999985;
       background: transparent;
-      pointer-events: auto;
-      cursor: pointer;
     }
-    
+
     .tour-popover {
       position: absolute;
-      z-index: 1000000;
-      background: rgba(18, 18, 18, 0.95);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid var(--gold-primary);
-      border-radius: 14px;
-      padding: 1.25rem;
-      width: 310px;
-      box-shadow: 0 15px 40px rgba(0,0,0,0.8), 0 0 0 1px rgba(212,175,55,0.15);
+      z-index: 999999;
+      background: linear-gradient(165deg, #1c1c1c 0%, #101010 100%);
+      border: 1px solid rgba(212, 175, 55, 0.45);
+      border-radius: 16px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9), 0 0 30px rgba(212, 175, 55, 0.15);
+      padding: 1.4rem 1.6rem;
+      width: 380px;
+      max-width: 90vw;
       color: #fff;
-      font-family: 'Montserrat', sans-serif;
-      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
       opacity: 0;
-      transform: scale(0.95);
+      transform: translateY(10px) scale(0.97);
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      pointer-events: auto;
     }
-    
+
     .tour-popover.active {
       opacity: 1;
-      transform: scale(1);
+      transform: translateY(0) scale(1);
     }
-    
+
     .tour-popover-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 0.6rem;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
-      padding-bottom: 0.5rem;
+      margin-bottom: 0.8rem;
+      padding-bottom: 0.6rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     }
-    
-    .tour-popover h3 {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 1.3rem;
-      color: var(--gold-primary);
+
+    .tour-popover-header h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--gold-primary, #d4af37);
       margin: 0;
-      font-weight: 600;
-      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
-    
+
     .tour-skip-link {
       background: transparent;
       border: none;
-      color: var(--text-muted);
-      font-size: 0.72rem;
+      color: var(--text-muted, #888);
       cursor: pointer;
-      font-family: 'Montserrat', sans-serif;
-      transition: var(--transition-fast);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      font-weight: 500;
+      font-size: 0.78rem;
+      padding: 4px 8px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: color 0.2s;
     }
-    
+
     .tour-skip-link:hover {
-      color: #ef5350;
+      color: #fff;
+      background: rgba(255, 255, 255, 0.08);
     }
-    
+
     .tour-popover p {
-      font-size: 0.82rem;
-      color: #dfdfdf;
-      line-height: 1.5;
-      margin: 0 0 1rem;
-      font-weight: 300;
+      font-size: 0.86rem;
+      line-height: 1.55;
+      color: var(--text-secondary, #cccccc);
+      margin: 0 0 1.2rem 0;
     }
-    
+
     .tour-popover-footer {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-top: 1rem;
-      border-top: 1px solid rgba(255,255,255,0.05);
-      padding-top: 0.8rem;
     }
-    
+
     .tour-progress {
-      font-size: 0.72rem;
-      color: var(--text-muted);
-      font-weight: 500;
+      font-size: 0.75rem;
+      color: var(--gold-light, #f3e5ab);
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      background: rgba(212, 175, 55, 0.1);
+      padding: 3px 8px;
+      border-radius: 12px;
+      border: 1px solid rgba(212, 175, 55, 0.2);
     }
-    
+
     .tour-buttons {
       display: flex;
-      gap: 0.4rem;
+      gap: 0.5rem;
     }
-    
+
     .tour-btn {
-      padding: 0.4rem 0.8rem;
-      border-radius: 6px;
-      font-size: 0.72rem;
+      padding: 0.48rem 0.95rem;
+      border-radius: 8px;
+      font-size: 0.8rem;
       font-weight: 600;
       cursor: pointer;
-      font-family: 'Montserrat', sans-serif;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
       transition: all 0.2s ease;
     }
-    
+
     .tour-btn-outline {
       background: transparent;
-      border: 1px solid rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #ddd;
+    }
+
+    .tour-btn-outline:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.08);
       color: #fff;
     }
-    
-    .tour-btn-outline:hover:not(:disabled) {
-      border-color: var(--gold-primary);
-      color: var(--gold-primary);
-      background: rgba(212,175,55,0.05);
-    }
-    
+
     .tour-btn-outline:disabled {
-      opacity: 0.25;
+      opacity: 0.3;
       cursor: not-allowed;
     }
-    
+
     .tour-btn-gold {
-      background: var(--gold-gradient);
+      background: var(--gold-gradient, linear-gradient(135deg, #d4af37 0%, #aa7c11 100%));
       border: none;
-      color: #050505;
-      box-shadow: 0 4px 15px rgba(212, 175, 55, 0.15);
+      color: #000;
+      font-weight: 700;
+      box-shadow: 0 2px 10px rgba(212, 175, 55, 0.35);
     }
-    
+
     .tour-btn-gold:hover {
-      box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3);
-      filter: brightness(1.1);
+      box-shadow: 0 4px 16px rgba(212, 175, 55, 0.55);
+      transform: translateY(-1px);
     }
-    
-    /* Setas direcionadoras do Popover */
-    .tour-popover::before {
-      content: '';
-      position: absolute;
-      border-width: 8px;
-      border-style: solid;
-      display: block;
-      width: 0;
-      height: 0;
-      border-color: transparent rgba(18, 18, 18, 0.95) transparent transparent;
-    }
-    
-    /* Posição Padrão (Direita) */
-    .tour-popover::before {
-      top: 50%;
-      right: 100%;
-      transform: translateY(-50%);
-    }
-    
-    /* Ajustes responsivos mobile */
+
     @media (max-width: 768px) {
       .tour-popover {
         position: fixed !important;
         bottom: 1.5rem !important;
         left: 50% !important;
         top: auto !important;
-        transform: translateX(-50%) scale(0.95) !important;
+        transform: translateX(-50%) scale(0.96) !important;
         width: calc(100% - 2rem) !important;
-        max-width: 350px !important;
+        max-width: 360px !important;
       }
       .tour-popover.active {
         transform: translateX(-50%) scale(1) !important;
-      }
-      .tour-popover::before {
-        display: none !important;
-      }
-      .tour-backdrop {
-        border-radius: 6px !important;
-        box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.8) !important;
       }
     }
   `;
   document.head.appendChild(styleEl);
 
-  // Inicializar elementos do Tour no DOM
   function createTourElements() {
     if (document.querySelector('.tour-backdrop')) return;
 
-    // Blocker de cliques que encerra o tour ao clicar fora
     clickBlockerEl = document.createElement('div');
     clickBlockerEl.className = 'tour-click-blocker';
     clickBlockerEl.title = 'Clique para fechar o tutorial';
     clickBlockerEl.addEventListener('click', endTour);
     document.body.appendChild(clickBlockerEl);
 
-    // Holofote spotlight que encerra o tour ao ser clicado
     backdropEl = document.createElement('div');
     backdropEl.className = 'tour-backdrop';
+    backdropEl.title = 'Elemento em destaque';
     backdropEl.addEventListener('click', endTour);
     document.body.appendChild(backdropEl);
 
-    // Popover informativo
     popoverEl = document.createElement('div');
     popoverEl.className = 'tour-popover';
     popoverEl.innerHTML = `
@@ -298,22 +272,20 @@
       </div>
       <p id="tour-desc">Descrição explicativa...</p>
       <div class="tour-popover-footer">
-        <span class="tour-progress" id="tour-progress-lbl">1 de 12</span>
+        <span class="tour-progress" id="tour-progress-lbl">1 de ${tourSteps.length}</span>
         <div class="tour-buttons">
-          <button class="tour-btn tour-btn-outline" id="tour-btn-prev"><i class="fa-solid fa-chevron-left"></i> Voltar</button>
+          <button class="tour-btn tour-btn-outline" id="tour-btn-prev"><i class="fa-solid fa-chevron-left"></i> Anterior</button>
           <button class="tour-btn tour-btn-gold" id="tour-btn-next">Próximo <i class="fa-solid fa-chevron-right"></i></button>
         </div>
       </div>
     `;
     document.body.appendChild(popoverEl);
 
-    // Adicionar eventos aos botões do popover
     document.getElementById('tour-btn-skip').addEventListener('click', endTour);
     document.getElementById('tour-btn-prev').addEventListener('click', prevStep);
     document.getElementById('tour-btn-next').addEventListener('click', nextStep);
   }
 
-  // Avançar passo
   function nextStep() {
     if (currentStepIdx < tourSteps.length - 1) {
       currentStepIdx++;
@@ -323,15 +295,12 @@
     }
   }
 
-  // Voltar passo
   function prevStep() {
     if (currentStepIdx > 0) {
       currentStepIdx--;
       renderStep(currentStepIdx);
     }
   }
-
-  let scrollListenerAttached = false;
 
   function updatePosition() {
     if (!backdropEl || !popoverEl || currentStepIdx < 0 || currentStepIdx >= tourSteps.length) return;
@@ -344,18 +313,18 @@
     const scrollX = window.pageXOffset || document.documentElement.scrollLeft;
     const scrollY = window.pageYOffset || document.documentElement.scrollTop;
 
-    // 1. Posicionar o holofote
-    backdropEl.style.left = `${rect.left + scrollX - 5}px`;
+    // Posicionar spotlight
+    backdropEl.style.left = `${rect.left + scrollX - 6}px`;
     backdropEl.style.top = `${rect.top + scrollY - 4}px`;
-    backdropEl.style.width = `${rect.width + 10}px`;
+    backdropEl.style.width = `${rect.width + 12}px`;
     backdropEl.style.height = `${rect.height + 8}px`;
 
-    // 2. Posicionar o popover (apenas em telas maiores que mobile)
+    // Posicionar popover
     if (window.innerWidth > 768) {
       popoverEl.style.left = `${rect.right + 20 + scrollX}px`;
       const popoverHeight = popoverEl.offsetHeight || 220;
       let topPos = rect.top + scrollY + (rect.height / 2) - (popoverHeight / 2);
-      popoverEl.style.top = `${Math.max(10, topPos)}px`;
+      popoverEl.style.top = `${Math.max(15, topPos)}px`;
     }
   }
 
@@ -363,11 +332,8 @@
     if (scrollListenerAttached) return;
     window.addEventListener('scroll', updatePosition, { passive: true });
     window.addEventListener('resize', updatePosition, { passive: true });
-
     const sidebar = document.querySelector('.sidebar');
-    if (sidebar) {
-      sidebar.addEventListener('scroll', updatePosition, { passive: true });
-    }
+    if (sidebar) sidebar.addEventListener('scroll', updatePosition, { passive: true });
     scrollListenerAttached = true;
   }
 
@@ -375,19 +341,16 @@
     window.removeEventListener('scroll', updatePosition);
     window.removeEventListener('resize', updatePosition);
     const sidebar = document.querySelector('.sidebar');
-    if (sidebar) {
-      sidebar.removeEventListener('scroll', updatePosition);
-    }
+    if (sidebar) sidebar.removeEventListener('scroll', updatePosition);
     scrollListenerAttached = false;
   }
 
-  // Encerrar tour
   function endTour() {
     localStorage.setItem('conectajoias_tutorial_completo', 'true');
+    sessionStorage.removeItem('conectajoias_iniciar_tour_imediato');
     detachScrollListeners();
 
     if (popoverEl) popoverEl.classList.remove('active');
-
     document.querySelectorAll('.tour-backdrop, .tour-popover, .tour-click-blocker').forEach(el => el.remove());
 
     backdropEl = null;
@@ -396,7 +359,6 @@
   }
   window.endTour = endTour;
 
-  // Renderizar o passo ativo
   function renderStep(idx) {
     createTourElements();
     attachScrollListeners();
@@ -405,33 +367,35 @@
     const element = document.querySelector(step.elementSelector);
 
     if (!element) {
-      console.warn(`Elemento do tour não encontrado: ${step.elementSelector}. Avançando.`);
-      nextStep();
+      console.warn(`Elemento do tour não encontrado no DOM: ${step.elementSelector}. Avançando para o próximo.`);
+      if (idx < tourSteps.length - 1) {
+        currentStepIdx = idx + 1;
+        renderStep(currentStepIdx);
+      } else {
+        endTour();
+      }
       return;
     }
 
-    // Scroll automático inteligente para colocar o elemento centralizado em tela (funciona na sidebar e na janela)
     try {
       element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
     } catch (e) {
       element.scrollIntoView(true);
     }
 
-    // Timeout para permitir que a animação de scroll termine antes de calcular as coordenadas finais
     setTimeout(() => {
       if (!backdropEl || !popoverEl) return;
 
       updatePosition();
 
-      // Atualizar textos do popover
       const titleEl = document.getElementById('tour-title');
       const descEl = document.getElementById('tour-desc');
       const progressEl = document.getElementById('tour-progress-lbl');
-      if (titleEl) titleEl.innerText = step.title;
+
+      if (titleEl) titleEl.innerHTML = step.title;
       if (descEl) descEl.innerText = step.description;
       if (progressEl) progressEl.innerText = `${idx + 1} de ${tourSteps.length}`;
 
-      // Habilitar/Desabilitar botões
       const btnPrev = document.getElementById('tour-btn-prev');
       const btnNext = document.getElementById('tour-btn-next');
 
@@ -444,10 +408,8 @@
         }
       }
 
-      // Ativar animação de surgimento
       popoverEl.classList.add('active');
-
-    }, 250);
+    }, 280);
   }
 
   // Inicializar o Onboarding Tour
@@ -455,31 +417,44 @@
     currentStepIdx = 0;
     renderStep(0);
   };
+  window.iniciarTutorialInterativo = window.initOnboardingTour;
 
-  // Garante a remoção ou inicialização automática do tour ao carregar a página
-  window.addEventListener('load', () => {
-    // Só inicia o tour se o usuário logado for MANAGER (Distribuidora)
+  // Lógica de Gatilho / Acionamento
+  function verificarGatilhoTour() {
     const usuarioJson = localStorage.getItem("conectajoias_usuario");
     if (!usuarioJson) return;
+
     try {
       const usuario = JSON.parse(usuarioJson);
       const roleUpper = (usuario.role || "").toUpperCase();
-      if (roleUpper !== "MANAGER") {
-        return; // Não executa o tour se não for MANAGER
+      // O tour administrativo é destinado a gestoras (Manager ou SuperAdmin da loja)
+      if (roleUpper !== "MANAGER" && roleUpper !== "SUPERADMIN") {
+        return;
       }
     } catch(e) {
       return;
     }
 
-    const completo = localStorage.getItem('conectajoias_tutorial_completo');
-    if (!completo) {
-      // Primeiro login: executa o onboarding tour de forma amigável após a carga
+    // 1. Prioridade Máxima: Acionamento Imediato pós-criação da conta
+    const tourImediato = sessionStorage.getItem("conectajoias_iniciar_tour_imediato") === "true";
+    
+    // 2. Primeiro Login do Usuário / Loja
+    const jaConcluiu = localStorage.getItem("conectajoias_tutorial_completo");
+
+    if (tourImediato || !jaConcluiu) {
+      console.log("✨ [Onboarding Tour] Acionando tutorial interativo da plataforma Conecta Joias...");
       setTimeout(() => {
         window.initOnboardingTour(true);
-      }, 1500);
-    } else {
-      document.querySelectorAll('.tour-backdrop, .tour-popover, .tour-click-blocker').forEach(el => el.remove());
+      }, 900);
     }
-  });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(verificarGatilhoTour, 600);
+    });
+  } else {
+    setTimeout(verificarGatilhoTour, 600);
+  }
 
 })();

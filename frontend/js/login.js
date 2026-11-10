@@ -420,6 +420,10 @@ const loginApp = {
     const btnPainel = document.getElementById("btn-ir-para-painel");
     if (btnPainel) {
       btnPainel.addEventListener("click", () => {
+        // Marca explicitamente para acionar o tutorial interativo imediatamente ao entrar no painel
+        sessionStorage.setItem("conectajoias_iniciar_tour_imediato", "true");
+        localStorage.removeItem("conectajoias_tutorial_completo");
+
         let role = "Manager";
         if (this._cadastroData && this._cadastroData.usuario && this._cadastroData.usuario.role) {
           role = this._cadastroData.usuario.role;
@@ -675,24 +679,42 @@ const loginApp = {
   copiarPIN: function() {
     const pinEl = document.getElementById("cred-pin");
     const lbl = document.getElementById("lbl-copiar-pin");
+    const icon = document.getElementById("icon-copiar-pin");
     if (pinEl && pinEl.innerText && pinEl.innerText !== "—") {
       navigator.clipboard.writeText(pinEl.innerText.trim());
-      if (lbl) {
-        lbl.innerText = "Copiado!";
-        setTimeout(() => { lbl.innerText = "Copiar PIN"; }, 2500);
-      }
+      if (lbl) lbl.innerText = "Copiado!";
+      if (icon) icon.className = "fa-solid fa-check";
+      setTimeout(() => {
+        if (lbl) lbl.innerText = "Copiar PIN";
+        if (icon) icon.className = "fa-regular fa-copy";
+      }, 2500);
+    }
+  },
+
+  copiarEmail: function() {
+    const emailEl = document.getElementById("cred-email");
+    const lbl = document.getElementById("lbl-copiar-email");
+    if (emailEl && emailEl.innerText && emailEl.innerText !== "—") {
+      navigator.clipboard.writeText(emailEl.innerText.trim());
+      if (lbl) lbl.innerText = "Copiado!";
+      setTimeout(() => {
+        if (lbl) lbl.innerText = "Copiar";
+      }, 2500);
     }
   },
 
   copiarLink: function() {
     const linkEl = document.getElementById("cred-link");
     const lbl = document.getElementById("lbl-copiar-link");
+    const icon = document.getElementById("icon-copiar-link");
     if (linkEl && linkEl.innerText && linkEl.innerText !== "—") {
       navigator.clipboard.writeText(linkEl.innerText.trim());
-      if (lbl) {
-        lbl.innerText = "Copiado!";
-        setTimeout(() => { lbl.innerText = "Copiar"; }, 2500);
-      }
+      if (lbl) lbl.innerText = "Copiado!";
+      if (icon) icon.className = "fa-solid fa-check";
+      setTimeout(() => {
+        if (lbl) lbl.innerText = "Copiar";
+        if (icon) icon.className = "fa-regular fa-copy";
+      }, 2500);
     }
   },
 
