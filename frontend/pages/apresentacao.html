@@ -1663,6 +1663,10 @@
     }
 
     @media (max-width: 768px) {
+      #cursor-glow {
+        display: none !important;
+      }
+
       header {
         padding: 1rem 6%;
       }
@@ -2144,6 +2148,18 @@
       }
       .pricing-card.popular:hover {
         transform: translateY(-5px);
+      }
+    }
+
+    @media (max-width: 480px) {
+      .pricing-grid {
+        gap: 1.5rem;
+      }
+      .pricing-card {
+        padding: 2rem 1.25rem;
+      }
+      .pricing-price .value {
+        font-size: 2.8rem;
       }
     }
   </style>

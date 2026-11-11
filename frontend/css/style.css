@@ -95,7 +95,7 @@ body {
   width: 280px;
   background-color: var(--bg-absolute);
   border-right: var(--border-gold);
-  padding: 2.5rem 1.5rem;
+  padding: 2.5rem 1.5rem calc(2.5rem + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   position: fixed;
@@ -241,7 +241,7 @@ html[data-plano="BRONZE"] .nav-item[data-target="notas-fiscais"] button::after {
 .main-content {
   margin-left: 280px;
   flex-grow: 1;
-  padding: 3rem;
+  padding: 3rem 3rem calc(3rem + env(safe-area-inset-bottom, 0px));
   min-height: 100vh;
 }
 
@@ -3126,7 +3126,7 @@ html[data-plano="BRONZE"] .nav-item[data-target="notas-fiscais"] button::after {
   z-index: 1001;
   background-color: var(--bg-absolute);
   border-bottom: var(--border-gold);
-  padding: 0.8rem 1.2rem;
+  padding: calc(0.8rem + env(safe-area-inset-top, 0px)) 1.2rem 0.8rem;
   align-items: center;
   justify-content: space-between;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.7);
@@ -3264,18 +3264,68 @@ html[data-plano="BRONZE"] .nav-item[data-target="notas-fiscais"] button::after {
     min-height: 44px;
     padding: 0.7rem 1.1rem;
     font-size: 0.85rem;
-    justify-content: center;
-    width: 100%;
   }
 
   .section-header .btn-gold, 
-  .section-header .btn-outline-gold {
+  .section-header .btn-outline-gold,
+  .modal-footer .btn-gold,
+  .modal-footer .btn-outline-gold,
+  .modal-footer .btn-danger {
     width: 100%;
+    justify-content: center;
   }
 
   /* Grids em 1 Coluna para Celular */
   .metrics-grid {
     grid-template-columns: 1fr !important;
+  }
+
+  /* Tabela de Maleta em Cards no Mobile */
+  #table-minha-maleta thead {
+    display: none !important;
+  }
+
+  #tbody-minha-maleta tr {
+    display: block !important;
+    margin-bottom: 1rem !important;
+    border: 1px solid rgba(212, 175, 55, 0.25) !important;
+    border-radius: var(--radius-md) !important;
+    padding: 1.1rem !important;
+    background: var(--bg-card) !important;
+    box-shadow: var(--shadow-premium) !important;
+  }
+
+  #tbody-minha-maleta td {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: 0.45rem 0 !important;
+    border: none !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important;
+    font-size: 0.85rem !important;
+    white-space: normal !important;
+  }
+
+  #tbody-minha-maleta td:last-child {
+    border-bottom: none !important;
+    margin-top: 0.6rem !important;
+    justify-content: flex-end !important;
+    padding-top: 0.6rem !important;
+  }
+
+  #tbody-minha-maleta td::before {
+    content: attr(data-label);
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+    margin-right: 0.8rem;
+  }
+
+  #tbody-minha-maleta td[data-label=""]::before {
+    display: none !important;
   }
 
   /* Modais em Telas de Celular */
@@ -3354,6 +3404,71 @@ html[data-plano="BRONZE"] .nav-item[data-target="notas-fiscais"] button::after {
     max-width: 440px !important;
     padding: 1.5rem 1.2rem !important;
     margin: 10px auto !important;
+  }
+
+  /* Modais compactos em celular */
+  .modal-card {
+    padding: 1.25rem 1rem !important;
+    width: 95vw !important;
+    border-radius: var(--radius-md) !important;
+  }
+  .modal-title-row h3 {
+    font-size: 1.2rem !important;
+  }
+  .modal-footer {
+    flex-direction: column !important;
+    gap: 0.75rem !important;
+  }
+
+  /* Abas de pagamento com scroll tátil suave */
+  .payment-tabs {
+    display: flex !important;
+    overflow-x: auto !important;
+    gap: 0.5rem !important;
+    scrollbar-width: none !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  .payment-tabs::-webkit-scrollbar {
+    display: none !important;
+  }
+  .payment-tabs > * {
+    flex-shrink: 0 !important;
+    min-width: 110px !important;
+  }
+}
+
+/* ==========================================================================
+   CLASSES UTILITÁRIAS DE GRID RESPONSIVO & MOBILE-FIRST
+   ========================================================================== */
+.grid-col-2-responsive { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+.grid-col-3-responsive { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+.grid-col-4-responsive { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+.dre-layout-grid      { display: grid; grid-template-columns: 1.5fr 1fr; gap: 2rem; }
+.filter-grid-4        { display: grid; grid-template-columns: 2fr 1.2fr 1.2fr 1.2fr; gap: 1rem; }
+.filter-grid-3        { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 1rem; }
+.grid-fixed-340       { display: grid; grid-template-columns: 1fr 340px; gap: 1.5rem; }
+
+@media (max-width: 992px) {
+  .dre-layout-grid { grid-template-columns: 1fr !important; }
+  .grid-col-4-responsive { grid-template-columns: repeat(2, 1fr) !important; }
+  .grid-col-3-responsive { grid-template-columns: repeat(2, 1fr) !important; }
+  .filter-grid-4, .filter-grid-3 { grid-template-columns: 1fr 1fr !important; }
+  .grid-fixed-340 { grid-template-columns: 1fr !important; }
+}
+
+@media (max-width: 768px) {
+  .grid-col-2-responsive { grid-template-columns: 1fr !important; }
+  .grid-col-3-responsive { grid-template-columns: 1fr !important; }
+  .grid-col-4-responsive { grid-template-columns: 1fr !important; }
+  .filter-grid-4, .filter-grid-3 { grid-template-columns: 1fr !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

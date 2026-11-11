@@ -236,6 +236,12 @@ const app = {
       try { this.renderizarEstoque(); } catch (e) { console.error("Erro ao renderizar Estoque no init:", e); }
       try { this.renderizarRevendedoras(); } catch (e) { console.error("Erro ao renderizar Revendedoras no init:", e); }
       try { this.renderizarClientes(); } catch (e) { console.error("Erro ao renderizar Clientes no init:", e); }
+      try { this.inicializarResponsividade(); } catch (e) { console.error("Erro ao inicializar responsividade:", e); }
+
+      // Fechar sidebar mobile ao pressionar tecla Escape
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") this.fecharSidebarMobile();
+      });
       
       this.carregarDadosIniciais().catch(e => {
         console.error("Erro no carregamento assíncrono de dados iniciais:", e);
@@ -1753,6 +1759,11 @@ const app = {
     const cancelBtn = document.getElementById(cancelBtnId);
 
     const abrir = () => {
+      if (modal) {
+        modal.scrollTop = 0;
+        const card = modal.querySelector('.modal-card, .modal-dialog, .modal-content');
+        if (card) card.scrollTop = 0;
+      }
       if (modalId === "modal-produto") this.abrirModalProduto();
       else if (modalId === "modal-revendedora") this.abrirModalRevendedora();
       else if (modalId === "modal-consignar") this.abrirModalConsignar();
@@ -1791,6 +1802,36 @@ const app = {
     if (sidebar) sidebar.classList.remove('active');
     if (overlay) overlay.classList.remove('active');
     document.body.classList.remove('sidebar-open');
+  },
+
+  // Inicialização de classes utilitárias de responsividade para suplantar estilos inline rígidos
+  inicializarResponsividade: function() {
+    try {
+      document.querySelectorAll('.metrics-grid').forEach(el => {
+        const cols = el.style.gridTemplateColumns || '';
+        if (cols.includes('repeat(3')) {
+          el.classList.add('grid-col-3-responsive');
+        } else if (cols.includes('repeat(4')) {
+          el.classList.add('grid-col-4-responsive');
+        }
+      });
+      document.querySelectorAll('.kpi-grid').forEach(el => {
+        const cols = el.style.gridTemplateColumns || '';
+        if (cols.includes('repeat(3')) {
+          el.classList.add('grid-col-3-responsive');
+        } else if (cols.includes('repeat(2')) {
+          el.classList.add('grid-col-2-responsive');
+        }
+      });
+      document.querySelectorAll('.dre-layout-grid').forEach(el => {
+        el.classList.add('dre-layout-grid');
+      });
+      document.querySelectorAll('[style*="1fr 340px"]').forEach(el => {
+        el.classList.add('grid-fixed-340');
+      });
+    } catch (e) {
+      console.warn("Aviso na inicialização de responsividade do SuperAdmin:", e);
+    }
   },
 
   // Navegação SPA
@@ -2476,7 +2517,14 @@ const app = {
     thead.innerHTML = "";
     const trHead = document.createElement("tr");
     
-    const colunas = Array.isArray(this.state.colunasEstoque) ? this.state.colunasEstoque : [];
+    const colunasOriginais = Array.isArray(this.state.colunasEstoque) ? this.state.colunasEstoque : [];
+    const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+    const colunas = isMobile && colunasOriginais.length > 4
+      ? colunasOriginais.filter(c => {
+          const cLower = String(c).toLowerCase();
+          return cLower.includes("código") || cLower.includes("codigo") || cLower.includes("nome") || cLower.includes("produto") || cLower.includes("qtd") || cLower.includes("quantidade") || cLower.includes("estoque") || cLower.includes("preço") || cLower.includes("preco") || cLower.includes("venda");
+        })
+      : colunasOriginais;
     colunas.forEach(col => {
       const th = document.createElement("th");
       th.style.cursor = "pointer";

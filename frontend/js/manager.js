@@ -216,6 +216,12 @@ const app = {
         }
         
         this.carregarDadosIniciais();
+        this.inicializarResponsividade();
+
+        // Fechar sidebar mobile ao pressionar tecla Escape
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") this.fecharSidebarMobile();
+        });
 
         // Configuração de sincronização de vendas offline resiliente
         window.addEventListener("online", () => {
@@ -324,6 +330,7 @@ const app = {
           
           this.exibirInterfacePosLogin();
           this.carregarDadosIniciais();
+          this.inicializarResponsividade();
           this.toast("Aviso: Servidor local offline. Iniciando em Modo de Demonstração (Perfil Gestora).", "warning");
           return;
         } else {
@@ -345,6 +352,7 @@ const app = {
             
             this.exibirInterfacePosLogin();
             this.carregarDadosIniciais();
+            this.inicializarResponsividade();
             this.toast(`Aviso: Servidor local offline. Iniciando em Modo de Demonstração (Perfil Consultora: ${revLocal.nome}).`, "warning");
             return;
           }
@@ -985,8 +993,8 @@ const app = {
       const tr = document.createElement("tr");
       tr.setAttribute("data-busca", `${item.codigo || ""} ${item.nome || ""}`.toLowerCase());
       tr.innerHTML = `
-        <td><strong>${item.codigo || "—"}</strong></td>
-        <td>
+        <td data-label="Código"><strong>${item.codigo || "—"}</strong></td>
+        <td data-label="Peça">
           <div style="display: flex; align-items: center; gap: 0.8rem;">
             <img src="${item.fotoUrl || ''}" loading="lazy" style="width: 36px; height: 36px; object-fit: cover; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);" onerror="this.src='https://images.unsplash.com/photo-1617038260897-41a1f14a8ca0?w=100&auto=format&fit=crop'">
             <div style="display: flex; flex-direction: column;">
@@ -995,13 +1003,13 @@ const app = {
             </div>
           </div>
         </td>
-        <td><span class="badge badge-ok" style="font-size:0.75rem;">${item.categoria || "—"}</span></td>
-        <td><span style="font-size: 1.1rem; font-weight: 700; color: var(--gold-primary);">${item.quantidadeConsignada}</span></td>
-        <td>R$ ${Number(item.precoVenda || 0).toFixed(2).replace(".", ",")}</td>
-        <td style="color: var(--text-primary);">R$ ${subtotal.toFixed(2).replace(".", ",")}</td>
-        <td style="color: #81c784; font-weight: 600;">R$ ${comissaoItem.toFixed(2).replace(".", ",")}</td>
-        <td>
-          <button class="btn-qty" style="background: rgba(67,160,71,0.15); border-color: rgba(67,160,71,0.4); color: #81c784; padding: 0.4rem 0.8rem; border-radius: 6px; font-size: 0.8rem; white-space: nowrap;"
+        <td data-label="Categoria"><span class="badge badge-ok" style="font-size:0.75rem;">${item.categoria || "—"}</span></td>
+        <td data-label="Qtd"><span style="font-size: 1.1rem; font-weight: 700; color: var(--gold-primary);">${item.quantidadeConsignada}</span></td>
+        <td data-label="Preço Unit.">R$ ${Number(item.precoVenda || 0).toFixed(2).replace(".", ",")}</td>
+        <td data-label="Subtotal" style="color: var(--text-primary);">R$ ${subtotal.toFixed(2).replace(".", ",")}</td>
+        <td data-label="Sua Comissão" style="color: #81c784; font-weight: 600;">R$ ${comissaoItem.toFixed(2).replace(".", ",")}</td>
+        <td data-label="">
+          <button class="btn-qty" style="background: rgba(67,160,71,0.15); border-color: rgba(67,160,71,0.4); color: #81c784; padding: 0.5rem 1.1rem; min-height: 44px; min-width: 90px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; cursor: pointer;"
             onclick="app.abrirModalVendaRevProduto('${item.produtoVariacaoId}', '${(item.nome || "").replace(/'/g, "\\'")}', ${item.precoVenda}, ${item.quantidadeConsignada})">
             <i class="fa-solid fa-check"></i> Vendi!
           </button>
@@ -2509,6 +2517,36 @@ const app = {
     if (sidebar) sidebar.classList.remove('active');
     if (overlay) overlay.classList.remove('active');
     document.body.classList.remove('sidebar-open');
+  },
+
+  // Inicialização de classes utilitárias de responsividade para suplantar estilos inline rígidos
+  inicializarResponsividade: function() {
+    try {
+      document.querySelectorAll('.metrics-grid').forEach(el => {
+        const cols = el.style.gridTemplateColumns || '';
+        if (cols.includes('repeat(3')) {
+          el.classList.add('grid-col-3-responsive');
+        } else if (cols.includes('repeat(4')) {
+          el.classList.add('grid-col-4-responsive');
+        }
+      });
+      document.querySelectorAll('.kpi-grid').forEach(el => {
+        const cols = el.style.gridTemplateColumns || '';
+        if (cols.includes('repeat(3')) {
+          el.classList.add('grid-col-3-responsive');
+        } else if (cols.includes('repeat(2')) {
+          el.classList.add('grid-col-2-responsive');
+        }
+      });
+      document.querySelectorAll('.dre-layout-grid').forEach(el => {
+        el.classList.add('dre-layout-grid');
+      });
+      document.querySelectorAll('.payment-tabs').forEach(el => {
+        el.classList.add('payment-tabs');
+      });
+    } catch (e) {
+      console.warn("Aviso na inicialização de responsividade:", e);
+    }
   },
 
   // Validação central de recursos do plano SaaS
